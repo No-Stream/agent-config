@@ -1,0 +1,316 @@
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
+personality = "friendly"
+approval_policy = "on-request"
+approvals_reviewer = "auto_review"
+sandbox_mode = "danger-full-access"
+default_permissions = ":danger-full-access"
+plan_mode_reasoning_effort = "high"
+
+[auto_review]
+policy = """
+Reversible destructive commands are allowed. 
+File deletions in version-controlled repos are fine. 
+No destructive commands outside of git repos: agent should ask me to run.
+No destructive git commands: agent should ask me to run.
+Non-destructive git reads and writes are allowed.
+It's fine to hit beta infra read or write. 
+It's fine to hit prod infra for reads but not writes/alterations.
+Using secrets via scripts to run commands is fine. Don't read secrets in plain text in the session or print to logs!
+Block dangerous large `rm -rf`, `git reset --hard` and similar "nuclear" commands.
+"""
+
+[sandbox_workspace_write]
+network_access = true
+writable_roots = ["~/.codex/memories", "~/.cache", "~/.pytensor"]
+
+[permissions.danger_full_access.filesystem]
+glob_scan_max_depth = 4
+":root" = "read"
+":tmpdir" = "write"
+":slash_tmp" = "write"
+"/var/run/docker.sock" = "write"
+[permissions.danger_full_access.filesystem.":workspace_roots"]
+"." = "write"
+".git" = "write"
+"**/.env" = "deny"
+"**/.env.*" = "deny"
+"**/*secret*" = "deny"
+"**/*token*" = "deny"
+"**/*credential*" = "deny"
+
+[permissions.danger_full_access.network]
+enabled = true
+mode = "full"
+allow_local_binding = true
+
+[permissions.danger_full_access.network.domains]
+"github.com" = "allow"
+"**.github.com" = "allow"
+"githubusercontent.com" = "allow"
+"**.githubusercontent.com" = "allow"
+"githubassets.com" = "allow"
+"**.githubassets.com" = "allow"
+"raw.githubusercontent.com" = "allow"
+"objects.githubusercontent.com" = "allow"
+"release-assets.githubusercontent.com" = "allow"
+"codeload.github.com" = "allow"
+"gitlab.com" = "allow"
+"**.gitlab.com" = "allow"
+"stackoverflow.com" = "allow"
+"**.stackoverflow.com" = "allow"
+"stackexchange.com" = "allow"
+"**.stackexchange.com" = "allow"
+"serverfault.com" = "allow"
+"superuser.com" = "allow"
+"wikipedia.org" = "allow"
+"**.wikipedia.org" = "allow"
+"wikimedia.org" = "allow"
+"**.wikimedia.org" = "allow"
+"python.org" = "allow"
+"**.python.org" = "allow"
+"pypi.org" = "allow"
+"**.pypi.org" = "allow"
+"pythonhosted.org" = "allow"
+"**.pythonhosted.org" = "allow"
+"files.pythonhosted.org" = "allow"
+"conda-forge.org" = "allow"
+"**.conda-forge.org" = "allow"
+"anaconda.org" = "allow"
+"**.anaconda.org" = "allow"
+"readthedocs.io" = "allow"
+"**.readthedocs.io" = "allow"
+"docs.python.org" = "allow"
+"developers.openai.com" = "allow"
+"platform.openai.com" = "allow"
+"openai.com" = "allow"
+"**.openai.com" = "allow"
+"numpy.org" = "allow"
+"**.numpy.org" = "allow"
+"scipy.org" = "allow"
+"**.scipy.org" = "allow"
+"pandas.pydata.org" = "allow"
+"pydata.org" = "allow"
+"**.pydata.org" = "allow"
+"matplotlib.org" = "allow"
+"**.matplotlib.org" = "allow"
+"statsmodels.org" = "allow"
+"**.statsmodels.org" = "allow"
+"xgboost.readthedocs.io" = "allow"
+"lightgbm.readthedocs.io" = "allow"
+"pola.rs" = "allow"
+"**.pola.rs" = "allow"
+"docs.pola.rs" = "allow"
+"scikit-learn.org" = "allow"
+"**.scikit-learn.org" = "allow"
+"pytorch.org" = "allow"
+"**.pytorch.org" = "allow"
+"tensorflow.org" = "allow"
+"**.tensorflow.org" = "allow"
+"huggingface.co" = "allow"
+"**.huggingface.co" = "allow"
+"hf.co" = "allow"
+"**.hf.co" = "allow"
+"fastapi.tiangolo.com" = "allow"
+"pydantic.dev" = "allow"
+"**.pydantic.dev" = "allow"
+"sqlalchemy.org" = "allow"
+"**.sqlalchemy.org" = "allow"
+"pytest.org" = "allow"
+"**.pytest.org" = "allow"
+"playwright.dev" = "allow"
+"**.playwright.dev" = "allow"
+"mozilla.org" = "allow"
+"**.mozilla.org" = "allow"
+"developer.mozilla.org" = "allow"
+"nodejs.org" = "allow"
+"**.nodejs.org" = "allow"
+"npmjs.com" = "allow"
+"**.npmjs.com" = "allow"
+"jsdelivr.net" = "allow"
+"**.jsdelivr.net" = "allow"
+"unpkg.com" = "allow"
+"**.unpkg.com" = "allow"
+"rust-lang.org" = "allow"
+"**.rust-lang.org" = "allow"
+"crates.io" = "allow"
+"**.crates.io" = "allow"
+"go.dev" = "allow"
+"**.go.dev" = "allow"
+"pkg.go.dev" = "allow"
+"r-project.org" = "allow"
+"**.r-project.org" = "allow"
+"tidyverse.org" = "allow"
+"**.tidyverse.org" = "allow"
+"posit.co" = "allow"
+"**.posit.co" = "allow"
+"docs.rs" = "allow"
+"api.scrapfly.io" = "allow"
+"**.scrapfly.io" = "allow"
+
+[permissions.safe_web_workspace.filesystem]
+glob_scan_max_depth = 4
+":root" = "read"
+":tmpdir" = "write"
+":slash_tmp" = "write"
+[permissions.safe_web_workspace.filesystem.":workspace_roots"]
+"." = "write"
+".git" = "write"
+"**/.env" = "deny"
+"**/.env.*" = "deny"
+"**/*secret*" = "deny"
+"**/*token*" = "deny"
+"**/*credential*" = "deny"
+
+[permissions.safe_web_workspace.network]
+enabled = true
+mode = "full"
+allow_local_binding = false
+
+[permissions.safe_web_workspace.network.domains]
+"github.com" = "allow"
+"**.github.com" = "allow"
+"githubusercontent.com" = "allow"
+"**.githubusercontent.com" = "allow"
+"githubassets.com" = "allow"
+"**.githubassets.com" = "allow"
+"raw.githubusercontent.com" = "allow"
+"objects.githubusercontent.com" = "allow"
+"release-assets.githubusercontent.com" = "allow"
+"codeload.github.com" = "allow"
+"gitlab.com" = "allow"
+"**.gitlab.com" = "allow"
+"stackoverflow.com" = "allow"
+"**.stackoverflow.com" = "allow"
+"stackexchange.com" = "allow"
+"**.stackexchange.com" = "allow"
+"serverfault.com" = "allow"
+"superuser.com" = "allow"
+"wikipedia.org" = "allow"
+"**.wikipedia.org" = "allow"
+"wikimedia.org" = "allow"
+"**.wikimedia.org" = "allow"
+"python.org" = "allow"
+"**.python.org" = "allow"
+"pypi.org" = "allow"
+"**.pypi.org" = "allow"
+"pythonhosted.org" = "allow"
+"**.pythonhosted.org" = "allow"
+"files.pythonhosted.org" = "allow"
+"conda-forge.org" = "allow"
+"**.conda-forge.org" = "allow"
+"anaconda.org" = "allow"
+"**.anaconda.org" = "allow"
+"readthedocs.io" = "allow"
+"**.readthedocs.io" = "allow"
+"docs.python.org" = "allow"
+"developers.openai.com" = "allow"
+"platform.openai.com" = "allow"
+"openai.com" = "allow"
+"**.openai.com" = "allow"
+"numpy.org" = "allow"
+"**.numpy.org" = "allow"
+"scipy.org" = "allow"
+"**.scipy.org" = "allow"
+"pandas.pydata.org" = "allow"
+"pydata.org" = "allow"
+"**.pydata.org" = "allow"
+"matplotlib.org" = "allow"
+"**.matplotlib.org" = "allow"
+"statsmodels.org" = "allow"
+"**.statsmodels.org" = "allow"
+"xgboost.readthedocs.io" = "allow"
+"lightgbm.readthedocs.io" = "allow"
+"pola.rs" = "allow"
+"**.pola.rs" = "allow"
+"docs.pola.rs" = "allow"
+"scikit-learn.org" = "allow"
+"**.scikit-learn.org" = "allow"
+"pytorch.org" = "allow"
+"**.pytorch.org" = "allow"
+"tensorflow.org" = "allow"
+"**.tensorflow.org" = "allow"
+"huggingface.co" = "allow"
+"**.huggingface.co" = "allow"
+"hf.co" = "allow"
+"**.hf.co" = "allow"
+"fastapi.tiangolo.com" = "allow"
+"pydantic.dev" = "allow"
+"**.pydantic.dev" = "allow"
+"sqlalchemy.org" = "allow"
+"**.sqlalchemy.org" = "allow"
+"pytest.org" = "allow"
+"**.pytest.org" = "allow"
+"playwright.dev" = "allow"
+"**.playwright.dev" = "allow"
+"mozilla.org" = "allow"
+"**.mozilla.org" = "allow"
+"developer.mozilla.org" = "allow"
+"nodejs.org" = "allow"
+"**.nodejs.org" = "allow"
+"npmjs.com" = "allow"
+"**.npmjs.com" = "allow"
+"jsdelivr.net" = "allow"
+"**.jsdelivr.net" = "allow"
+"unpkg.com" = "allow"
+"**.unpkg.com" = "allow"
+"rust-lang.org" = "allow"
+"**.rust-lang.org" = "allow"
+"crates.io" = "allow"
+"**.crates.io" = "allow"
+"go.dev" = "allow"
+"**.go.dev" = "allow"
+"pkg.go.dev" = "allow"
+"r-project.org" = "allow"
+"**.r-project.org" = "allow"
+"tidyverse.org" = "allow"
+"**.tidyverse.org" = "allow"
+"posit.co" = "allow"
+"**.posit.co" = "allow"
+"docs.rs" = "allow"
+"api.scrapfly.io" = "allow"
+"**.scrapfly.io" = "allow"
+
+[features]
+multi_agent = true
+apps = true
+network_proxy = false
+prevent_idle_sleep = true
+terminal_resize_reflow = true
+memories = true
+external_migration = true
+context_management.experimental_mode = true
+
+[features.multi_agent_v2]
+enabled = true
+min_wait_timeout_ms = 300000
+default_wait_timeout_ms = 300000
+max_wait_timeout_ms = 1740000
+
+[plugins."gmail@openai-curated"]
+enabled = true
+
+[plugins."github@openai-curated"]
+enabled = true
+
+[tui]
+notification_condition = "always"
+status_line = ["model-with-reasoning", "current-dir", "git-branch", "run-state", "context-used", "context-window-size", "five-hour-limit", "weekly-limit"]
+status_line_use_colors = true
+screen_reader_detection_done = true
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 50
+default_subagent_model = "gpt-6-luna"
+default_subagent_reasoning_effort = "xhigh"
+
+# Hard-block guard for unsandboxed runs (mirrors ~/.claude settings deny list + guard-bash.sh).
+[[hooks.PreToolUse]]
+matcher = "^(Bash|apply_patch|Edit|Write)$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "/usr/bin/python3 ~/.codex/hooks/guard_shell.py"
+timeout = 30
+statusMessage = "Checking command against the block list"

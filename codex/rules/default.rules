@@ -1,0 +1,229 @@
+prefix_rule(
+    pattern=["rm", ["-r", "-R", "-rf", "-fr", "-Rf", "-fR", "--recursive"]],
+    decision="forbidden",
+    justification="Destructive recursive deletes must be run manually.",
+    match=["rm -rf /tmp/example", "rm -r old-output", "rm -R old-output"],
+    not_match=["rm file.txt"],
+)
+
+prefix_rule(
+    pattern=["rm", ["-f", "--force"], ["-r", "-R", "--recursive"]],
+    decision="forbidden",
+    justification="Destructive recursive deletes must be run manually.",
+    match=["rm -f -r /tmp/example", "rm --force --recursive old-output"],
+    not_match=["rm -f file.txt"],
+)
+
+prefix_rule(
+    pattern=["rm", ["-r", "-R", "--recursive"], ["-f", "--force"]],
+    decision="forbidden",
+    justification="Destructive recursive deletes must be run manually.",
+    match=["rm -r -f /tmp/example", "rm --recursive --force old-output"],
+    not_match=["rm -r old-output"],
+)
+
+prefix_rule(
+    pattern=["git", ["reset", "clean", "restore", "filter-branch", "reflog"]],
+    decision="forbidden",
+    justification="History or worktree destructive git commands must be run manually.",
+    match=["git reset --hard HEAD", "git clean -fd", "git restore ."],
+    not_match=["git status"],
+)
+
+prefix_rule(
+    pattern=["git", "checkout", ["--", "."]],
+    decision="forbidden",
+    justification="Bulk checkout can discard local changes; run it manually if needed.",
+    match=["git checkout -- .", "git checkout ."],
+    not_match=["git checkout feature-branch"],
+)
+
+prefix_rule(
+    pattern=["git", "push", ["--force", "-f", "--force-with-lease", "--force-if-includes", "--delete", "-d", "--mirror", "--prune", "--no-verify"]],
+    decision="forbidden",
+    justification="Force pushes, remote deletions and skipping push hooks must be done manually.",
+    match=["git push --force-with-lease", "git push --delete origin feature"],
+    not_match=["git push origin feature", "git status"],
+)
+
+prefix_rule(
+    pattern=[["sudo", "su", "dd", "mkfs", "shred", "shutdown", "reboot", "halt", "poweroff"]],
+    decision="forbidden",
+    justification="Privileged or system-destructive commands must be run manually.",
+    match=["sudo make install", "dd if=/dev/zero of=/tmp/blob", "reboot"],
+    not_match=["make test"],
+)
+
+prefix_rule(
+    pattern=["systemctl", ["halt", "poweroff", "reboot"]],
+    decision="forbidden",
+    justification="System power commands must be run manually.",
+    match=["systemctl reboot"],
+    not_match=["systemctl status ssh"],
+)
+
+prefix_rule(
+    pattern=["chmod", "777"],
+    decision="forbidden",
+    justification="chmod 777 is blocked by the global safety policy.",
+    match=["chmod 777 script.sh"],
+    not_match=["chmod +x script.sh"],
+)
+
+prefix_rule(
+    pattern=["aws", "s3", ["rm", "rb"]],
+    decision="forbidden",
+    justification="Destructive S3 operations must be run manually.",
+    match=["aws s3 rm s3://bucket/key", "aws s3 rb s3://bucket"],
+    not_match=["aws s3 ls"],
+)
+
+prefix_rule(
+    pattern=["aws", "ec2", "terminate-instances"],
+    decision="forbidden",
+    justification="EC2 termination commands must be run manually.",
+    match=["aws ec2 terminate-instances --instance-ids i-123"],
+    not_match=["aws ec2 describe-instances"],
+)
+
+prefix_rule(
+    pattern=["aws", "autoscaling", "terminate-instance-in-auto-scaling-group"],
+    decision="forbidden",
+    justification="Autoscaling termination commands must be run manually.",
+    match=["aws autoscaling terminate-instance-in-auto-scaling-group --instance-id i-123"],
+    not_match=["aws autoscaling describe-auto-scaling-groups"],
+)
+
+prefix_rule(
+    pattern=["aws", "emr", "terminate-clusters"],
+    decision="forbidden",
+    justification="EMR termination commands must be run manually.",
+    match=["aws emr terminate-clusters --cluster-ids j-123"],
+    not_match=["aws emr describe-cluster --cluster-id j-123"],
+)
+
+prefix_rule(
+    pattern=["aws", "batch", "terminate-job"],
+    decision="forbidden",
+    justification="Batch job termination must be run manually.",
+    match=["aws batch terminate-job --job-id abc --reason stop"],
+    not_match=["aws batch describe-jobs --jobs abc"],
+)
+
+prefix_rule(
+    pattern=["aws", ["configure", "sts", "iam", "kms"]],
+    decision="forbidden",
+    justification="Sensitive AWS credential and key-management commands must be run manually.",
+    match=["aws configure get aws_access_key_id", "aws sts assume-role --role-arn arn", "aws iam create-access-key --user-name example-user"],
+    not_match=["aws s3 ls"],
+)
+
+prefix_rule(
+    pattern=[["cdk", "terraform", "pulumi"], "destroy"],
+    decision="forbidden",
+    justification="Infrastructure destroy commands must be run manually.",
+    match=["terraform destroy", "cdk destroy app-stack"],
+    not_match=["terraform plan"],
+)
+
+prefix_rule(
+    pattern=["kubectl", "delete", "namespace"],
+    decision="forbidden",
+    justification="Namespace deletion must be run manually.",
+    match=["kubectl delete namespace prod"],
+    not_match=["kubectl get namespace"],
+)
+
+# Mirror of Claude Code's permissions.deny and the owner's git policy, added 2026-10-12 so Codex can
+
+# run without a sandbox. These are argv-prefix rules only; ~/.codex/hooks/guard_shell.py re-checks
+
+# compound scripts, `git -C <dir> ...`, wrappers and the regex classes these rules cannot express.
+
+prefix_rule(
+    pattern=["git", ["rebase", "filter-repo"]],
+    decision="forbidden",
+    justification="History-rewriting git commands must be run manually.",
+    match=["git rebase master", "git rebase -i HEAD~3"],
+    not_match=["git status"],
+)
+
+prefix_rule(
+    pattern=["git", "pull", ["--rebase", "-r"]],
+    decision="forbidden",
+    justification="git pull --rebase must be run manually; plain git pull is allowed.",
+    match=["git pull --rebase", "git pull -r origin master"],
+    not_match=["git pull", "git pull origin master"],
+)
+
+prefix_rule(
+    pattern=["git", "commit", ["--amend", "--no-verify", "-n", "--no-gpg-sign"]],
+    decision="forbidden",
+    justification="Amending or skipping commit hooks must be done manually.",
+    match=["git commit --amend --no-edit", "git commit --no-verify -m x", "git commit -n -m x"],
+    not_match=["git commit -m x"],
+)
+
+prefix_rule(
+    pattern=["git", "stash", ["drop", "clear"]],
+    decision="forbidden",
+    justification="Dropping stashes is irrecoverable; run it manually.",
+    match=["git stash drop", "git stash clear"],
+    not_match=["git stash", "git stash pop"],
+)
+
+prefix_rule(
+    pattern=["git", "branch", ["-D", "-d", "-m", "-M", "-f", "-c", "-C", "--delete", "--move", "--copy", "--force"]],
+    decision="forbidden",
+    justification="Deleting, renaming or force-moving branches must be done manually.",
+    match=["git branch -D feature", "git branch -m old new"],
+    not_match=["git branch", "git branch new-feature"],
+)
+
+prefix_rule(
+    pattern=["git", "switch", ["-f", "--force", "--discard-changes"]],
+    decision="forbidden",
+    justification="Switching with discarded changes must be done manually.",
+    match=["git switch --discard-changes main"],
+    not_match=["git switch main"],
+)
+
+prefix_rule(
+    pattern=["git", "checkout", ["-f", "--force"]],
+    decision="forbidden",
+    justification="Forced checkout discards local changes; run it manually.",
+    match=["git checkout -f main"],
+    not_match=["git checkout -b feature"],
+)
+
+prefix_rule(
+    pattern=["mv"],
+    decision="forbidden",
+    justification="mv is blocked by the global policy; use git mv for tracked files or cp.",
+    match=["mv a b"],
+    not_match=["git mv a b"],
+)
+
+prefix_rule(
+    pattern=[["pip", "pip3"], "install"],
+    decision="forbidden",
+    justification="Never pip install; add the dependency to pyproject.toml and use uv.",
+    match=["pip install requests", "pip3 install x"],
+    not_match=["pip list"],
+)
+
+prefix_rule(
+    pattern=[["python", "python3"], "-m", "pip", "install"],
+    decision="forbidden",
+    justification="Never pip install; add the dependency to pyproject.toml and use uv.",
+    match=["python -m pip install x"],
+    not_match=["python -m pytest"],
+)
+
+prefix_rule(
+    pattern=["uv", "pip", "install"],
+    decision="forbidden",
+    justification="Never pip install; add the dependency to pyproject.toml and use uv sync.",
+    match=["uv pip install x"],
+    not_match=["uv sync --frozen"],
+)
