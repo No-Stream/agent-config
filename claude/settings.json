@@ -147,6 +147,12 @@
         "source": "github",
         "repo": "warpdotdev/claude-code-warp"
       }
+    },
+    "local-tools": {
+      "source": {
+        "source": "directory",
+        "path": "~/claude-local-marketplace"
+      }
     }
   },
   "effortLevel": "medium",
@@ -165,6 +171,7 @@
   "tui": "fullscreen",
   "timeFormat": "12-hour",
   "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "editorMode": "normal",
   "verbose": true,
   "autoCompactEnabled": true,
@@ -189,6 +196,5 @@
     "environment": [
       "$defaults"
     ]
-  },
-  "skipWorkflowUsageWarning": true
+  }
 }

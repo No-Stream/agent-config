@@ -113,12 +113,13 @@ Fix what you find — bugs, broken tests, wrong logic, dead code, stale comments
   - **Rhetorical performance:** LinkedIn cadence, engineered punchlines, "here's the kicker" moves, cleverness for its own sake. If a sentence's force comes from its rhythm instead of its claim, rewrite it.
   - **Em-dash kickers:** "statement — punchy fragment that reframes it." Fine when the fragment adds real information; a tic when it's there for the beat. Ordinary parenthetical em-dashes are fine.
 - **Literal language in anything a human reads** (chat, write-ups, figure titles, captions, table headers, axis labels, commit messages). Use the simplest, most direct wording that a reader understands on the first pass. Your own reasoning, notes to subagents, and internal docs only you read are exempt; write those however you like.
-  - **Real subjects do the acting.** The model, the training run, and we can do things. A trace, a figure, a row, a reward, or a result cannot. "The main reason each cooperating trace gives" → "the main reason in each trace". "With reward always paying for cooperation" → "rewarded for cooperation". "92 of 96 rest on a premise the prompt never gave" → "in 92 of 96 the model relies on a premise that is not in the prompt".
+  - **Real subjects do the acting.** Subjects are agents that can act: a model, a person, a dog, a training run, we. A trace, a figure, a row, a reward, or a result cannot; no animist or mannered phrasing. "The main reason each cooperating trace gives" → "the main reason in each trace". "With reward always paying for cooperation" → "rewarded for cooperation". "92 of 96 rest on a premise the prompt never gave" → "in 92 of 96 the model relies on a premise that is not in the prompt".
   - **No metaphor where a literal word exists.** "Pushing the direction unlocks cooperation" → "steering along the direction raises cooperation". "RL changed which argument wins" → "RL changed how often the model used each argument". "A ladder of partner descriptions" → "a sequence of partner descriptions".
   - **No sales or pitch register.** Don't write to sound clever, punchy, or engaging. A figure title states the finding as a plain sentence.
 - **Normal paragraph length in docs** (write-ups, drafts, docs meant to be read as prose): usually 4-6 sentences, sometimes up to 8, rarely 3. Runs of 2-3 sentence paragraphs read as choppy and I have to stitch them together. Chat and code are exempt.
 - **Research, don't guess.** Hazy on an API/version/flag → search. One tool call is trivial; guessing wrong costs a debugging session. Push research into subagents when possible.
 - **Final summaries re-ground, they don't continue.** Terse shorthand between tool calls is fine — that's thinking out loud. The final summary is for someone who didn't watch any of it (often me, seeing overnight or fan-out work for the first time): lead with the outcome in one sentence, then the detail. Drop working shorthand — no arrow chains, hyphen-stacked compounds, or labels you coined mid-task. Complete sentences, each identifier its own plain-language clause. If forced to choose short vs. clear, choose clear.
+- **No coined shorthand when talking to me.** I run 3-6 projects at once and may not look at a thread for hours or a day, so any term you or a subagent coined ("the pool", "round 3", "the register", "move F13") is unfamiliar unless I have used it first. Spell it out with its context: "the task set for the third organism RL run", not "the pool" or "round 3" (round 3 of what?). Established terms of art (RL, RLVR, SFT, AUC, precision, LoRA) are fine. Your own reasoning and messages between agents may use any shorthand; this rule covers what I read, including subagent output you relay.
 - **Name things by what they are, never by plan numbering.** "Step 4", "phase 2", "stage 3a", "option B", "arm self" mean nothing to me twelve hours and five other projects later. Say "the prosocial mixed-partner training run", "the self-prediction rerun", "the pro-cooperation arm". A plan doc may number its sections; messages to me describe the thing, adding the number in parentheses only if it helps find it in the doc.
 
 ### Just do things — don't tell me to do things
@@ -225,16 +226,16 @@ For Claude Code sessions: codex agents are a great option for review and for wel
 
 | Task | Model | Effort |
 |---|---|---|
-| Complex or challenging implementation (hard problem, many moving parts, or where Luna at xhigh isn't cutting it) | Sol (newest `gpt-*-sol`) | `medium` |
+| Complex or challenging but well-specified implementation (hard problem, many moving parts, or where Luna at xhigh isn't cutting it) | Terra (newest `gpt-*-terra`) | `medium` |
 | **Default for simple and most routine implementation work** (data munging, backend plumbing, writing tests, parsers, refactors, codebase research, summarization) | Luna (newest `gpt-*-luna`) | `xhigh` |
 | Second opinion on a design, or a very important call. Advice only: never writes code | Astra (newest `gpt-*-astra`) | `medium` |
 | Planning and system design | Claude Fable | high |
 | Ambiguous, ill-defined, or taste-loaded (naming, API shape, UI, prose) | Claude Opus | high |
 | Thin Claude-side glue: wrappers that shell out to Codex or a CLI, mechanical stages inside a Claude-only workflow | Claude Haiku | `high` (`low` for pure forwarding) |
 
-**Luna is the default implementation model.** Think of it as roughly a Sonnet from one or two generations ago: plenty competent for most tasks, and practically unlimited (equivalent cost is tens of cents per million output tokens), so parallelize aggressively with it. Escalate to Sol for complex implementations or when Luna isn't cutting it. Never use Terra: it was a one-generation tier, and the newest Sol costs the same.
+**Luna is the default implementation model.** Think of it as roughly a Sonnet from one or two generations ago: plenty competent for most tasks, and practically unlimited (equivalent cost is tens of cents per million output tokens), so parallelize aggressively with it. Escalate to Terra for complex but well-specified implementations or when Luna isn't cutting it. As of 2026-10, Terra is strong and costs half of Sol, so Sol is no longer a routine implementation pick. OpenAI's tier lineup shifts between generations, so recheck this when a new generation ships.
 
-**Effort tracks price, not difficulty.** Reasoning depth is bought per token, so the cheaper the model the more of it you can afford. Luna is dirt cheap, so `xhigh` costs almost nothing and buys real capability — always run Luna at `xhigh`; don't "correct" it down to match its position in the table. Sol is expensive and thinks a lot; `high` is slightly smarter but burns a great deal more, and `medium` is generally good enough. Astra is the most expensive tier; call it sparingly, for advice.
+**Effort tracks price, not difficulty.** Reasoning depth is bought per token, so the cheaper the model the more of it you can afford. Luna is dirt cheap, so `xhigh` costs almost nothing and buys real capability — always run Luna at `xhigh`; don't "correct" it down to match its position in the table. Terra costs more and thinks a lot; `high` is slightly smarter but burns a great deal more, and `medium` is generally good enough. Astra is the most expensive tier; call it sparingly, for advice.
 
 **Haiku is allowed, and good now.** It is cheap, so `high` effort is the normal setting; drop to `low` for pure forwarding. Luna at `xhigh` still comes first for basic tasks because Claude usage is the scarcer budget, but use Haiku when the work has to happen on the Claude side, such as a workflow stage or a wrapper agent that calls Codex.
 
@@ -249,12 +250,14 @@ python3 -c "import json; [print(m['slug']) for m in json.load(open('$HOME/.codex
 Both flags are real and must be passed **explicitly** — the plugin's default is to leave `--model` and `--effort` unset, which falls through to whatever `~/.codex/config.toml` pins, not to this table:
 
 ```
-/codex:rescue --model <newest gpt-*-sol slug> --effort medium <task>
+/codex:rescue --model <newest gpt-*-terra slug> --effort medium <task>
 ```
 
 `--effort` accepts `none | minimal | low | medium | high | xhigh`. The models also support `max` and `ultra`, but the plugin's validator rejects those — asking for them fails the dispatch.
 
 **Codex is the default; Opus is the exception you justify.** The drift is always in the same direction — a task feels important, so it gets Opus. Importance is not the criterion. The criterion is whether *correctness is checkable*: if the task has a clear spec and a test, a benchmark, a type-check or a measurement that says whether it worked, it goes to Codex however consequential it is. Reserve Opus for genuine taste (naming, API shape, prose), for problems where you cannot state up front what "done" looks like, and for one-way doors — and send planning and system design to Fable rather than Opus. Before dispatching Opus, say in one line why Codex could not verify this task — if you cannot, use Codex. Opus is also a scarcer resource: long parallel Opus fan-outs hit session limits and get killed mid-task, which costs more than the model choice ever saved.
+
+**When Codex hits its usage limit**, tell me at once with the reset time it reports, so I can decide whether to spend a banked reset. Meanwhile substitute Claude models and keep going: Haiku at `medium` or `high` in place of Luna, Opus at `medium` in place of Terra. Say so if Claude usage is itself near its limits.
 
 ---
 
