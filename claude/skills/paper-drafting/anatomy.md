@@ -23,8 +23,9 @@ Use simple language; define any jargon that cannot be avoided.
 
 ## TL;DR (post)
 
-3-6 bullets: the main finding with its number, the key evidence, the most important caveat, and why it is interesting.
-A reader who stops here should have the whole story.
+An epistemic-status line first (how much work went into this, overall confidence, the weakest part). Then 3-6
+bullets: the main finding with its number and confidence, the key evidence, the most important caveat, and why it is
+interesting. A reader who stops here should have the whole story.
 
 ## Introduction
 
@@ -36,8 +37,10 @@ An extended abstract that a reader can stop after. Repetition with the abstract 
 3. **Main claim**, with the nuance and definitions it needs. Be explicit about what is new and what is prior work.
    The same results read as arrogant or as modest depending on how the novelty is framed.
 4. **The case**: the most important evidence for it. Repeat 3-4 for a second or third claim.
-5. **Implications**: who should do what differently, which misconception this corrects.
-6. **Contributions**: a bullet list of claims, each with its key evidence in a phrase.
+5. **Implications**: who should do what differently, which misconception this corrects. Hedge the ones the evidence
+   does not establish ("plausibly", "speculatively") and point to the implications section.
+6. **Contributions**: a bullet list of claims, each with its key evidence in a phrase and, in a paper, the section
+   that argues it.
 
 The introduction sets the structure of the rest of the paper.
 
@@ -72,6 +75,8 @@ conclusions.
   its result. If experiments share one method, a single methods section with a subsection per experiment is fine.
 - Plan each paragraph's first and last sentence: what it shows and how it connects to the claim.
 - Report baselines, controls, sample sizes and uncertainty next to the result, not in an appendix.
+- Say how the result was found: what was explored, roughly how many variants were tried, which shortcuts were taken,
+  and how the reported result was confirmed.
 - Give enough detail to replicate; link code where possible.
 
 ## Limitations
@@ -79,11 +84,15 @@ conclusions.
 Required. The reader needs a calibrated sense of what was learned, and the authors know the weaknesses better than
 anyone. Include: conditions not tested, small samples, untuned baselines, alternative explanations not ruled out, and
 likely misreadings or over-updates. Researchers whose opinion matters think more of work that states its limits.
+For each central claim, say what result would most lower our confidence in it, unless the results section already
+does.
 
-## Speculation (posts only)
+## Implications and speculation
 
-Intuitions the evidence does not establish but the author believes, each with a stated confidence and what evidence
-would change it.
+Papers and posts. The broader conclusions the authors find plausible but this work does not establish: what the result
+suggests about other models, settings or open questions, and intuitions about mechanism. Each item gets a confidence
+(a probability, or a word from the confidence vocabulary in the main skill), the reason we believe it, and the evidence
+that would change it. In a conference paper keep it to a short section; in a post it can run as long as it is useful.
 
 ## Related work
 
@@ -92,11 +101,13 @@ difference is small, say so (parallel work, a fix to a flaw in it, a more rigoro
 politely and never authors. Put related work up front only when the paper exists to fill a gap in or correct specific
 prior work. Post: inline links, plus a section only if the post corrects or extends specific prior work.
 
-A literature-search subagent given the claims ledger is a good way to find what must be cited.
+A literature-search subagent given the claims ledger is a good way to find what must be cited. When a citation
+supports a specific claim, cite the section or page; in a post, a short quote in a footnote helps.
 
 ## Discussion and conclusion
 
-Omit by default. If an insight is worth stating, it belongs in the abstract or introduction.
+Omit by default. If an insight is worth stating, it belongs in the abstract or introduction; a plausible but
+unestablished implication belongs in the implications and speculation section.
 
 ## Appendices
 

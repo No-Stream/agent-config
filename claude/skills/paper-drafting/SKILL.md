@@ -15,8 +15,13 @@ The default failure is shoveling: listing every finding in the order it was foun
 remembers nothing. Readers take away a few sentences at most, so choose those sentences on purpose. If you do not
 choose what to drop, something important gets dropped by accident.
 
+The second failure is miscalibration, common in mainstream scientific writing: narrow claims stated more confidently
+than the evidence supports, and the broader implications the authors actually believe left unsaid. The reader wants to
+know how to update. Tell them how confident we are in each claim, what it rests on, and what would change our mind, and
+state the plausible implications in a labelled place (see Confidence and epistemic status).
+
 Adapted from Neel Nanda, "Highly Opinionated Advice on How to Write ML Papers" and his paper-writing checklist
-(both 2025, Alignment Forum).
+(both 2025, Alignment Forum), and Luke Muehlhauser, "Reasoning Transparency" (2017, Open Philanthropy).
 
 ## Venue
 
@@ -24,9 +29,10 @@ Decide the venue first and state it. It changes the standard of defense, not the
 
 | | Paper (conference, arXiv, tech report) | Post (LessWrong, blog, internal writeup) |
 |---|---|---|
-| Opening | Abstract | TL;DR of 3-6 bullets |
+| Opening | Abstract | Epistemic-status line, then a TL;DR of 3-6 bullets |
 | Objections | Pre-empt every serious reviewer objection | Answer real, meaningful objections; ignore nits; anticipate likely misreadings |
-| Speculation | Out of the main text | Welcome, in a section labelled as speculation, with stated confidence |
+| Confidence | Probabilities preferred for central claims; for a conference submission, the hedge vocabulary may replace them in the text | Probabilities for central claims and main implications |
+| Implications and speculation | A short labelled section, each item with its confidence | A labelled section, as long as it is useful, each item with its confidence |
 | Related work | Short section, near the end | Inline links where they matter; a section only if the post corrects or extends prior work |
 | Tacit knowledge | Appendix | Main text if it is interesting |
 
@@ -60,8 +66,8 @@ that has no source anywhere. Both are allowed in a draft handed back for review;
    - **Narrative**: 3-5 sentences a stranger could repeat back: the context, the problem, what we showed, why it matters.
    - **Claims ledger**: one row per claim (see below).
    - **Cut list**: every finding in the source material that is not a claim, each with a destination: *supporting*
-     (main text, as evidence, a control or setup for a named claim), *appendix*, *limitations*, *speculation* (posts
-     only), *follow-up*, or *drop*, and a one-line reason. A finding marked *supporting* gets a sentence or a table
+     (main text, as evidence, a control or setup for a named claim), *appendix*, *limitations*, *implications
+     and speculation*, *follow-up*, or *drop*, and a one-line reason. A finding marked *supporting* gets a sentence or a table
      row, not its own subsection; several supporting checks can share one "checks" table. Subsections belong to
      claims and their direct evidence.
    - **Alternative narratives**: if the right story is not obvious, 2-3 candidate narratives with their trade-offs and
@@ -95,11 +101,14 @@ Most readers see only the title and abstract; many see the figures; few read the
 | Strength | existence proof / systematic / narrow (conditions) / hedged (suggestive, tentative) / guarantee |
 | Evidence | Each supporting result, with a pointer to the file, run or table it comes from |
 | Verification | *verified* (re-derived from raw artifacts), *notes only* (taken from notes or summaries), or *mismatch* |
-| Pre- or post-hoc | Was the result predicted before it was seen? |
+| Pre- or post-hoc | Was the result predicted before it was seen? If found while exploring, roughly how many variants were tried, and was it confirmed on fresh samples or a held-out split? |
 | Baselines and controls | What it was compared against, and how hard the baseline was tuned |
 | Known weaknesses | Sample size, seeds, alternative explanations, untested conditions |
+| Confidence | A probability that the claim is true as worded, or a word from the vocabulary below |
+| What would change our mind | The result or experiment that would most lower our confidence |
 
-The wording in the draft must match the ledger's strength. One seed and n=100 is "suggestive" or an existence proof,
+Strength is how broad the claim is; confidence is how likely it is to be true. They are separate: a narrow claim can be
+near certain, and a systematic one can be a coin flip. The wording in the draft must match the ledger's strength. One seed and n=100 is "suggestive" or an existence proof,
 never "X causes Y". **Every number in the draft must trace to a ledger evidence pointer.** A derived number (a
 difference, a standard error, a share) needs its derivation written in the narrative file. If a number cannot be
 traced, mark it `[UNSOURCED]` and ask; never write a plausible-looking value.
@@ -112,11 +121,61 @@ Several claims must share a theme; a grab-bag of findings is hard to understand 
 three applies to posts too. A result that strengthens a claim (a steering intervention, a length control) is evidence
 under that claim, not a fourth claim.
 
+## Confidence and epistemic status
+
+The reader's question is "how should I update?" Answer it explicitly.
+
+**Vocabulary.** Use hedge words with fixed meanings, so "plausibly" means the same thing in every section:
+
+| Word | Rough probability |
+|---|---|
+| almost certainly | above 95% |
+| very likely | 80-95% |
+| likely | 60-80% |
+| plausibly | 30-60% |
+| unlikely | below 30% |
+
+*Speculatively* (or "we suspect") marks a claim this work barely bears on: we believe it, but the evidence here is
+thin. Probabilities are better than words for the central claims and the main implications, because readers read hedge
+words differently. A conference paper may use the words in the text and keep the numbers in the ledger. If a number is
+soft, say so ("our estimate moved from 40% to 70% during the project and is not stable").
+
+**What would change our mind.** For each central claim, state in the draft the result that would most lower our
+confidence, next to the claim or in Limitations. This is what makes the claim falsifiable, and it tells the next
+researcher which experiment to run.
+
+**Implications and speculation.** State the broader conclusions we find plausible, even when this work cannot
+establish them: what the result suggests about other models, other settings, or the field's open questions. Put them
+in a labelled section, each with a confidence and the reason we believe it. This applies to papers as well as posts.
+Leaving them out does not make a paper more rigorous; it hides what the authors actually think.
+
+**Claims outside the ledger.** Motivation, background, characterisations of prior work and mechanistic intuitions
+also need their basis signalled when the argument leans on them. Say which kind of support it is:
+
+- our own experiment (then it belongs in the ledger);
+- a paper we read carefully, cited with the section or page;
+- a paper we skimmed or a secondary source ("reportedly; we have not checked the primary studies");
+- widely believed in the field, not checked by us;
+- our intuition or a simple argument, stated as such.
+
+In a post, colloquial forms are fine ("Supposedly (I haven't checked)..."). In a paper, the same information goes in
+conventional phrasing or a footnote. Easily verifiable, uncontroversial facts need no flag.
+
+**How we got here.** Say briefly how the result was found: an exploratory search over prompts, configurations or
+metrics is fine, but say roughly how many were tried and how the reported one was confirmed. Confirmation on fresh
+samples or a held-out split replaces pre-registration when more data is cheap. Mention prior beliefs when they plausibly
+shaped the work ("we set out expecting X"); this is not required otherwise.
+
+**Epistemic-status line (posts).** One or two sentences at the top: how much work went into this, how confident we
+are overall, and which part is weakest.
+
 ## Sections
 
 - **No discussion or conclusion section by default.** A real conclusion belongs in the abstract or introduction;
   what remains is usually grand statements. Write a **Limitations** section instead, which is required.
-- Posts may add a **Speculation** section ("what I think is going on") with confidence stated per item.
+- An **Implications and speculation** section ("what we think this means", "what I think is going on") is expected
+  in both papers and posts, with a confidence and a reason per item. It differs from a discussion section: each item
+  is labelled, hedged and says what it rests on, rather than restating the results in grander terms.
 - Ruthless appendices: anything not needed for the narrative goes there. Appendices are cheap and lightly read, so do
   not polish them.
 - An optional **tacit knowledge** appendix (in a post, a main section): what was hard, what broke, what we
@@ -133,7 +192,10 @@ Run both, each in a fresh subagent with no access to this conversation:
    from the field as context. For a post, tell it to ignore nits and report only objections that would change a
    careful reader's belief.
 
-Then check each claim's wording against the ledger, and that every number has a source.
+Also ask the cold reader how confident the authors are in each main claim and what each claim rests on. If its answer
+differs from the ledger's confidence column, the hedging in the draft is off.
+
+Then check each claim's wording and hedge word against the ledger, and that every number has a source.
 
 ## Writing style
 
@@ -148,6 +210,7 @@ These apply at release, not to a draft handed back for review.
 - No `TODO`, `??`, `[UNSOURCED]`, `[OWNER: ...]`, or broken references.
 - Every figure and table is referenced in the text.
 - Limitations section present; no conclusion section unless the owner asked for one.
+- Each central claim states its confidence and what would change our mind; implications are in a labelled section.
 - Privacy and anonymity (for blind review: no names, usernames, identifying links).
 - For papers: page count against the venue limit; venue-specific checklists. See `release.md`.
 
@@ -162,5 +225,10 @@ These apply at release, not to a draft handed back for review.
 | Strong result in the main text, contradicting result omitted | Contradicting results go in Limitations, or the claim narrows |
 | A known-bug era number quoted alongside fixed numbers | Only post-fix numbers; mention the bug in an appendix if it matters |
 | Conclusion section restating the intro | Delete it; move any new insight to the intro |
-| Speculation mixed into results in a post | Separate labelled section |
+| Speculation mixed into results | Separate labelled section |
+| Narrow claim stated as certain, broad implication left unsaid | Hedge the narrow claim to its ledger confidence; state the implication, labelled, with its confidence |
+| Hedge words used loosely ("may", "suggests" everywhere) | Use the confidence vocabulary; give probabilities for central claims |
+| No statement of what would falsify the main claim | Name the result that would most lower confidence |
+| Best of many explored variants reported as if it were the only one | Say how many were tried; confirm on fresh samples or a held-out split |
+| Background or prior-work claim from a skimmed source stated as fact | Signal the kind of support, or check the source |
 | Prose before the narrative and outline are signed off | Go back to the narrative file |

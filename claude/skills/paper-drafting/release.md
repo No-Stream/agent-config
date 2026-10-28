@@ -23,6 +23,8 @@ Load only when the draft is going to a venue or out in public.
 - Acknowledgements (generous) and an author-contributions statement; a corresponding-author email.
 - Code: runs on a fresh machine, has a licence (MIT or Apache 2.0 for reuse), a README, ideally a notebook showing the
   main results.
+- Data: release the eval transcripts or samples behind the main results where the repo's privacy and
+  benchmark-integrity rules allow, so readers can check the examples themselves.
 - arXiv takes about one working day to appear; first-time submitters to cs.LG need an endorsement, so arrange it early.
 - Short-form summary (tweet thread, post teaser): the first item does almost all the work. It must make sense to an
   ML reader who does not know a paper is involved, state the key insight in plain words, carry the most eye-catching

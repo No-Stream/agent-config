@@ -20,7 +20,7 @@ question, propose it with its cost; do not launch paid or long compute without t
 Assume a mistake exists, and look for it.
 
 - **Bugs**: How surprised would I be if this turned out to be a bug, a judge error or a data leak? Check the most
-  surprising results hardest.
+  surprising results hardest (see Surprising results below).
 - **Noise**: Sample size, seeds, standard error. Is the effect clearly larger than run-to-run variation?
 - **Statistics**: for frequentist tests, treat p < 0.05 as weak. Want p < 0.01 for a confirmatory result and
   p < 0.001 for one found while exploring many hypotheses. When no test was run, do the back-of-envelope version: a
@@ -40,8 +40,10 @@ Assume a mistake exists, and look for it.
 - **Ablations**: for a method with several changes, does each change earn its place?
 - **Cherry-picking**: are qualitative examples representative? Give random examples alongside chosen ones, or say how
   they were chosen. Existence-proof claims are the exception: one trustworthy example suffices.
-- **Pre- vs post-hoc**: was the result predicted before it was seen? Post-hoc fits are weaker evidence; say which is
-  which.
+- **Pre- vs post-hoc**: was the result predicted before it was seen? Exploration is fine, but a result picked from
+  many variants (prompts, configurations, metrics, layers) is weaker evidence until it is confirmed on fresh samples or
+  a held-out split. Count roughly how many variants were tried. When more data is cheap, confirmation replaces
+  pre-registration; when it is not, say the result is post-hoc.
 - **Independence of evidence**: several qualitatively different lines of evidence beat many near-duplicates. Ask how
   well result 1 predicts result 2.
 - **Quality over quantity**: is there at least one compelling experiment that is hard to deny? Lead with it; move
@@ -49,11 +51,37 @@ Assume a mistake exists, and look for it.
 - **Domain controls**: apply the repo's standing controls (for example matched-norm placebos for steering, eval
   awareness rates).
 
+## Surprising results
+
+Surprising results are often wrong. Any result that surprised us, or that contradicts prior work or the field's
+expectations, must clear these checks before it enters the ledger as *verified*. Ideally they happen during the
+research, as part of code review; if not, do them now.
+
+- **Rule out the obvious explanations first.** The usual causes are a bug in the pipeline, the wrong model, checkpoint
+  or adapter loaded, stale cached results, a prompt-template or chat-format error, truncated outputs, an answer parser
+  or judge that fails silently, swapped labels or conditions, and overlap between training and eval data.
+- **Read raw samples** from each condition, not only the aggregate. Many errors are obvious in ten transcripts.
+- **Run the controls that would expose an artefact**: a null or placebo condition (random direction, shuffled
+  labels, unrelated fine-tune), a condition where a known effect should reproduce, and a check that the effect does
+  not track a confound such as length or refusal rate.
+- **Ask what the result would look like if it were an artefact**, and check that it does not look like that.
+
+If these checks have not been done, say so in the audit report, mark the result *not checked*, and propose the checks
+with their cost. A surprising result with no controls is at most a hedged claim.
+
+## Citations
+
+A light check, not a literature review. For each citation the argument leans on (prior results we build on, claims
+about what other work found), a subagent finds the passage in the cited paper and records the section or page and a
+short quote in the narrative file. If the paper says something weaker or different, narrow our wording or drop the
+citation. Skip citations that only point to a method or a dataset.
+
 ## Output
 
 A short audit report in the narrative file: each claim's evidence status (verified / mismatch / not checked),
-the problems found, and any narrowing of claims they force. Then a list of the misconceptions or over-updates a reader
-is likely to make; these feed the Limitations section.
+the problems found, any narrowing of claims they force, and a proposed confidence and "what would change our mind"
+for each claim. Then a list of the misconceptions or over-updates a reader is likely to make; these feed the
+Limitations section.
 
 ## Distilling experiments
 
