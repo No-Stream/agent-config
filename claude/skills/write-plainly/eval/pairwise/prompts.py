@@ -29,6 +29,26 @@ who asked (gap questions, outline agreement, choosing a template) and write from
 {context}
 Return the passage in the `passage` field."""
 
+BARE_DRAFT_PROMPT = """\
+You are drafting one passage for a blind writing evaluation. Write it as if a colleague had \
+handed you these notes and asked for this passage.
+
+{instructions}
+
+Document type: {doc_type}
+Intended reader: {reader}
+Target length: about {target_words} words; stay between {min_words} and {max_words}.
+
+Source notes (the only facts you may use):
+{notes}
+
+How this run works:
+- Nobody is available to answer questions. Write from the notes.
+- Use only facts from the notes. Do not invent numbers, names or results.
+- The passage is body text only: no title or heading, no preamble, no sign-off.
+{context}
+Return the passage in the `passage` field."""
+
 AUTHOR_PROMPT = """\
 Next step: {stage_name}.
 

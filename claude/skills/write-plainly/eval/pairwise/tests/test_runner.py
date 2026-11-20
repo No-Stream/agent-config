@@ -381,6 +381,31 @@ class TestRun:
         assert not (out_dir / "stub-kettle" / "solo" / "00-draft.json").exists()
 
 
+class TestBareDraft:
+    def test_a_draft_that_reads_no_files_gets_no_guidance_tools_or_path_note(
+        self, tmp_path: Path, fake_claude: Path, stub_tasks_file: Path, claude_calls
+    ) -> None:
+        config_file = write_config(tmp_path)
+        bare_pipeline = '\n[[pipeline]]\nname = "bare"\n  [[pipeline.stage]]\n  kind = "draft"\n'
+        config_file.write_text(config_file.read_text() + bare_pipeline + '  name = "draft"\n')
+        out_dir = tmp_path / "out"
+        make_runner(config_file, fake_claude, stub_tasks_file, out_dir).run(
+            ["stub-kettle"], ["bare"], jobs=1
+        )
+        (call,) = claude_calls()
+        arguments, prompt = call["arguments"], call["prompt"]
+        assert arguments[arguments.index("--tools") + 1] == ""
+        assert logged_model(call) == "opus"
+        assert prompt.startswith("You are drafting") and "bimetal" in prompt
+        assert "about 180 words" in prompt and "Nobody is available" in prompt
+        for absent in ("guidance", "files", "Later turns", "Path note for the test."):
+            assert absent not in prompt, absent
+        draft = stage(out_dir, "stub-kettle", "bare", "00-draft")
+        assert (out_dir / "stub-kettle" / "bare" / "final.md").read_text() == (
+            draft["passage"] + "\n"
+        )
+
+
 class TestFidelityGate:
     def gate_run(
         self, tmp_path: Path, fake_claude: Path, stub_tasks_file: Path, config_file: Path

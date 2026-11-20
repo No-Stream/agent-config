@@ -52,6 +52,7 @@ from pipeline_config import (
 )
 from prompts import (
     AUTHOR_PROMPT,
+    BARE_DRAFT_PROMPT,
     DRAFT_PROMPT,
     GATE_FIDELITY_PROMPT,
     MEASURE_FIDELITY_PROMPT,
@@ -172,11 +173,13 @@ class Runner:
         )
         return run_claude(call, self.config.claude)
 
-    def author_call(self, prompt: str, resume_session_id: str | None) -> ClaudeResult:
+    def author_call(
+        self, prompt: str, resume_session_id: str | None, tools: tuple[str, ...] = ("Read",)
+    ) -> ClaudeResult:
         return self.claude(
             prompt=prompt,
             model=self.config.author_model,
-            tools=("Read",),
+            tools=tools,
             json_schema=PASSAGE_SCHEMA,
             new_session_id=None if resume_session_id else str(uuid.uuid4()),
             resume_session_id=resume_session_id,
@@ -261,18 +264,24 @@ class Runner:
             source_pipeline = self.config.pipeline(stage.from_pipeline)
             source = self.ensure_stage(task.task_id, source_pipeline, 0, previous=[])
             return {**source, "copied_from": stage.from_pipeline}
-        prompt = DRAFT_PROMPT.format(
-            read_list=read_list(stage.read),
-            instructions=stage.instructions.strip(),
-            doc_type=task.doc_type,
-            reader=task.reader,
-            target_words=task.target_words,
-            min_words=MIN_PASSAGE_WORDS,
-            max_words=MAX_PASSAGE_WORDS,
-            notes=quoted(task.notes_for_writer),
-            context=self.context(run.pipeline),
-        )
-        result = self.author_call(prompt, resume_session_id=None)
+        fields = {
+            "instructions": stage.instructions.strip(),
+            "doc_type": task.doc_type,
+            "reader": task.reader,
+            "target_words": task.target_words,
+            "min_words": MIN_PASSAGE_WORDS,
+            "max_words": MAX_PASSAGE_WORDS,
+            "notes": quoted(task.notes_for_writer),
+        }
+        if stage.read:
+            prompt = DRAFT_PROMPT.format(
+                read_list=read_list(stage.read), context=self.context(run.pipeline), **fields
+            )
+            result = self.author_call(prompt, resume_session_id=None)
+        else:
+            # The model's own draft: no path note to the skill and no tool to open it.
+            prompt = BARE_DRAFT_PROMPT.format(context=run.pipeline.override, **fields)
+            result = self.author_call(prompt, resume_session_id=None, tools=())
         require_reads(stage, result)
         return with_passage(run.record, result, "author")
 
