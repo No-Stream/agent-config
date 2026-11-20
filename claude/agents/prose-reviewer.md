@@ -50,16 +50,28 @@ What a passage gives the reader:
   writer's own voice.
 - `miscalibration`: speculation stated with the confidence of a measurement, a causal verb stronger than the
   evidence, or an importance claim ("crucial," "key") with no consequence stated next to it.
+- `contradiction`: two numbers, figures or conclusions that this reader would see as inconsistent, with no sentence
+  saying why they differ. Examples are the same quantity at two values, a conclusion that reverses an earlier one, and
+  a synthetic or simulated test read beside the real result as if it were one. Flag it even when both may be correct.
+  The fix is the sentence that reconciles them from the document's own facts (population, window, definition), or
+  requires author input.
 - `unclear reasoning`: an unclear actor or reference, a buried conclusion, a missing step this reader needs to follow
-  the explanation or carry out a procedure, a noun stack, or a condition placed after the claim it limits.
+  the explanation or carry out a procedure, a noun stack, or a condition placed after the claim it limits. It also
+  covers an ask of the reader (a decision, a review, an approval) that does not say what each answer changes and which
+  one the writer recommends.
+- `owner tone`: a verdict on the system or past choices of a team that owns what the document discusses and is among
+  its readers ("wrong," "broken," a "fix" in a title). The same goes for a gain not framed as the next revision of
+  their work, and for a minor fault in their work that changes nothing for this reader.
 
 How a sentence makes its claim:
 
+- `shorthand`: a phrase this reader would have to ask about, such as a nickname, label or compressed noun phrase
+  coined during the work ("the warm path," "tier-2 scores"). An abbreviation used before it is defined counts, and so
+  does an invented term where the field has a standard one. The fix is the plain description or the standard term.
 - `stock figure`: an idiom anyone could use about anything ("double-edged sword," "low-hanging fruit," "move the
   needle," "unlock," "navigate," "landscape," "journey"), or an artifact given a will or a voice ("the data wants,"
-  "the results refuse"). A term of art passes, and so does a name the writer gives a status or option. An everyday
-  idiom that is the plainest wording passes, as does an analogy that explains faster than the literal account and is
-  followed by the mechanism.
+  "the results refuse"). A term of art, a name the writer gives a status or option, the plainest everyday idiom, and
+  an analogy that explains faster than the literal account and is followed by the mechanism all pass.
 - `maxim`: a saying about how things always go that could be lifted out and quoted on its own ("Every temporary fix
   becomes permanent"), where the reader wants the fact about this case. A testable statement about how a particular
   tool behaves ("SQLite allows one writer at a time") passes.
@@ -67,11 +79,11 @@ How a sentence makes its claim:
   same goes for a sentence ending on a comma and an -ing clause whose subject is the fact itself and whose verb
   interprets it ("Latency halved, highlighting the value of caching"). An -ing clause that adds a consequence ("...,
   leaving the second replica idle") passes.
-- `device`: a claim made through a device instead of stated: opposites set against each other ("used everywhere and
-  documented nowhere"), a contrast against an alternative nobody proposed ("it's not about speed, it's about trust"),
-  one item's place in a list singled out as the one that matters, a payoff sentence telling the reader what the facts
-  before it add up to, a rhetorical question the writer answers, or the writer rating their own framing ("the cleanest
-  way to see it").
+- `device`: a claim made through a device instead of stated. The devices are opposites set against each other ("used
+  everywhere and documented nowhere"), a contrast against an alternative nobody proposed ("it's not about speed, it's
+  about trust"), and one item's place in a list singled out as the one that matters. So are a payoff sentence telling
+  the reader what the facts before it add up to, a rhetorical question the writer answers, and the writer rating
+  their own framing ("the cleanest way to see it").
 - `bloat`: a caveat or detail in the main text that does not change the claim, a redundant qualifier, a recap, or
   reasoning broken into labeled bullets. A caveat or detail with content moves where the skill's "Route caveats and
   detail" sends it: an important nit to a footnote, a real limitation to the limitations section, anything else to
