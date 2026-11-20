@@ -1,7 +1,7 @@
 # agent-config
 
 My configuration for Claude Code and OpenAI Codex: the instructions file both agents read, custom skills, subagents,
-safety hooks and settings. It is published as a reference. Paths are shown as `~`, and per-project entries and
+safety hooks and settings. Paths are shown as `~`, and per-project entries and
 auto-saved command approvals are removed.
 
 | Path | What it is |
@@ -13,19 +13,20 @@ auto-saved command approvals are removed.
 | `claude/agents/` | Subagents used by the review and write-plainly skills |
 | `claude/skills/review/` | Multi-domain code review workflow (correctness, ML, stats, security, performance, ...) with a Codex second opinion |
 | `claude/skills/paper-drafting/` | Turning research into a paper or blog post: narrative, claims ledger, evidence red-team, drafting order |
-| `claude/skills/write-plainly/` | Writing and revising documents that other people read (READMEs, reports, posts): plain technical register, caveats in proportion, prose linters (`check-prose.sh` runs sloplint, slop-guard and house rules), and an Opus reviewer plus a fidelity check |
+| `claude/skills/write-plainly/` | Rules for plain prose in documents other people read (READMEs, reports, posts), three prose linters run by `check-prose.sh`, and an Opus reviewer subagent |
 | `claude/skills/visualization/` | Plot choice, uncertainty, computed and asserted titles, light and dark themes, figure review; includes `vizstyle.py` and tests |
 | `codex/config.toml` | Codex settings: permissions profiles, network allowlist, agents, hook registration |
 | `codex/rules/default.rules` | Codex prefix rules that forbid the same destructive commands as the Claude deny list |
 | `codex/hooks/` | Codex PreToolUse guard that reuses the Claude guard and checks compound shell commands, with test cases |
 
-## Installing and updating
+## Installing
 
 To use any of this, copy or symlink the pieces you want into `~/.claude/` and `~/.codex/`; skills go in
 `~/.claude/skills/<name>/`. The hooks call `jq`, and the Codex guard runs under the system `python3`. The
 write-plainly linters need [uv](https://docs.astral.sh/uv/) for slop-guard, and Ruby 3.3 or later with
 `gem install sloplint` so that `sloplint` is on `PATH`.
 
-The repo is a copy of my live config, refreshed by `python3 sync.py`. The script copies an explicit allowlist of files
-from `~/.claude` and `~/.codex`, applies the redactions, and fails if any file in the repo matches a sensitive
+I keep this repo in sync with my live config using `python3 sync.py`. The script copies an explicit allowlist of files
+from `~/.claude` and `~/.codex`, replaces home-directory paths with `~`, drops per-project entries and private names,
+and fails if any file in the repo matches a sensitive
 pattern. The private part of that pattern list is kept in the gitignored `.private/forbidden_patterns.txt`.

@@ -39,7 +39,7 @@ Check that the subject can do what the verb says. Tests, results, and documents 
 
 ## Evidence and numbers
 
-State what was measured, changed, or compared, and under what conditions. Separate findings from your interpretation and from your recommendation, and state a material assumption once. Mark which sentences are measurements and which are inferences or opinions, so speculation does not read with the same confidence as data. An inconclusive result is not evidence of equivalence. Cite the source for each claim, prefer primary sources, and do not claim to have checked sources you did not read. Attribute a claim to a named person, document, or dataset, not to "experts" or "studies."
+State what was measured, changed, or compared, and under what conditions. Separate findings from your interpretation and from your recommendation, and state a material assumption once. Mark which sentences are measurements and which are inferences or opinions, so speculation does not read with the same confidence as data. Put a decisive limitation next to its claim, and a minor one once, where it applies. An inconclusive result is not evidence of equivalence. Cite the source for each claim, prefer primary sources, and do not claim to have checked sources you did not read. Attribute a claim to a named person, document, or dataset, not to "experts" or "studies."
 
 Use numbers selectively. Put patterns in a figure and exact lookup values in a table; in prose, give the interpretation and the few numbers needed to check it. Express each result once: the effect size ("median runtime fell by 20%"), or the endpoints when the absolute values matter ("from 25 s to 20 s"), not both plus a ratio. Give each important number its baseline, denominator, units, and period. Distinguish percent from percentage points, and match precision to the measurement.
 
@@ -75,7 +75,7 @@ For a local edit, make the smallest change that fixes the problem. For a rewrite
 
 1. Run `~/.claude/skills/write-plainly/check-prose.sh FILE` on the draft (write it to a scratch file first if it is not a file yet). It runs three linters: sloplint (rhetorical AI tells, high precision), slop-guard with a tuned config (word lists, structure, rhythm), and `lint_prose.py` (this skill's own rules: dashes, coined labels, bold run-ins, thin sections, short-paragraph runs, Title Case headings).
 2. Triage the findings; do not optimize the score. Fix every em dash, coined label, and high-confidence sloplint note unless it sits in a quotation or names something literally. Treat a single slop-guard word hit ("robust," "crucial") as a prompt to check that the word is literal and earned, since careful human writers use these words too. Skip findings in quoted material, code, and tables.
-3. Compare against the source for numbers, negation, modality, scope, and attribution. Read the result as someone who did not write it, and remove any sentence that adds no information.
+3. Search the draft for passive voice and make each instance active unless the actor is unknown or irrelevant; no linter covers this. Compare against the source for numbers, negation, modality, scope, and attribution. Read the result as someone who did not write it, and remove any sentence that adds no information.
 4. For a standalone document others will read, also run the review below.
 
 ## Review by a fresh reader
