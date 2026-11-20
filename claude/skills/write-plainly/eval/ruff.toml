@@ -1,0 +1,3 @@
+# false_flags.py runs on Python 3.11 or newer, for tomllib.
+target-version = "py311"
+line-length = 100
