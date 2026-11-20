@@ -135,7 +135,7 @@ dark and light exports.
 - Show context the reader needs to judge size: chance level, the baseline, the previous best.
 - Up to three sentences of pale gray text below the plot (`add_caption`) may explain what the plot cannot show itself.
   A figure that needs more than that is probably the wrong plot. In a paper, the document's own caption does this job
-  instead, and follows the paper-drafting skill.
+  instead, and follows the paper-drafting skill. Write titles and captions to the write-plainly skill's standard.
 - Size text for the final display: readable at the column or screen width where the figure will appear.
 - Multi-panel figures: the message goes in `fig.suptitle(title, x=0.01, ha="left", fontweight="bold")`; panel titles
   just name the panel.

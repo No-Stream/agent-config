@@ -200,8 +200,9 @@ Then check each claim's wording and hedge word against the ledger, and that ever
 ## Writing style
 
 Inform, do not persuade. Precise and plain: jargon only where it adds precision, and define every term the reader
-might not know. You have months of context and the reader has none. If the owner has prose-style instructions,
-follow them.
+might not know. You have months of context and the reader has none. Write and revise the prose with the
+`write-plainly` skill: it covers sentences, numbers, caveats, formatting, the prose linters, and the fresh-reader
+review. This skill decides what the writeup claims and in what order; `write-plainly` decides how each sentence says it.
 
 ## Final checks
 

@@ -34,6 +34,7 @@ COPIED_DIRS: dict[str, str] = {
     ".claude/skills/paper-drafting": "claude/skills/paper-drafting",
     ".claude/skills/review": "claude/skills/review",
     ".claude/skills/visualization": "claude/skills/visualization",
+    ".claude/skills/write-plainly": "claude/skills/write-plainly",
 }
 CODEX_CONFIG = ".codex/config.toml"
 CODEX_RULES = ".codex/rules/default.rules"

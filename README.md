@@ -4,29 +4,28 @@ My configuration for Claude Code and OpenAI Codex: the instructions file both ag
 safety hooks and settings. It is published as a reference. Paths are shown as `~`, and per-project entries and
 auto-saved command approvals are removed.
 
-## Contents
-
 | Path | What it is |
 |---|---|
 | `AGENTS.md` | Global instructions for both agents. Locally, `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` are symlinks to it |
 | `claude/settings.json` | Claude Code settings: permission allow and deny lists, hooks, plugins, auto-mode rules |
 | `claude/hooks/guard-bash.sh` | PreToolUse hook that blocks destructive or credential-reading shell commands |
 | `claude/statusline-command.sh` | Status line: model, effort, directory, branch, context use, rate limits |
-| `claude/agents/` | Subagents used by the review skill |
+| `claude/agents/` | Subagents used by the review and write-plainly skills |
 | `claude/skills/review/` | Multi-domain code review workflow (correctness, ML, stats, security, performance, ...) with a Codex second opinion |
 | `claude/skills/paper-drafting/` | Turning research into a paper or blog post: narrative, claims ledger, evidence red-team, drafting order |
+| `claude/skills/write-plainly/` | Writing and revising documents that other people read (READMEs, reports, posts): plain technical register, caveats in proportion, prose linters (`check-prose.sh` runs sloplint, slop-guard and house rules), and an Opus reviewer plus a fidelity check |
 | `claude/skills/visualization/` | Plot choice, uncertainty, computed and asserted titles, light and dark themes, figure review; includes `vizstyle.py` and tests |
 | `codex/config.toml` | Codex settings: permissions profiles, network allowlist, agents, hook registration |
 | `codex/rules/default.rules` | Codex prefix rules that forbid the same destructive commands as the Claude deny list |
 | `codex/hooks/` | Codex PreToolUse guard that reuses the Claude guard and checks compound shell commands, with test cases |
 
-## Installing
+## Installing and updating
 
-Copy or symlink the pieces you want into `~/.claude/` and `~/.codex/`. Skills go in `~/.claude/skills/<name>/`.
-The hooks call `jq`; the Codex guard runs under the system `python3`.
+To use any of this, copy or symlink the pieces you want into `~/.claude/` and `~/.codex/`; skills go in
+`~/.claude/skills/<name>/`. The hooks call `jq`, and the Codex guard runs under the system `python3`. The
+write-plainly linters need [uv](https://docs.astral.sh/uv/) for slop-guard, and Ruby 3.3 or later with
+`gem install sloplint` so that `sloplint` is on `PATH`.
 
-## Updating this repo
-
-`python3 sync.py` copies an explicit allowlist from the live config, applies the redactions, and fails if any file in
-the repo matches a sensitive pattern. The private part of that pattern list lives in the gitignored
-`.private/forbidden_patterns.txt`.
+The repo is a copy of my live config, refreshed by `python3 sync.py`. The script copies an explicit allowlist of files
+from `~/.claude` and `~/.codex`, applies the redactions, and fails if any file in the repo matches a sensitive
+pattern. The private part of that pattern list is kept in the gitignored `.private/forbidden_patterns.txt`.
