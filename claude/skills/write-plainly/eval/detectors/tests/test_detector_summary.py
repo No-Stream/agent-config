@@ -1,0 +1,25 @@
+import pytest
+from scoring import DETECTORS, Text
+from summarize import control_table, wilson
+
+
+def paired_texts(human: list[float], model: list[float]) -> tuple[list[Text], dict[str, dict]]:
+    texts, scores = [], {}
+    for arm, values in (("human", human), ("no-skill", model)):
+        for index, value in enumerate(values):
+            text = Text(f"bheijden/{arm}/t{index}", "bheijden", arm, f"t{index}", "r", 100, "p")
+            texts.append(text)
+            scores[text.id] = {"score": value}
+    return texts, scores
+
+
+@pytest.mark.parametrize(("detector", "human_wins"), [("desklib", "3/4"), ("binoculars", "1/4")])
+def test_human_less_ai_like_follows_the_detector_direction(detector, human_wins):
+    texts, scores = paired_texts(human=[0.1, 0.2, 0.3, 0.9], model=[0.5, 0.6, 0.7, 0.8])
+    row = control_table(DETECTORS[detector], texts, scores).splitlines()[-1]
+    assert row.startswith(f"| no-skill | 4 | {human_wins} |")
+
+
+def test_wilson_matches_a_published_value():
+    low, high = wilson(3, 10)
+    assert (round(low, 4), round(high, 4)) == (0.1078, 0.6032)

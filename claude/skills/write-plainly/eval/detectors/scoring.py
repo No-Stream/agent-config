@@ -1,0 +1,271 @@
+"""Manifest records, text preparation, chunking and score records shared by every detector.
+
+Standard library only: the SageMaker job imports this module inside a stock container.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import unicodedata
+from collections.abc import Iterable, Sequence
+from dataclasses import asdict, dataclass, fields
+from itertools import pairwise
+from pathlib import Path
+
+WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’.%-]*")  # the word rule of pairwise/common.py
+TYPOGRAPHY = str.maketrans(
+    {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201a": "'",
+        "\u201b": "'",
+        "\u2032": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u201e": '"',
+        "\u201f": '"',
+        "\u2033": '"',
+        "\u2026": "...",
+        "\u00a0": " ",
+        "\u202f": " ",
+    }
+)
+TABLE_ROW = re.compile(r"^\s*\|")
+HEADING = re.compile(r"^#+\s+", re.MULTILINE)
+LIST_MARKER = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)[ \t]+", re.MULTILINE)
+LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+STRONG = re.compile(r"(\*\*|__)(.+?)\1")
+EMPHASIS = re.compile(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])")
+EXTRA_BLANK_LINES = re.compile(r"\n{3,}")
+
+
+@dataclass(frozen=True)
+class Detector:
+    """`window` is the model's input length in tokens, special tokens included."""
+
+    name: str
+    model: str
+    revision: str
+    window: int
+    higher_is_ai: bool
+    unit: str
+    threshold: float | None
+    threshold_source: str
+
+
+FALCON = ("tiiuae/falcon-7b", "ec89142b67d748a1865ea4451372db8313ada0d8")
+FALCON_INSTRUCT = ("tiiuae/falcon-7b-instruct", "8782b5c5d8c9290412416618f36a133653e85285")
+DETECTORS = {
+    detector.name: detector
+    for detector in (
+        Detector(
+            "desklib",
+            "desklib/ai-text-detector-v1.01",
+            "5fdea974cd4287c61674951ec78803aa274e2fb7",
+            768,
+            True,
+            "log-odds of P(AI)",
+            0.0,
+            "P(AI) = 0.5, the model card's cut-off",
+        ),
+        Detector(
+            "gpttrace",
+            "nakas/gpttrace-v8s-1b",
+            "ac748e32ca8c90bb8858fadc427757728e27b063",
+            512,
+            True,
+            "machine logit minus human logit",
+            9.3,
+            "the model card's 1% false-positive cut-off",
+        ),
+        Detector(
+            "binoculars",
+            f"{FALCON[0]} observer, {FALCON_INSTRUCT[0]} performer",
+            f"{FALCON[1][:12]}, {FALCON_INSTRUCT[1][:12]}",
+            512,
+            False,
+            "log-perplexity over cross-perplexity",
+            0.8536432310785527,
+            "the reference code's low false-positive cut-off; AI below it",
+        ),
+        Detector(
+            "fast-detectgpt",
+            f"{FALCON[0]} sampling, {FALCON_INSTRUCT[0]} scoring",
+            f"{FALCON[1][:12]}, {FALCON_INSTRUCT[1][:12]}",
+            512,
+            True,
+            "analytic sampling discrepancy",
+            None,
+            "none published; the reference fit puts human texts near 0 and AI near 2.9",
+        ),
+    )
+}
+CPU_DETECTORS = ("desklib", "gpttrace")
+GPU_DETECTORS = ("binoculars", "fast-detectgpt")
+
+
+@dataclass(frozen=True)
+class Text:
+    """One manifest row; `path` is relative to the repo root."""
+
+    id: str
+    corpus: str
+    arm: str
+    topic: str
+    register: str
+    words: int
+    path: str
+
+
+@dataclass(frozen=True)
+class ChunkScore:
+    tokens: int
+    score: float
+
+
+def word_count(text: str) -> int:
+    return len(WORD.findall(text))
+
+
+def prepare_text(markdown: str) -> str:
+    """Plain prose for a detector: markdown syntax and table rows removed, typography folded.
+
+    Curly quotes, the ellipsis character and no-break spaces come from the editor or publisher,
+    not the author, so every text gets ASCII forms. Dashes are left alone.
+    """
+    text = "\n".join(line for line in markdown.splitlines() if not TABLE_ROW.match(line))
+    text = HEADING.sub("", text)
+    text = LIST_MARKER.sub("", text)
+    text = LINK.sub(r"\1", text)
+    text = STRONG.sub(r"\2", text)
+    text = EMPHASIS.sub(r"\1", text)
+    text = text.replace("`", "")
+    text = "".join(c for c in text if unicodedata.category(c) != "Cf")
+    text = text.translate(TYPOGRAPHY)
+    return EXTRA_BLANK_LINES.sub("\n\n", text).strip()
+
+
+def text_sha256(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def write_jsonl(rows: Iterable[dict], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows))
+    tmp.replace(path)
+
+
+def read_jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def write_manifest(texts: Sequence[Text], path: Path) -> None:
+    check_unique_ids(texts)
+    write_jsonl((asdict(text) for text in texts), path)
+
+
+def read_manifest(path: Path) -> list[Text]:
+    expected = {field.name for field in fields(Text)}
+    texts = []
+    for row in read_jsonl(path):
+        if set(row) != expected:
+            raise ValueError(f"{path}: row {row.get('id')!r} has fields {sorted(row)}")
+        texts.append(Text(**row))
+    check_unique_ids(texts)
+    return texts
+
+
+def check_unique_ids(texts: Sequence[Text]) -> None:
+    ids = [text.id for text in texts]
+    duplicates = sorted({text_id for text_id in ids if ids.count(text_id) > 1})
+    if duplicates:
+        raise ValueError(f"duplicate text ids: {duplicates}")
+
+
+def chunk_spans(n_tokens: int, window: int) -> list[tuple[int, int]]:
+    """Split n tokens into the fewest chunks of at most `window` tokens, as equal in size as possible.
+
+    Equal sizes keep a short tail chunk, whose score is noisy, from deciding the per-chunk extremes.
+    """
+    if n_tokens < 1 or window < 1:
+        raise ValueError(
+            f"need at least one token and a positive window, got {n_tokens=} {window=}"
+        )
+    count = -(-n_tokens // window)
+    bounds = [index * n_tokens // count for index in range(count + 1)]
+    return list(pairwise(bounds))
+
+
+def chunk_texts(
+    text: str, offsets: Sequence[tuple[int, int]], window: int
+) -> list[tuple[str, int]]:
+    """Cut `text` at token boundaries into chunks of at most `window` tokens, with their sizes.
+
+    `offsets` are the (start, end) character offsets of the text's tokens, without special tokens.
+    """
+    return [
+        (text[offsets[start][0] : offsets[end - 1][1]], end - start)
+        for start, end in chunk_spans(len(offsets), window)
+    ]
+
+
+def aggregate(chunks: Sequence[ChunkScore]) -> dict:
+    """Token-weighted mean over chunks, plus the per-chunk extremes and the chunk scores."""
+    if not chunks:
+        raise ValueError("no chunks to aggregate")
+    total = sum(chunk.tokens for chunk in chunks)
+    return {
+        "score": sum(chunk.tokens * chunk.score for chunk in chunks) / total,
+        "chunk_max": max(chunk.score for chunk in chunks),
+        "chunk_min": min(chunk.score for chunk in chunks),
+        "tokens": total,
+        "chunk_scores": [chunk.score for chunk in chunks],
+        "chunk_tokens": [chunk.tokens for chunk in chunks],
+    }
+
+
+def score_record(text_id: str, sha: str, detector: str, window: int, chunks: Sequence[ChunkScore]):
+    return {
+        "id": text_id,
+        "sha256": sha,
+        "detector": detector,
+        "window": window,
+        **aggregate(chunks),
+    }
+
+
+def reusable_scores(
+    existing: Sequence[dict], wanted: dict[str, str], detector: str, window: int
+) -> dict[str, dict]:
+    """Existing records still valid for the wanted {id: sha256}: same text, detector and window."""
+    return {
+        row["id"]: row
+        for row in existing
+        if row["detector"] == detector
+        and row["window"] == window
+        and wanted.get(row["id"]) == row["sha256"]
+    }
+
+
+def prepared_texts(texts: Sequence[Text], repo: Path) -> dict[str, str]:
+    return {text.id: prepare_text((repo / text.path).read_text()) for text in texts}
+
+
+def split_pending(
+    prepared: dict[str, str], scores_file: Path, detector: Detector
+) -> tuple[dict[str, dict], dict[str, str]]:
+    """The score records still valid for these texts, and the texts that need scoring."""
+    wanted = {text_id: text_sha256(text) for text_id, text in prepared.items()}
+    existing = read_jsonl(scores_file) if scores_file.exists() else []
+    kept = reusable_scores(existing, wanted, detector.name, detector.window)
+    return kept, {text_id: text for text_id, text in prepared.items() if text_id not in kept}
+
+
+def write_scores(scores_file: Path, order: Iterable[str], records: dict[str, dict]) -> list[str]:
+    """Write the records in manifest order, dropping texts no longer in it; return unscored ids."""
+    order = list(order)
+    write_jsonl((records[text_id] for text_id in order if text_id in records), scores_file)
+    return [text_id for text_id in order if text_id not in records]
