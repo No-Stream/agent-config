@@ -95,7 +95,7 @@ if matches '\bchmod[[:space:]]+777\b'; then
   exit 0
 fi
 
-if matches '\b(dd|mkfs|shred|shutdown|reboot|halt|poweroff|systemctl[[:space:]]+(halt|poweroff|reboot)|su|sudo)\b'; then
+if matches '(^|[;&|($`])[[:space:]]*\(?(sudo|su|dd|mkfs|shred|shutdown|reboot|halt|poweroff)\b|\bsystemctl[[:space:]]+(halt|poweroff|reboot)\b'; then
   deny "Blocked: privileged or system-destructive command must be run manually."
   exit 0
 fi
