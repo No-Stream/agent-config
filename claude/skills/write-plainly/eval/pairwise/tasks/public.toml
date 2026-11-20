@@ -1,0 +1,132 @@
+# Public writing tasks; every bullet cites a public source it was checked against.
+
+[[task]]
+id = "pub-chinchilla-scaling"
+doc_type = "Section of a research readout"
+reader = "Marco, an ML engineer who has trained mid-size transformers but has not read the scaling-law papers; he has a fixed GPU budget for a new pretraining run and needs to know how to split it between model size and training tokens, and how far to trust that rule"
+target_words = 220
+notes = """
+- question: fixed training compute budget; best split between parameter count N and training tokens D. "compute-optimal" = lowest loss reachable for that budget [1]
+- method: 400+ language models, 70M to 16B+ params, 5B to 500B tokens; three separate fitting approaches give comparable predictions [1]
+- result: N and D should grow in equal proportion as compute grows; each doubling of model size -> double the training tokens [1]
+- earlier rule (Kaplan et al. 2020): 10x compute -> model 5.5x bigger, tokens only 1.8x. field followed it: most large models trained on ~300B tokens whatever their size; authors call them "significantly undertrained" [1]
+- test: Gopher's compute budget spent on a 4x smaller model. Chinchilla = 70B params, 1.4T tokens; Gopher = 280B params, 300B tokens [1]
+- Chinchilla beats Gopher, GPT-3, Jurassic-1 and MT-NLG 530B on a large range of downstream tasks [1]
+- MMLU (exam-style questions, 57 subjects), 5-shot average accuracy: Chinchilla 67.6%, Gopher 60.0%. abstract rounds to 67.5% [1]
+- sizing arithmetic used in the paper: training FLOPs ~ 6 * N * D [1]
+- Table 3 projections, compute-optimal tokens: 1B params -> 20.2B tokens; 10B -> 205.1B; 67B -> 1.5T. works out to ~20 tokens per param (ratio computed from the table; the paper states no such rule) [1]
+- smaller model at the same training spend -> smaller memory footprint, cheaper fine-tuning and inference [1]
+- limitation: only two comparable runs at large scale (Chinchilla, Gopher), none at intermediate scales [1]
+- limitation: frontier curves at high compute, so the paper may still overestimate the optimal model size [1]
+- limitation: every run used under one epoch of data; repeated-data regime untested [1]
+- authors: "significant uncertainty" extrapolating many orders of magnitude [1]
+"""
+sources = [
+  "[1] Hoffmann et al. (2022), Training Compute-Optimal Large Language Models, arXiv:2203.15556 (abstract; Sections 1, 3.4, 4 and 5; Tables 1, 3 and 6), https://arxiv.org/abs/2203.15556",
+]
+
+[[task]]
+id = "pub-wilson-interval"
+doc_type = "Proposal paragraph"
+reader = "Hana, an analytics lead whose team dashboard shows conversion rates with 95% error bars from the textbook Wald formula, often on segments of a few dozen users; she knows what a confidence interval is but not the coverage literature, and must decide whether to change the dashboard's default interval"
+target_words = 190
+notes = """
+- Wald ("standard") interval: p-hat +/- z * sqrt(p-hat * (1 - p-hat) / n), p-hat = X/n. textbook default, near-universal in practice [1]
+- coverage = probability the interval contains the true p; a nominal 95% interval should cover about 95% of the time [1]
+- textbook rule of thumb: use Wald only if n * min(p, 1 - p) >= 5 (or 10). paper: these prescriptions are "misleading and defective" and "cannot be trusted" [1]
+- Wald coverage is erratic in both n and p, not only at small n or p near 0 or 1. n = 100: p = 0.106 -> coverage 0.952, p = 0.107 -> 0.911 [1]
+- larger samples can be worse: p = 0.2, n = 30 -> 0.946; n = 98 -> 0.928 [1]
+- even at p = 0.5: n = 40 -> 0.919 [1]
+- Wald at X = 0 or X = n: p-hat * (1 - p-hat) = 0, so the interval has zero width (follows from the formula) [1]
+- Wilson ("score") interval, from Wilson 1927: inverts the same normal-approximation test but uses the null standard error sqrt(p(1 - p)/n) in place of the estimated one. closed form; centered at (X + z^2/2) / (n + z^2), i.e. p-hat pulled toward 0.5 [1]
+- recommendation: n <= 40 -> Wilson or the equal-tailed Jeffreys interval (very similar, pick by taste); n > 40 -> Wilson, Jeffreys and Agresti-Coull nearly identical, Agresti-Coull preferred for its simple form [1]
+- Agresti-Coull at 95%: add 2 successes and 2 failures, then apply the Wald formula; never shorter than Wilson [1]
+- Jeffreys: Bayesian interval under a Beta(1/2, 1/2) prior; endpoints are beta quantiles, no closed form [1]
+- Wilson and Jeffreys: excellent average coverage across p [1]
+- caveat: Wilson coverage has deep downward spikes for p very close to 0 or 1; a modified Wilson removes the first few [1]
+- Clopper-Pearson "exact" interval: "wastefully conservative", not recommended for practical use [1]
+"""
+sources = [
+  "[1] Brown, Cai and DasGupta (2001), Interval Estimation for a Binomial Proportion, Statistical Science 16(2):101-133 (abstract; Sections 1, 2 and 3), https://doi.org/10.1214/ss/1009213286",
+]
+
+[[task]]
+id = "pub-ripgrep-filtering"
+doc_type = "README section"
+reader = "Sam, a new contributor who uses grep daily but is new to ripgrep; Sam ran rg for a string they know is in the repo, got no match, and needs to know which default filters could be hiding the file and how to check"
+target_words = 180
+notes = """
+- recursive search skips by default: paths matched by ignore files; hidden files and dirs; binary files. symlinks not followed [1]
+- ignore files read: .gitignore (incl. parent dirs in the same repo, $GIT_DIR/info/exclude, global core.excludesFile), .ignore, .rgignore [1]
+- .gitignore rules apply only when rg detects a git repo (e.g. sees a .git dir); --no-require-git applies them anyway [2]
+- precedence on conflict: .rgignore > .ignore > .gitignore. e.g. .gitignore has log/; a .ignore next to it with !log/ -> rg searches log/, git still ignores it [1]
+- hidden = base name starts with "." (on Windows, also the hidden file attribute). --hidden (short -.) searches them, .git included [2]
+- binary = file contains a NUL byte anywhere. default: stop searching the file at the first NUL; warning if a match was already printed [1]
+- with memory maps, the binary check covers only the first few KB plus matching lines, so the same file can be classified differently; --no-mmap makes it consistent [1]
+- filters apply only during directory traversal. rg foo .file searches a hidden file; rg foo binary-file searches it in binary mode [1]
+- -u / --unrestricted, repeatable up to 3 times (a 4th is an error): -u = --no-ignore; -uu = --no-ignore --hidden; -uuu = --no-ignore --hidden --binary [2]
+- guide says -u disables .gitignore handling; flag docs: -u is identical to --no-ignore, which drops .gitignore, .ignore and .rgignore alike [1, 2]
+- -uuu still skips symlinks (--follow / -L to follow) and still does not print matches from binary files (-a / --text searches them as text; can dump control characters into the terminal) [1, 2]
+- --files: print the files rg would search, search nothing; shows whether one particular file is included [1, 2]
+- --debug: debug messages name every skipped file and why it was skipped [2]
+- error saying no files were searched: one likely cause is a * rule in $HOME/.gitignore; rerun with --debug [1]
+"""
+sources = [
+  "[1] ripgrep 15.2.0 user guide, GUIDE.md (Automatic filtering, Binary data, Common options), https://github.com/BurntSushi/ripgrep/blob/15.2.0/GUIDE.md",
+  "[2] ripgrep 15.2.0 flag documentation, crates/core/flags/defs.rs (--unrestricted, --no-ignore, --hidden, --no-require-git, --files, --debug), https://github.com/BurntSushi/ripgrep/blob/15.2.0/crates/core/flags/defs.rs",
+]
+
+[[task]]
+id = "pub-requests-verify-pool"
+doc_type = "Pull request description"
+reader = "Priya, a requests maintainer reviewing this PR; she knows HTTPAdapter and urllib3 connection pooling well but has not seen the security report, and needs to judge whether the change closes the hole and what it could break for HTTPAdapter subclasses"
+target_words = 200
+notes = """
+- report: in a Session, if the first request to an origin uses verify=False, later requests to that origin also skip certificate verification, even with verify=True set explicitly [1, 2, 6]
+- lasts for the lifetime of the pooled connection; risk is man-in-the-middle, loss of confidentiality and integrity [2]
+- tracked as GHSA-9wx4-h78v-vm56 / CVE-2024-35195, moderate, CVSS 3.1 score 5.6; affects requests < 2.32.0 [1, 2]
+- cause: HTTPAdapter.get_connection(url, proxies) picks the urllib3 pool from the URL alone (poolmanager.connection_from_url); verify never reaches pool selection [3]
+- send() then calls cert_verify(), which sets cert_reqs / ca_certs on that shared pool object (CERT_NONE when verify is falsy); a connection already opened unverified stays in the pool and is reused [2, 3]
+- urllib3 PoolKey has key_cert_reqs and key_ca_certs fields alongside scheme, host, port [4]
+- change: new _urllib3_request_context(request, verify) returns host params (scheme, host, port) and pool_kwargs: cert_reqs = "CERT_NONE" if verify is False, else "CERT_REQUIRED"; ca_certs = verify when verify is a CA bundle path [5]
+- change: new HTTPAdapter._get_connection(request, verify, proxies) passes these to connection_from_host(..., pool_kwargs=...) on the pool manager or proxy manager, so verified and unverified requests to one host get separate pools [4, 5]
+- compat: send() now calls _get_connection(); get_connection() kept unchanged for subclasses but no longer called by send(), so a subclass overriding it is bypassed [5]
+- adapter defaults unchanged: pool_connections = pool_maxsize = 10 (DEFAULT_POOLSIZE) [3, 5]
+- test: test_different_connection_pool_for_tls_settings. Session GET https://invalid.badssl.com with verify=False -> status 421; second GET with default verify -> SSLError [5]
+- test needs network access to badssl.com [5]
+- tox.ini: pytest {posargs:tests}, so tox can run a single test file [5]
+- workarounds for users on older versions: don't send verify=False as the first request to a host in a Session, or call Session.close() after verify=False requests [1]
+"""
+sources = [
+  "[1] psf/requests security advisory GHSA-9wx4-h78v-vm56, Session object does not verify requests after making first request with verify=False, https://github.com/psf/requests/security/advisories/GHSA-9wx4-h78v-vm56",
+  "[2] GitHub Advisory Database entry GHSA-9wx4-h78v-vm56 (CVE-2024-35195), https://github.com/advisories/GHSA-9wx4-h78v-vm56",
+  "[3] requests v2.31.0 source, requests/adapters.py (get_connection, cert_verify, send, DEFAULT_POOLSIZE), https://github.com/psf/requests/blob/v2.31.0/requests/adapters.py",
+  "[4] urllib3 2.2.1 source, src/urllib3/poolmanager.py (PoolKey, connection_from_host), https://github.com/urllib3/urllib3/blob/2.2.1/src/urllib3/poolmanager.py",
+  "[5] psf/requests pull request #6655, Use TLS settings in selecting connection pool (diff of src/requests/adapters.py, tests/test_requests.py, tox.ini), https://github.com/psf/requests/pull/6655",
+  "[6] requests HISTORY.md, 2.32.0 (2024-05-20) Security entry, https://github.com/psf/requests/blob/v2.32.0/HISTORY.md",
+]
+
+[[task]]
+id = "pub-sqlite-wal"
+doc_type = "Design-doc explanation"
+reader = "Dana, a backend engineer who has used SQLite as a library but never tuned it, choosing a journal mode for a local job queue where several worker processes on one machine poll for jobs and claim them"
+target_words = 210
+notes = """
+- default rollback journal: copy original pages to a journal file, write changes into the db file; commit = journal deleted [1]
+- WAL inverts it: db file left as is, changes appended to a separate WAL file; commit = a commit record appended to the WAL. readers keep reading the unchanged db file meanwhile [1]
+- readers don't block the writer, the writer doesn't block readers [1]
+- one writer at a time (there is only one WAL file) [1]
+- a read transaction records an "end mark" (last valid commit in the WAL) when it starts and sees the db as of that point for the whole transaction [1]
+- checkpoint = copying WAL content back into the db file. automatic when a commit takes the WAL to 1000 pages (~4 MB) or the last connection closes; threshold set by PRAGMA wal_autocheckpoint [1]
+- checkpoint starvation: a checkpoint can't reset the WAL while any reader still uses it; with at least one reader always active, the WAL grows without bound. reads slow down as the WAL grows [1]
+- files: db plus "-wal" and "-shm" (the wal-index, a shared-memory file, rarely over 32 KiB); both deleted when the last connection closes cleanly [1]
+- all processes must be on the same host: WAL needs shared memory, does not work over a network filesystem [1]
+- PRAGMA journal_mode=WAL is persistent: survives close and reopen [1]
+- synchronous=NORMAL: WAL synced only at checkpoints, not on every commit; faster, but commits may roll back after a power loss or hard reset [1]
+- large transactions: over ~100 MB rollback modes likely faster, over 1 GB WAL may fail with an I/O or disk-full error; same page: since 3.11.0 (2016-02-15) WAL handles large transactions as efficiently as rollback [1]
+- read-mostly workloads: WAL perhaps 1-2% slower than rollback journal [1]
+- some obscure cases still return SQLITE_BUSY, e.g. while another connection runs crash recovery [1]
+"""
+sources = [
+  "[1] SQLite documentation, Write-Ahead Logging, https://www.sqlite.org/wal.html",
+]
