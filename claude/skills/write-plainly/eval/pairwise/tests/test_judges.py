@@ -7,41 +7,34 @@ from pathlib import Path
 import pytest
 
 import agents
-from judges import batch_text, checked_verdicts
+from judges import letter_orders, ranking_in_set_letters, set_text
 
 PAIRWISE_DIR = Path(__file__).resolve().parents[1]
-PAIRS = [
+LETTERS = ["A", "B", "C", "D", "E"]
+SETS = [
     {
-        "pair_id": f"0{n}",
+        "set_id": str(n),
         "doc_type": "README section",
         "reader": "Ana",
-        "left": f"L{n}",
-        "right": f"R{n}",
+        "passages": {letter: f"Passage {letter}{n}." for letter in LETTERS},
     }
     for n in (1, 2, 3)
 ]
-RESULT_FILES = {
-    f"{judge}-{order}-{batch:02d}.json"
-    for judge in ("opus", "codex")
-    for order in ("shown", "swapped")
-    for batch in (0, 1)
-}
 
 
 def judge(
-    tmp_path: Path, fake_claude: Path, fake_codex: Path, *extra: str
+    tmp_path: Path, fake_claude: Path, fake_codex: Path, *extra: str, sets: list[dict] = SETS
 ) -> subprocess.CompletedProcess:
     """Run judges.py from tmp_path with relative paths, as a person would, on the fakes."""
-    (tmp_path / "pairs.jsonl").write_text("".join(json.dumps(pair) + "\n" for pair in PAIRS))
+    (tmp_path / "sets.jsonl").write_text("".join(json.dumps(s) + "\n" for s in sets))
     (tmp_path / "SKILL.md").write_text("Write plainly.\n")
     home = tmp_path / "home"
     (home / ".codex").mkdir(parents=True, exist_ok=True)
     (home / ".codex" / "review.config.toml").write_text('sandbox_mode = "read-only"\n')
     command = [
-        sys.executable, str(PAIRWISE_DIR / "judges.py"), "--pairs", "pairs.jsonl",
-        "--skill", "SKILL.md", "--out", "judges", "--seed", "5", "--batch-size", "2",
-        "--effort", "low", "--claude-bin", str(fake_claude), "--codex-bin", str(fake_codex),
-        *extra,
+        sys.executable, str(PAIRWISE_DIR / "judges.py"), "--sets", "sets.jsonl",
+        "--skill", "SKILL.md", "--out", "judges", "--seed", "5", "--effort", "low",
+        "--claude-bin", str(fake_claude), "--codex-bin", str(fake_codex), *extra,
     ]  # fmt: skip
     env = {**os.environ, "HOME": str(home)}
     return subprocess.run(
@@ -49,45 +42,48 @@ def judge(
     )
 
 
-def picks(out_dir: Path, judge_name: str, order: str) -> dict[str, str]:
-    verdicts = [
-        verdict
-        for result_file in out_dir.glob(f"{judge_name}-{order}-*.json")
-        for verdict in json.loads(result_file.read_text())["verdicts"]
+def recorded(out_dir: Path, judge_name: str, order: str) -> dict[str, dict]:
+    records = [
+        json.loads(path.read_text()) for path in out_dir.glob(f"{judge_name}-{order}-set*.json")
     ]
-    return {verdict["pair_id"]: verdict["pick"] for verdict in verdicts}
+    return {record["set_id"]: record for record in records}
 
 
 class TestCommand:
-    def test_both_judges_see_both_orders_and_picks_are_in_the_pairs_file_orientation(
+    def test_both_judges_rank_every_set_in_both_orders_in_the_sets_file_letters(
         self, tmp_path: Path, fake_claude: Path, fake_codex: Path, claude_calls
     ) -> None:
         completed = judge(tmp_path, fake_claude, fake_codex)
         assert completed.returncode == 0, completed.stderr
         out_dir = tmp_path / "judges"
-        assert {path.name for path in out_dir.glob("*.json")} == RESULT_FILES
-        assert picks(out_dir, "opus", "shown") == dict.fromkeys(("01", "02", "03"), "left")
-        assert picks(out_dir, "opus", "swapped") == dict.fromkeys(("01", "02", "03"), "right")
-        assert picks(out_dir, "codex", "shown") == dict.fromkeys(("01", "02", "03"), "right")
-        assert picks(out_dir, "codex", "swapped") == dict.fromkeys(("01", "02", "03"), "left")
-        assert len(claude_calls()) == 4  # two batches of at most two pairs, two orders
+        for passage_set in SETS:
+            orders = letter_orders(passage_set["set_id"], LETTERS, seed=5)
+            opus = {o: recorded(out_dir, "opus", o)[passage_set["set_id"]] for o in orders}
+            codex = {o: recorded(out_dir, "codex", o)[passage_set["set_id"]] for o in orders}
+            for order, shown in orders.items():
+                # the fake claude ranks in the order shown, the fake codex in reverse
+                assert opus[order]["ranking"] == "".join(shown)
+                assert codex[order]["ranking"] == "".join(reversed(shown))
+        assert len(claude_calls()) == 6  # three sets, two orders
         assert all("--safe-mode" in call["arguments"] for call in claude_calls())
         skill_line = f"- {(tmp_path / 'SKILL.md').resolve()}\n"
         assert all(skill_line in call["prompt"] for call in claude_calls())
+        assert "opus: Kendall tau between the two orders' rankings, mean -1.00" in completed.stderr
 
-    def test_a_rerun_skips_batches_already_judged(
+    def test_a_rerun_skips_sets_already_ranked(
         self, tmp_path: Path, fake_claude: Path, fake_codex: Path, claude_calls
     ) -> None:
         judge(tmp_path, fake_claude, fake_codex)
         completed = judge(tmp_path, fake_claude, fake_codex)
         assert completed.returncode == 0, completed.stderr
-        assert len(claude_calls()) == 4
+        assert len(claude_calls()) == 6
 
-    def test_a_judged_batch_holding_other_pairs_stops_the_run(
+    def test_a_ranked_set_on_disk_that_differs_from_the_set_stops_the_run(
         self, tmp_path: Path, fake_claude: Path, fake_codex: Path
     ) -> None:
-        judge(tmp_path, fake_claude, fake_codex, "--only", "01")
-        completed = judge(tmp_path, fake_claude, fake_codex)
+        judge(tmp_path, fake_claude, fake_codex)
+        edited = [{**SETS[0], "passages": {**SETS[0]["passages"], "A": "Edited."}}, *SETS[1:]]
+        completed = judge(tmp_path, fake_claude, fake_codex, sets=edited)
         assert completed.returncode != 0 and "RuntimeError" in completed.stderr
 
     def test_an_opus_judge_that_skips_the_guidance_stops_the_run(
@@ -97,24 +93,32 @@ class TestCommand:
         fake_codex: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setenv("FAKE_CLAUDE_SKIP_READS", "You are judging")
+        monkeypatch.setenv("FAKE_CLAUDE_SKIP_READS", "You are ranking")
         completed = judge(tmp_path, fake_claude, fake_codex, "--judges", "opus")
         assert completed.returncode != 0 and "RuntimeError" in completed.stderr
         assert not list((tmp_path / "judges").glob("*.json"))
 
 
-class TestVerdicts:
-    def test_the_swapped_batch_shows_each_pair_reversed(self) -> None:
-        text = batch_text(PAIRS[:1], "swapped")
-        assert text.index("### Left\n\nR1") < text.index("### Right\n\nL1")
+class TestOrders:
+    def test_the_second_order_reverses_the_first(self) -> None:
+        orders = letter_orders("1", LETTERS, seed=5)
+        assert sorted(orders["drawn"]) == LETTERS
+        assert orders["reversed"] == orders["drawn"][::-1]
 
-    def test_verdicts_must_cover_exactly_the_batch(self) -> None:
-        with pytest.raises(RuntimeError):
-            checked_verdicts(
-                [{"pair_id": "01", "choice": "left", "reason": ""}], ["01", "02"], "shown"
-            )
-        with pytest.raises(RuntimeError):
-            checked_verdicts([{"pair_id": "01", "choice": "both", "reason": ""}], ["01"], "shown")
+    def test_the_judge_sees_each_passage_under_its_shown_letter(self) -> None:
+        text = set_text(SETS[0], ["C", "A", "B", "E", "D"])
+        assert text.index("### Passage A\n\nPassage C1.") < text.index(
+            "### Passage B\n\nPassage A1."
+        )
+        assert "Intended reader: Ana" in text
+
+    def test_a_ranking_in_shown_letters_maps_back_to_set_letters(self) -> None:
+        shown = ["C", "A", "B", "E", "D"]
+        assert ranking_in_set_letters("AB=CED", shown) == "CA=BDE"
+
+    def test_a_ranking_that_misses_a_passage_is_refused(self) -> None:
+        with pytest.raises(ValueError):
+            ranking_in_set_letters("ABCD", ["C", "A", "B", "E", "D"])
 
 
 class TestCodex:

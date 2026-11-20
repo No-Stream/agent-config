@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Label blind passage pairs one at a time: left, right, tie or skip, with an optional note.
+"""Rank blind passage sets: read each task's passages one at a time, then rank them best first.
 
-Run it in a terminal: python3 label.py PAIRS_FILE
-Each answer is appended to the labels file at once, so you can quit at any point and run the
-same command again to continue. Skipped pairs come back after the unanswered ones. Standard
-library only, Python 3.9 or newer.
+Run it in a terminal: python3 label.py SETS_FILE
+Each ranking is appended to the rankings file at once, so you can quit at any point and run the
+same command again to continue. Standard library only, Python 3.9 or newer.
 """
 
 from __future__ import annotations
@@ -19,57 +18,97 @@ import termios
 import textwrap
 import time
 import tty
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from itertools import zip_longest
 from pathlib import Path
 
-PAIR_FIELDS = {"pair_id", "doc_type", "reader", "left", "right"}
-CHOICE_KEYS = {
-    "1": "left",
-    "h": "left",
-    "\x1b[D": "left",
-    "left": "left",
-    "2": "right",
-    "l": "right",
-    "\x1b[C": "right",
-    "right": "right",
-    "t": "tie",
-    "tie": "tie",
-    "s": "skip",
-    "skip": "skip",
-}
-NOTE_KEYS = {"n", "note"}
-BACK_KEYS = {"u", "back"}
+SET_FIELDS = {"set_id", "doc_type", "reader", "passages"}
+NEXT_KEYS = {"n", "\x1b[C", "next"}
+PREVIOUS_KEYS = {"p", "\x1b[D", "previous"}
+RANK_KEYS = {"r", "rank"}
+BACK_KEYS = {"b", "back"}
 QUIT_KEYS = {"q", "quit", "\x03", "\x04", ""}
-LEGEND = "1/← left   2/→ right   t tie   s skip   n note   u back   q quit"
-SIDE_BY_SIDE_MIN_WIDTH = 100
+LEGEND = "n/→ next   p/← previous   r rank   b previous task   q quit"
+RANKING_PROMPT = "Ranking, best first, = for a tie (CA=EBD); Enter reads again, q quits: "
+NOTE_PROMPT = "Note (optional, Enter to skip): "
+MAX_TEXT_WIDTH = 100
 CLEAR_SCREEN = "\x1b[2J\x1b[H"
 
 
-def load_pairs(pairs_file: Path) -> list[dict]:
-    pairs = [json.loads(line) for line in pairs_file.read_text().splitlines() if line.strip()]
-    for pair in pairs:
-        if set(pair) != PAIR_FIELDS:
+@dataclass(frozen=True)
+class Console:
+    """How a session reads keys and lines, writes the screen, and measures width and time."""
+
+    read_key: Callable[[], str]
+    read_line: Callable[[str], str]
+    write: Callable[[str], None]
+    width: Callable[[], int]
+    clock: Callable[[], float] = time.monotonic
+
+
+def load_sets(sets_file: Path) -> list[dict]:
+    sets = [json.loads(line) for line in sets_file.read_text().splitlines() if line.strip()]
+    for passage_set in sets:
+        if set(passage_set) != SET_FIELDS:
             raise ValueError(
-                f"pair {pair.get('pair_id')} has fields {sorted(pair)}, expected {sorted(PAIR_FIELDS)}"
+                f"set {passage_set.get('set_id')} has fields {sorted(passage_set)}, "
+                f"expected {sorted(SET_FIELDS)}"
             )
-    return pairs
+    return sets
 
 
-def latest_labels(labels_file: Path) -> dict[str, dict]:
-    """The last answer given for each pair; a later answer replaces an earlier one."""
+def latest_rankings(labels_file: Path) -> dict[str, dict]:
+    """The last ranking given for each set; a later ranking replaces an earlier one."""
     if not labels_file.exists():
         return {}
     records = [json.loads(line) for line in labels_file.read_text().splitlines() if line.strip()]
-    return {record["pair_id"]: record for record in records}
+    return {record["set_id"]: record for record in records}
 
 
-def pairs_to_show(pairs: list[dict], labels: dict[str, dict]) -> list[dict]:
-    unanswered = [pair for pair in pairs if pair["pair_id"] not in labels]
-    skipped_ids = {pair_id for pair_id, record in labels.items() if record["choice"] == "skip"}
-    skipped = [pair for pair in pairs if pair["pair_id"] in skipped_ids]
-    return unanswered + skipped
+def parse_ranking(typed: str, letters: Sequence[str]) -> list[list[str]]:
+    """Places best first, each a list of tied letters: "CA=EBD" is C, then A tied with E, B, D."""
+    text = "".join(typed.split()).upper()
+    groups: list[list[str]] = []
+    joining = False
+    for position, character in enumerate(text):
+        if character == "=":
+            if joining or not groups or position == len(text) - 1:
+                raise ValueError("= goes between two letters, as in CA=EBD")
+            joining = True
+        elif character in letters:
+            if joining:
+                groups[-1].append(character)
+            else:
+                groups.append([character])
+            joining = False
+        else:
+            raise ValueError(f"{character} is not one of the letters {''.join(letters)}")
+    placed = [letter for group in groups for letter in group]
+    repeated = sorted({letter for letter in placed if placed.count(letter) > 1})
+    if repeated:
+        raise ValueError(f"{', '.join(repeated)} placed more than once")
+    missing = [letter for letter in letters if letter not in placed]
+    if missing:
+        raise ValueError(f"{', '.join(missing)} missing")
+    if len(groups) < 2:
+        raise ValueError("a ranking needs at least two places")
+    return groups
+
+
+def format_ranking(groups: list[list[str]]) -> str:
+    return "".join("=".join(group) for group in groups)
+
+
+def ranks(groups: list[list[str]]) -> dict[str, float]:
+    """Each letter's place, 1 for the best; tied letters share the mean of the places they span."""
+    result: dict[str, float] = {}
+    place = 1
+    for group in groups:
+        for letter in group:
+            result[letter] = place + (len(group) - 1) / 2
+        place += len(group)
+    return result
 
 
 def is_list_marker(word: str) -> bool:
@@ -96,88 +135,117 @@ def wrap_passage(text: str, width: int) -> list[str]:
     return lines
 
 
-def render(pair: dict, answered: int, total: int, note: str, width: int) -> str:
-    rule = "─" * width
-    header = textwrap.wrap(f"{answered}/{total} done · {pair['doc_type']}", width=width)
-    header += textwrap.wrap(f"Reader: {pair['reader']}", width=width)
-    if width >= SIDE_BY_SIDE_MIN_WIDTH:
-        column_width = (width - 3) // 2
-        left_lines = ["LEFT", ""] + wrap_passage(pair["left"], column_width)
-        right_lines = ["RIGHT", ""] + wrap_passage(pair["right"], column_width)
-        body = [
-            f"{left.ljust(column_width)} │ {right}"
-            for left, right in zip_longest(left_lines, right_lines, fillvalue="")
-        ]
-    else:
-        body = ["LEFT", ""] + wrap_passage(pair["left"], width) + [rule, "RIGHT", ""]
-        body += wrap_passage(pair["right"], width)
-    note_lines = textwrap.wrap(f"note: {note}", width=width) if note else []
-    footer = [rule] + note_lines
-    footer += textwrap.wrap(LEGEND, width=width, break_on_hyphens=False)
-    return CLEAR_SCREEN + "\n".join(header + [rule] + body + footer) + "\n"
+def header(passage_set: dict, title: str, width: int) -> list[str]:
+    lines = textwrap.wrap(f"{title} · {passage_set['doc_type']}", width=width)
+    return lines + textwrap.wrap(f"Reader: {passage_set['reader']}", width=width) + ["─" * width]
 
 
-def run_session(
-    pairs: list[dict],
-    labels_file: Path,
-    read_key: Callable[[], str],
-    read_line: Callable[[str], str],
-    write: Callable[[str], None],
-    terminal_width: Callable[[], int],
-    clock: Callable[[], float] = time.monotonic,
-) -> None:
-    labels = latest_labels(labels_file)
-    queue = pairs_to_show(pairs, labels)
-    shown_this_session: list[dict] = []
-    position = 0
+def render_passage(passage_set: dict, letter: str, position: int, total: int, width: int) -> str:
+    width = min(width, MAX_TEXT_WIDTH)
+    strip = " ".join(f"[{x}]" if x == letter else x for x in sorted(passage_set["passages"]))
+    lines = header(passage_set, f"Task {position}/{total} · {strip}", width)
+    lines += wrap_passage(passage_set["passages"][letter], width)
+    lines += ["─" * width] + textwrap.wrap(LEGEND, width=width, break_on_hyphens=False)
+    return CLEAR_SCREEN + "\n".join(lines) + "\n"
+
+
+def render_ranking_screen(passage_set: dict, position: int, total: int, width: int) -> str:
+    """Each passage's opening words beside its letter, as a reminder while ranking."""
+    width = min(width, MAX_TEXT_WIDTH)
+    lines = header(passage_set, f"Task {position}/{total} · rank", width)
+    for letter in sorted(passage_set["passages"]):
+        line = f"{letter}  {' '.join(passage_set['passages'][letter].split())}"
+        lines.append(line if len(line) <= width else line[: width - 1] + "…")
+    return CLEAR_SCREEN + "\n".join(lines + ["─" * width]) + "\n"
+
+
+def rank_one_set(
+    passage_set: dict,
+    position: int,
+    total: int,
+    can_go_back: bool,
+    console: Console,
+) -> tuple[str, dict | None]:
+    """("ranked", record), ("back", None) or ("quit", None)."""
+    letters = sorted(passage_set["passages"])
+    shown = 0
+    started = console.clock()
+    redraw = True
     while True:
-        if position == len(queue):
-            skipped = sum(1 for record in labels.values() if record["choice"] == "skip")
-            write(
-                f"\nAll {len(pairs)} pairs answered ({skipped} skipped). "
-                f"Labels are in {labels_file}.\nu goes back to the last pair, q quits.\n"
+        if redraw:
+            console.write(
+                render_passage(passage_set, letters[shown], position, total, console.width())
             )
-            key = read_key()
-            while key not in QUIT_KEYS and not (key in BACK_KEYS and shown_this_session):
-                key = read_key()
-            if key in QUIT_KEYS:
-                return
-            queue.insert(position, shown_this_session.pop())
-        pair = queue[position]
-        note = ""
-        answered = sum(1 for record in labels.values() if record["choice"] != "skip")
-        write(render(pair, answered, len(pairs), note, terminal_width()))
-        started = clock()
-        while True:
-            key = read_key()
-            if key in QUIT_KEYS:
-                write(
-                    f"\nStopped with {answered} of {len(pairs)} answered. "
-                    "Run the same command to continue.\n"
-                )
-                return
-            if key in NOTE_KEYS:
-                note = read_line("note: ").strip()
-                write(render(pair, answered, len(pairs), note, terminal_width()))
-                continue
-            if key in BACK_KEYS and shown_this_session:
-                previous = shown_this_session.pop()
-                queue.insert(position, previous)
-                break
-            if key in CHOICE_KEYS:
-                record = {
-                    "pair_id": pair["pair_id"],
-                    "choice": CHOICE_KEYS[key],
+        key = console.read_key()
+        redraw = True
+        if key in QUIT_KEYS:
+            return "quit", None
+        if key in BACK_KEYS and can_go_back:
+            return "back", None
+        if key in PREVIOUS_KEYS and shown > 0:
+            shown -= 1
+        elif key in NEXT_KEYS and shown < len(letters) - 1:
+            shown += 1
+        elif key in RANK_KEYS or key in NEXT_KEYS:
+            console.write(render_ranking_screen(passage_set, position, total, console.width()))
+            while True:
+                typed = console.read_line(RANKING_PROMPT).strip()
+                if not typed:
+                    break
+                if typed.lower() in QUIT_KEYS:
+                    return "quit", None
+                try:
+                    groups = parse_ranking(typed, letters)
+                except ValueError as error:
+                    console.write(f"  {error}\n")
+                    continue
+                note = console.read_line(NOTE_PROMPT).strip()
+                return "ranked", {
+                    "set_id": passage_set["set_id"],
+                    "ranking": format_ranking(groups),
                     "note": note,
-                    "seconds": round(clock() - started, 1),
+                    "seconds": round(console.clock() - started, 1),
                     "answered_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 }
-                with labels_file.open("a") as labels_handle:
-                    labels_handle.write(json.dumps(record) + "\n")
-                labels[pair["pair_id"]] = record
-                shown_this_session.append(pair)
-                position += 1
-                break
+        else:
+            redraw = False
+
+
+def next_unranked(sets: list[dict], rankings: dict[str, dict], after: int) -> int | None:
+    """The first unranked set after position `after`, wrapping round; None when all are ranked."""
+    order = list(range(after + 1, len(sets))) + list(range(after + 1))
+    return next((index for index in order if sets[index]["set_id"] not in rankings), None)
+
+
+def run_session(sets: list[dict], labels_file: Path, console: Console) -> None:
+    rankings = latest_rankings(labels_file)
+    index = next_unranked(sets, rankings, after=-1)
+    while True:
+        if index is None:
+            console.write(
+                f"\nAll {len(sets)} tasks ranked. Rankings are in {labels_file}.\n"
+                "b reopens the last task, q quits.\n"
+            )
+            key = console.read_key()
+            while key not in QUIT_KEYS | BACK_KEYS:
+                key = console.read_key()
+            if key in QUIT_KEYS:
+                return
+            index = len(sets) - 1
+        action, record = rank_one_set(sets[index], index + 1, len(sets), index > 0, console)
+        if action == "quit":
+            console.write(
+                f"\nStopped with {len(rankings)} of {len(sets)} tasks ranked. "
+                "Run the same command to continue.\n"
+            )
+            return
+        if action == "back":
+            index -= 1
+            continue
+        with labels_file.open("a") as labels_handle:
+            labels_handle.write(json.dumps(record) + "\n")
+        rankings[record["set_id"]] = record
+        index = next_unranked(sets, rankings, after=index)
 
 
 def read_terminal_key() -> str:
@@ -195,11 +263,11 @@ def read_terminal_key() -> str:
 
 
 def read_piped_key() -> str:
-    """One answer per line when stdin is not a terminal, as in scripted runs."""
+    """One key per line when stdin is not a terminal, as in scripted runs."""
     return sys.stdin.readline().strip()
 
 
-def read_note(prompt: str) -> str:
+def read_typed_line(prompt: str) -> str:
     sys.stdout.write(prompt)
     sys.stdout.flush()
     return sys.stdin.readline()
@@ -214,17 +282,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("pairs_file", type=Path)
-    parser.add_argument("--labels", type=Path, help="default: labels.jsonl beside the pairs file")
+    parser.add_argument("sets_file", type=Path)
+    parser.add_argument("--labels", type=Path, help="default: rankings.jsonl beside the sets file")
     args = parser.parse_args()
-    labels_file = args.labels or args.pairs_file.parent / "labels.jsonl"
-    run_session(
-        pairs=load_pairs(args.pairs_file),
-        labels_file=labels_file,
+    console = Console(
         read_key=read_terminal_key if sys.stdin.isatty() else read_piped_key,
-        read_line=read_note,
+        read_line=read_typed_line,
         write=write_out,
-        terminal_width=lambda: shutil.get_terminal_size().columns,
+        width=lambda: shutil.get_terminal_size().columns,
+    )
+    run_session(
+        load_sets(args.sets_file), args.labels or args.sets_file.parent / "rankings.jsonl", console
     )
 
 

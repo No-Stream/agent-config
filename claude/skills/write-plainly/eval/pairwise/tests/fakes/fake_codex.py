@@ -1,4 +1,4 @@
-"""Stand-in for `codex exec` in tests: picks right for every pair in the batch file it is given."""
+"""Stand-in for `codex exec` in tests: ranks the passages of the set file it is given in reverse."""
 
 import json
 import re
@@ -12,10 +12,10 @@ def main() -> None:
         sys.exit("codex must get an empty stdin")
     output_file = Path(arguments[arguments.index("-o") + 1])
     prompt = arguments[-1]
-    batch_file = Path(re.search(r"Then read (\S+), which holds", prompt).group(1))
-    pair_ids = re.findall(r"^## Pair (\S+)$", batch_file.read_text(), re.MULTILINE)
-    lines = [json.dumps({"pair_id": p, "choice": "right", "reason": "stub"}) for p in pair_ids]
-    output_file.write_text("Here are the verdicts.\n" + "\n".join(lines) + "\n")
+    set_file = Path(re.search(r"Then read (\S+), which holds", prompt).group(1))
+    letters = re.findall(r"^### Passage (\S+)$", set_file.read_text(), re.MULTILINE)
+    answer = json.dumps({"ranking": "".join(reversed(letters)), "reason": "stub"})
+    output_file.write_text(f"Here is the ranking.\n{answer}\n")
 
 
 if __name__ == "__main__":

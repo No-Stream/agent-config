@@ -1,9 +1,9 @@
 """Stand-in for `claude -p` in tests: logs each call and answers in Claude Code's JSON format.
 
 Author calls (a JSON schema with `passage`) return four sentences that differ on every call, so
-each author stage changes every sentence. A gate fidelity check reports one unsupported change;
-the per-task measurement reports one for passage A only. Each call reads the files its prompt
-lists. Environment variables change that:
+each author stage changes every sentence. A ranking call ranks the passages in the order shown. A
+gate fidelity check reports one unsupported change; the per-task measurement reports one for
+passage A only. Each call reads the files its prompt lists. Environment variables change that:
 
 - FAKE_CLAUDE_FAIL_ONCE_ON=<text>: the first call whose prompt contains the text fails.
 - FAKE_CLAUDE_SKIP_READS=<text>: a call whose prompt contains the text reads nothing.
@@ -47,12 +47,10 @@ def main() -> None:
         ]
         structured = {"passage": " ".join(sentences)}
         text = json.dumps(structured)
-    elif '"verdicts"' in schema:
-        batch_file = Path(re.search(r"Then read (\S+), which holds", prompt).group(1))
-        pair_ids = re.findall(r"^## Pair (\S+)$", batch_file.read_text(), re.MULTILINE)
-        structured = {
-            "verdicts": [{"pair_id": p, "choice": "left", "reason": "stub"} for p in pair_ids]
-        }
+    elif '"ranking"' in schema:
+        set_file = Path(re.search(r"Then read (\S+), which holds", prompt).group(1))
+        letters = re.findall(r"^### Passage (\S+)$", set_file.read_text(), re.MULTILINE)
+        structured = {"ranking": "".join(letters), "reason": "stub"}
         text = json.dumps(structured)
     elif "There are" in prompt and "revisions" in prompt:
         labels = re.findall(r"\b([A-Z]): /", prompt)

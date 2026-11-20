@@ -13,132 +13,175 @@ from pathlib import Path
 
 import pytest
 
-from label import LEGEND, latest_labels, render, run_session, wrap_passage
+from label import (
+    LEGEND,
+    Console,
+    latest_rankings,
+    load_sets,
+    parse_ranking,
+    ranks,
+    render_passage,
+    render_ranking_screen,
+    run_session,
+    wrap_passage,
+)
 
 LABEL_SCRIPT = Path(__file__).resolve().parents[1] / "label.py"
+LETTERS = ("A", "B", "C", "D", "E")
 PASSAGE = (
     "The kettle switches off when the water boils.\n\n"
     "A bimetal strip bends when steam reaches it and opens the circuit, so the element stops heating."
 )
 
 
+def make_set(set_id: str) -> dict:
+    return {
+        "set_id": set_id,
+        "doc_type": "README section",
+        "reader": "Ana",
+        "passages": {letter: f"Passage {letter} of set {set_id}." for letter in LETTERS},
+    }
+
+
 @pytest.fixture
-def pairs_file(tmp_path: Path) -> Path:
-    pairs = [
-        {
-            "pair_id": f"0{n}",
-            "doc_type": "README section",
-            "reader": "Ana",
-            "left": f"Left {n}.",
-            "right": f"Right {n}.",
-        }
-        for n in (1, 2, 3)
-    ]
-    path = tmp_path / "pairs.jsonl"
-    path.write_text("".join(json.dumps(pair) + "\n" for pair in pairs))
+def sets_file(tmp_path: Path) -> Path:
+    path = tmp_path / "sets.jsonl"
+    path.write_text("".join(json.dumps(make_set(set_id)) + "\n" for set_id in ("1", "2", "3")))
     return path
 
 
 def scripted_session(
-    pairs_file: Path,
+    sets_file: Path,
     keys: list[str],
-    notes: tuple[str, ...] = (),
+    lines: tuple[str, ...] = (),
     clock: Callable[[], float] = time.monotonic,
 ) -> str:
-    """Run one labeling session on scripted keys and return everything it printed."""
-    key_iterator, note_iterator = iter(keys), iter(notes)
+    """Run one labeling session on scripted keys and typed lines; return everything it printed."""
+    key_iterator, line_iterator = iter(keys), iter(lines)
     printed: list[str] = []
-    pairs = [json.loads(line) for line in pairs_file.read_text().splitlines()]
-    run_session(
-        pairs=pairs,
-        labels_file=pairs_file.parent / "labels.jsonl",
+    console = Console(
         read_key=lambda: next(key_iterator),
-        read_line=lambda prompt: next(note_iterator),
+        read_line=lambda prompt: next(line_iterator),
         write=printed.append,
-        terminal_width=lambda: 120,
+        width=lambda: 80,
         clock=clock,
     )
+    run_session(load_sets(sets_file), sets_file.parent / "rankings.jsonl", console)
     return "".join(printed)
 
 
-def choices(pairs_file: Path) -> dict[str, str]:
+def rankings(sets_file: Path) -> dict[str, str]:
     return {
-        pair_id: record["choice"]
-        for pair_id, record in latest_labels(pairs_file.parent / "labels.jsonl").items()
+        set_id: record["ranking"]
+        for set_id, record in latest_rankings(sets_file.parent / "rankings.jsonl").items()
     }
 
 
+class TestRanking:
+    def test_letters_best_first_with_equals_joining_a_tie(self) -> None:
+        assert parse_ranking("CA=EBD", LETTERS) == [["C"], ["A", "E"], ["B"], ["D"]]
+
+    def test_lower_case_and_spaces_are_accepted(self) -> None:
+        assert parse_ranking(" ca = e bd ", LETTERS) == [["C"], ["A", "E"], ["B"], ["D"]]
+
+    @pytest.mark.parametrize(
+        "typed",
+        ["CAEB", "CAEBDD", "CAEBF", "=CAEBD", "CAEBD=", "CA==EBD", "A=B=C=D=E", "CA1EBD"],
+    )
+    def test_a_ranking_must_place_each_letter_once_in_at_least_two_places(self, typed: str) -> None:
+        with pytest.raises(ValueError):
+            parse_ranking(typed, LETTERS)
+
+    def test_tied_letters_share_the_mean_of_their_places(self) -> None:
+        assert ranks([["C"], ["A", "E"], ["B"], ["D"]]) == {
+            "C": 1.0,
+            "A": 2.5,
+            "E": 2.5,
+            "B": 4.0,
+            "D": 5.0,
+        }
+
+
 class TestSession:
-    def test_each_answer_is_saved_before_the_next_pair(self, pairs_file: Path) -> None:
-        output = scripted_session(pairs_file, ["1", "q"])
-        assert choices(pairs_file) == {"01": "left"}
-        assert "Stopped with 1 of 3 answered" in output
+    def test_each_ranking_is_saved_before_the_next_task(self, sets_file: Path) -> None:
+        output = scripted_session(sets_file, ["r", "q"], lines=("cabed", "", "q"))
+        assert rankings(sets_file) == {"1": "CABED"}
+        assert "Stopped with 1 of 3 tasks ranked" in output
 
-    def test_resume_starts_at_the_first_unanswered_pair(self, pairs_file: Path) -> None:
-        scripted_session(pairs_file, ["1", "q"])
-        output = scripted_session(pairs_file, ["\x1b[C", "t", "q"])
-        assert "Left 1." not in output and "Left 2." in output
-        assert choices(pairs_file) == {"01": "left", "02": "right", "03": "tie"}
-        assert "All 3 pairs answered (0 skipped)" in output
+    def test_passages_are_shown_one_at_a_time_and_page_both_ways(self, sets_file: Path) -> None:
+        output = scripted_session(sets_file, ["n", "\x1b[C", "p", "\x1b[D", "q"])
+        shown = [
+            next(letter for letter in LETTERS if f"Passage {letter} of set 1." in screen)
+            for screen in output.split("\x1b[2J")[1:]
+        ]
+        assert shown == ["A", "B", "C", "B", "A"]
 
-    def test_a_note_and_the_seconds_spent_are_stored_with_the_answer(
-        self, pairs_file: Path
+    def test_next_on_the_last_passage_opens_the_ranking_prompt(self, sets_file: Path) -> None:
+        scripted_session(sets_file, ["n"] * 5 + ["q"], lines=("ABCDE", "", "q"))
+        assert rankings(sets_file) == {"1": "ABCDE"}
+
+    def test_resume_starts_at_the_first_unranked_task(self, sets_file: Path) -> None:
+        scripted_session(sets_file, ["r", "q"], lines=("ABCDE", ""))
+        output = scripted_session(sets_file, ["r", "r", "q"], lines=("EDCBA", "", "B=ACDE", ""))
+        assert "of set 1." not in output and "Passage A of set 2." in output
+        assert rankings(sets_file) == {"1": "ABCDE", "2": "EDCBA", "3": "B=ACDE"}
+        assert "All 3 tasks ranked" in output
+
+    def test_an_invalid_ranking_is_refused_and_asked_again(self, sets_file: Path) -> None:
+        scripted_session(sets_file, ["r", "q"], lines=("ABCD", "ABCDE", "", "q"))
+        assert rankings(sets_file) == {"1": "ABCDE"}
+
+    def test_an_empty_ranking_goes_back_to_reading(self, sets_file: Path) -> None:
+        scripted_session(sets_file, ["r", "q"], lines=("",))
+        assert rankings(sets_file) == {}
+
+    def test_the_note_and_the_seconds_spent_are_stored_with_the_ranking(
+        self, sets_file: Path
     ) -> None:
-        clock = iter([10.0, 12.5, 20.0]).__next__  # pair 1 shown, pair 1 answered, pair 2 shown
-        scripted_session(pairs_file, ["n", "2", "q"], notes=("close call\n",), clock=clock)
-        record = latest_labels(pairs_file.parent / "labels.jsonl")["01"]
-        assert record["choice"] == "right" and record["note"] == "close call"
-        assert record["seconds"] == 2.5
+        clock = iter([10.0, 52.5, 60.0]).__next__  # set 1 shown, set 1 ranked, set 2 shown
+        scripted_session(sets_file, ["r", "q"], lines=("ABCDE", "close call"), clock=clock)
+        record = latest_rankings(sets_file.parent / "rankings.jsonl")["1"]
+        assert record["note"] == "close call" and record["seconds"] == pytest.approx(42.5)
 
-    def test_back_reopens_the_previous_pair_and_the_new_answer_wins(self, pairs_file: Path) -> None:
-        scripted_session(pairs_file, ["1", "u", "2", "q"])
-        lines = (pairs_file.parent / "labels.jsonl").read_text().splitlines()
-        assert [json.loads(line)["choice"] for line in lines] == ["left", "right"]
-        assert choices(pairs_file) == {"01": "right"}
+    def test_back_reopens_the_previous_task_and_the_new_ranking_wins(self, sets_file: Path) -> None:
+        output = scripted_session(sets_file, ["r", "b", "r", "q"], lines=("ABCDE", "", "EDCBA", ""))
+        lines = (sets_file.parent / "rankings.jsonl").read_text().splitlines()
+        assert [json.loads(line)["ranking"] for line in lines] == ["ABCDE", "EDCBA"]
+        assert rankings(sets_file) == {"1": "EDCBA"}
+        assert output.rindex("Passage A of set 2.") > output.rindex("Passage A of set 1.")
 
-    def test_skipped_pairs_come_back_after_unanswered_ones(self, pairs_file: Path) -> None:
-        scripted_session(pairs_file, ["s", "1", "q"])
-        output = scripted_session(pairs_file, ["2", "1", "q"])
-        assert output.index("Left 3.") < output.index("Left 1.")
-        assert choices(pairs_file) == {"01": "left", "02": "left", "03": "right"}
+    def test_back_after_the_last_task_reopens_it(self, sets_file: Path) -> None:
+        typed = ("ABCDE", "", "ABCDE", "", "ABCDE", "", "EDCBA", "")
+        output = scripted_session(sets_file, ["r", "r", "r", "x", "b", "r", "q"], lines=typed)
+        assert output.count("All 3 tasks ranked") == 2
+        assert rankings(sets_file) == {"1": "ABCDE", "2": "ABCDE", "3": "EDCBA"}
 
-    def test_back_after_the_last_pair_reopens_it_and_the_new_answer_wins(
-        self, pairs_file: Path
-    ) -> None:
-        output = scripted_session(pairs_file, ["1", "2", "t", "x", "u", "2", "q"])
-        assert output.count("All 3 pairs answered") == 2
-        assert output.rindex("Left 3.") > output.index("All 3 pairs answered")
-        assert choices(pairs_file) == {"01": "left", "02": "right", "03": "right"}
+    def test_unknown_keys_and_back_on_the_first_task_are_ignored(self, sets_file: Path) -> None:
+        scripted_session(sets_file, ["x", "b", "p", "r", "q"], lines=("ABCDE", ""))
+        assert rankings(sets_file) == {"1": "ABCDE"}
 
-    def test_unknown_keys_are_ignored(self, pairs_file: Path) -> None:
-        scripted_session(pairs_file, ["x", "u", "1", "q"])
-        assert choices(pairs_file) == {"01": "left"}
+    def test_q_at_the_ranking_prompt_quits(self, sets_file: Path) -> None:
+        output = scripted_session(sets_file, ["r"], lines=("q",))
+        assert rankings(sets_file) == {} and "Stopped with 0 of 3 tasks ranked" in output
 
 
 class TestScreen:
-    def test_wide_terminals_show_the_passages_side_by_side(self) -> None:
-        pair = {
-            "pair_id": "01",
-            "doc_type": "README section",
-            "reader": "Ana",
-            "left": PASSAGE,
-            "right": PASSAGE,
-        }
-        screen = render(pair, 0, 30, "", 120)
-        assert "LEFT" in screen and "│ RIGHT" in screen
-        assert max(len(line) for line in screen.splitlines()) <= 120
+    def set_with_long_passage(self) -> dict:
+        return {**make_set("1"), "passages": dict.fromkeys(LETTERS, PASSAGE)}
 
-    def test_narrow_terminals_stack_the_passages(self) -> None:
-        pair = {
-            "pair_id": "01",
-            "doc_type": "README section",
-            "reader": "Ana",
-            "left": PASSAGE,
-            "right": PASSAGE,
-        }
-        screen = render(pair, 0, 30, "a note", 60)
-        assert "│" not in screen and screen.index("LEFT") < screen.index("RIGHT")
-        assert "note: a note" in screen and max(len(line) for line in screen.splitlines()) <= 60
+    def test_a_passage_screen_names_the_task_letter_reader_and_document_type(self) -> None:
+        screen = render_passage(self.set_with_long_passage(), "C", 2, 5, 60)
+        header = screen.splitlines()[:3]
+        assert "Task 2/5" in header[0] and "[C]" in header[0] and "README section" in header[0]
+        assert "Reader: Ana" in header[1]
+        assert LEGEND.split()[0] in screen
+        assert max(len(line) for line in screen.splitlines()) <= 60
+
+    def test_the_ranking_screen_reminds_each_passage_by_its_opening(self) -> None:
+        screen = render_ranking_screen(self.set_with_long_passage(), 1, 5, 40)
+        openings = [line for line in screen.splitlines() if line[:3] in {f"{x}  " for x in LETTERS}]
+        assert len(openings) == 5 and all(len(line) <= 40 for line in openings)
+        assert openings[0].startswith("A  The kettle switches off")
 
     def test_wrapping_keeps_paragraphs_and_list_items(self) -> None:
         lines = wrap_passage(
@@ -147,6 +190,14 @@ class TestScreen:
         assert lines[:2] == ["First paragraph", "continues here."]
         assert lines[2] == "" and lines[3] == "- item one" and lines[4].startswith("- item two")
         assert lines[5].startswith("  ")
+
+
+class TestSetFile:
+    def test_a_set_with_extra_fields_is_refused(self, tmp_path: Path) -> None:
+        path = tmp_path / "sets.jsonl"
+        path.write_text(json.dumps({**make_set("1"), "task_id": "kettle"}) + "\n")
+        with pytest.raises(ValueError):
+            load_sets(path)
 
 
 class TestCommand:
@@ -165,11 +216,11 @@ class TestCommand:
             if select.select([master], [], [], 0.1)[0]:
                 buffer.extend(os.read(master, 65536))
 
-    def test_real_keypresses_in_a_terminal(self, pairs_file: Path) -> None:
+    def test_real_keypresses_in_a_terminal(self, sets_file: Path) -> None:
         master, worker = os.openpty()
-        fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+        fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 100, 0, 0))
         process = subprocess.Popen(
-            [sys.executable, str(LABEL_SCRIPT), str(pairs_file)],
+            [sys.executable, str(LABEL_SCRIPT), str(sets_file)],
             stdin=worker,
             stdout=worker,
             stderr=worker,
@@ -180,23 +231,21 @@ class TestCommand:
         os.close(worker)
         screen = bytearray()
         try:
-            self.read_until(master, screen, LEGEND, 1)
-            os.write(master, b"1")
-            self.read_until(master, screen, LEGEND, 2)
-            os.write(master, b"n")
-            self.read_until(master, screen, "note: ", 1)
-            os.write(master, b"close call\r")
-            self.read_until(master, screen, "note: close call", 1)
+            self.read_until(master, screen, "Passage A of set 1.", 1)
             os.write(master, b"\x1b[C")
-            self.read_until(master, screen, "Left 3.", 1)
+            self.read_until(master, screen, "Passage B of set 1.", 1)
+            os.write(master, b"r")
+            self.read_until(master, screen, "Ranking, best first", 1)
+            os.write(master, b"ba=cde\r")
+            self.read_until(master, screen, "Note", 1)
+            os.write(master, b"close call\r")
+            self.read_until(master, screen, "Passage A of set 2.", 1)
             os.write(master, b"q")
-            self.read_until(master, screen, "Stopped with 2 of 3 answered", 1)
+            self.read_until(master, screen, "Stopped with 1 of 3 tasks ranked", 1)
             assert process.wait(timeout=10) == 0
         finally:
             process.kill()
             process.wait()
             os.close(master)
-        assert "│ RIGHT" in screen.decode()
-        records = latest_labels(pairs_file.parent / "labels.jsonl")
-        assert records["01"]["choice"] == "left"
-        assert records["02"]["choice"] == "right" and records["02"]["note"] == "close call"
+        record = latest_rankings(sets_file.parent / "rankings.jsonl")["1"]
+        assert record["ranking"] == "BA=CDE" and record["note"] == "close call"
