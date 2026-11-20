@@ -117,3 +117,38 @@ Beyond the general limits in "What it does not show", four threats bear on these
 - One model wrote every agent text, `claude-opus-5` prompted one way. Other models, other prompts and real agent drafts can fire these rules at different rates.
 - The rates are counts of matches. They do not say whether a reader would want a flagged sentence changed. The change notes above quote the hits that were read for this triage.
 - The agent side is plain text, so the markdown rules are not judged, and the human side's 33,024 words of web pages have no agent counterpart. Each tell-rule change above points the same way on the matched corpus alone, where both sides are plain text on the same topics, though `tone` and `impact-noun-bare` fire on only one matched human text each.
+
+## Rules from the owner's corrections
+
+The skill's owner collected the writing corrections they had given to models and merged them into rules. The rules below implement the ones a pattern can catch, as new rules in `lint_prose.py` and a wider `coined-label`. Each was first tried as a standalone script on these corpora, then rebuilt in `lint_prose.py` and run through `false_flags.py`. The table comes from a run on 2026-11-20 with `lint_prose.py` and `lint_prose_patterns.py` at sha256 `0836dddb75c3`, on the same corpora as the table above. Each rule was also run on the model text the owner had corrected; that text and those results stay private.
+
+The owner gave these rules, so they are house style and stay even where careful human writers break them. A rule that fires on three or more human texts, or whose verdict depends on the reader, has a message that starts with "Check:". Most of the corrections were about chat and status messages: labels coined during the work, pointers back to an earlier message, acronyms nobody defined. The agent texts here are essays written from a brief, which rarely do these things, so an agent rate of zero means the rule stays quiet on essays. It says nothing about how often the rule catches model habits in messages.
+
+| rule | what it flags | message | human | agent | human texts | agent texts |
+|---|---|---|---|---|---|---|
+| `coined-label` | labels and IDs coined during the work ("route C", "phase-3", "task #42", `LIB-12`, "C3") | check | 0.35 | 0.00 | 4/31 | 0/24 |
+| `back-reference` | pointers to earlier text ("as discussed", "in my previous message", "the fix above", "per the rule", "the two questions about parking are still open") | check | 0.14 | 0.00 | 4/31 | 0/24 |
+| `announcing-sentence` | a sentence that only names what follows ("Two changes help wheelchair users:", "We wanted to know whether late opening helps.") | check | 0.02 | 0.00 | 1/31 | 0/24 |
+| `stock-emphasis` | "honest", "honestly", "frankly", "to be honest", "table stakes", "is a big win", "and that matters." | fix | 0.00 | 0.17 | 0/31 | 4/24 |
+| `history-in-document` | edit history ("was changed from", "the earlier draft", "now counts loans instead of visits", "this revision corrects") | fix | 0.00 | 0.00 | 0/31 | 0/24 |
+| `all-caps-emphasis` | ordinary words in capitals ("NOT", "VERY", "IMPORTANT FOR EVERYONE") | fix | 0.09 | 0.00 | 2/31 | 0/24 |
+| `rather-than` | "rather than", and a ", not" contrast after a number, bracket or inline code | check | 0.11 | 1.11 | 5/31 | 12/24 |
+| `cannot-rule-out` | "cannot be ruled out", "can't rule out", "we cannot exclude" | fix | 0.00 | 0.00 | 0/31 | 0/24 |
+| `cleft-sentence` | "What keeps the queue short is the second desk.", "It is the narrow door that causes the delay." | check | 0.14 | 0.72 | 7/31 | 11/24 |
+| `triad-density` | the third and later sentence in a section with an "A, B and C" series | check | 2.43 | 4.09 | 24/31 | 21/24 |
+| `tldr-shape` | a TL;DR, Summary or Abstract section of more than eight sentences or four numbers | fix | 0.02 | 0.00 | 1/31 | 0/24 |
+| `undefined-acronym` | the first use of an acronym that comes before its definition | check | 1.50 | 0.55 | 20/31 | 9/24 |
+| `inverted-animacy-check` | a thing that earns, holds, buys, wins, crowds or rescues ("The window display earns most of the new members.") | check | 0.00 | 0.04 | 0/31 | 1/24 |
+
+The human hits were read. `coined-label` fires on product, chip and robot names (R1, V3, H800, PR2), on "L2 regularization" and on two real "described in #3" pointers. `back-reference` fires on cross-references inside long essays ("as noted above"), which the advisory message leaves the writer free to keep. `undefined-acronym` fires mostly on well-known abbreviations outside its skip list (SGD, RNN, IRS, BBC), which is why it is advisory. The `all-caps-emphasis`, `tldr-shape` and `announcing-sentence` hits are real instances: capitals for emphasis in a nineteenth-century biography, a 50-sentence Summary section, and "A few tips and tricks for this step:" before a list. `history-in-document` and `cannot-rule-out` never fired: these corpora have no revised drafts and no statistical readouts.
+
+How the rules decide:
+
+- `coined-label` reads label words followed by a number or a capital letter ("decision 7", "Track C's", "phase-3"), tracker IDs (`LIB-8.3`), word-and-hex IDs (`req-7c21be`), hash numbers and short letter-and-digit codes. Inside backticks it reads only tracker IDs, hex IDs and hash numbers, because a short code there is usually a variable name such as `W1`. An ID passes when it sits in parentheses right after a plain description ("the roof repair (LIB-12)"), and so do its later uses. Standard prefixes (UTF, SHA, ISO and a few more), common public codes (S3, Q3, P0, A100) and "#1" as a rank also pass.
+- `undefined-acronym` looks for an all-caps word of two to six letters before any "(ACR)" or "ACR (spelled out)" in the document. It skips about 40 universal ones (API, URL, JSON, GPU and others), Roman numerals, ordinary words in capitals, code and link text.
+- `all-caps-emphasis` flags a run of capitals that contains one of about 200 common words that are not also acronyms; a capitalized word the document defines in parentheses passes.
+- `triad-density` allows two sentences with a three-item series per H1 or H2 section, as the owner asked, and counts paragraphs, captions and footnotes. slop-guard's three-item check stays off, because it flags single plain lists.
+- `rather-than` leaves the word-comma-not form ("open, not closed") to slop-guard's `contrast_pairs`, which already flags it.
+- The phrase and sentence rules skip double-quoted spans, which hold someone else's words. `coined-label` and `undefined-acronym` read quoted text, because a quoted button or ticket name is still an unexplained ID.
+
+No rule was dropped. Four rules (`history-in-document`, `tldr-shape`, `all-caps-emphasis` and `triad-density`) caught none of the owner's corrected text, but each is a document rule, and the private text was mostly short message fragments without the headings or revisions those rules need.
