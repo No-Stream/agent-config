@@ -14,15 +14,35 @@ from pathlib import Path
 from typing import Literal
 
 from lint_prose_patterns import (
+    ACRONYM,
+    ACRONYM_DEFINITION,
+    ANNOUNCING_COLON,
+    ANNOUNCING_QUESTION,
     ARITHMETIC,
+    CAPITALIZED_RUN,
+    CLEFT,
+    DEFINED_IN_PARENTHESES,
+    DESCRIBED_ID,
+    HASH_NUMBER,
+    HEX_ID,
     LABEL_PATTERN,
     LARGE_SPELLED_NUMBER,
+    LIST_ENTRY_WORDS,
     NOT_A_NUMBER,
     NUMBER,
+    ORDINARY_WORD,
     PHRASE_RULES,
     PRONOUN_I_AFTER_LABEL,
+    PUBLIC_IDS,
+    QUOTATION,
+    ROMAN_NUMERALS,
+    SHORT_CODE,
     SPELLED_NUMBER,
+    STANDARD_ID_PREFIXES,
+    THREE_ITEM_SERIES,
     TITLE_SMALL_WORDS,
+    TRACKER_ID,
+    UNIVERSAL_ACRONYMS,
     YEAR_ORDINAL_OR_VERSION,
 )
 
@@ -36,22 +56,88 @@ NUMBERS_PER_100_WORDS = 2
 MIN_BODY_WORDS_FOR_DENSITY = 100
 FREE_TOP_LEVEL_SECTIONS = 6
 WORDS_PER_EXTRA_SECTION = 400
+ANNOUNCING_QUESTION_MAX_WORDS = 12
+FREE_TRIADS_PER_SECTION = 2
+MAX_SUMMARY_SENTENCES = 8
+MAX_SUMMARY_NUMBERS = 4
 
 MESSAGES = {
     "em-dash": "Em dash; use a comma, parentheses, a colon, a semicolon or a new sentence.",
     "dash-substitute": "Dash used as a pause; use punctuation that shows how the clauses connect.",
-    "coined-label": "Label that may have been coined during the work; name the thing by what it is unless the reader already knows this label.",
+    "coined-label": (
+        "Check: label or ID that may have been coined during the work (advisory). Name the thing"
+        " by what it is, with any ID after that description, unless the reader already knows it."
+    ),
     "bold-run-in": "Bold run-in heading; use a heading or plain prose.",
-    "thin-h2-section": "Section has little body; merge it into a neighbour or make it a minor heading.",
-    "short-paragraph-run": "Run of very short paragraphs; combine related sentences and state how they connect.",
+    "thin-h2-section": (
+        "Section has little body; merge it into a neighbour or make it a minor heading."
+    ),
+    "short-paragraph-run": (
+        "Run of very short paragraphs; combine related sentences and state how they connect."
+    ),
     "title-case-heading": "Heading looks like Title Case; use sentence case.",
     "stacked-hedge": "Two hedges on one claim; keep the one that states the real uncertainty.",
-    "nominalization-of": 'Check: possible action buried in a noun (advisory). If someone did it, use the verb, as in "we implemented X".',
-    "inverted-animacy": "A thing given a person's verb; say what it does (shows, returns) or who does it.",
-    "long-sentence": "Long sentence with almost no punctuation; split it or mark where its clauses break.",
-    "complex-sentence": f"Sentence of {COMPLEX_SENTENCE_WORDS} or more words; split it so each sentence makes one point.",
-    "number-density": "Too many numbers for body prose; move them to a table or figure and say what they show.",
-    "heading-density": "More top-level sections than the length supports; merge sections or nest them.",
+    "nominalization-of": (
+        "Check: possible action buried in a noun (advisory). If someone did it, use the verb,"
+        ' as in "we implemented X".'
+    ),
+    "inverted-animacy": (
+        "A thing given a person's verb; say what it does (shows, returns) or who does it."
+    ),
+    "inverted-animacy-check": (
+        "Check: a thing that earns, holds, buys or wins (advisory). Make the person the subject,"
+        " or say what the thing has or contains."
+    ),
+    "back-reference": (
+        "Check: points back to earlier text (advisory). Restate the thing here so this text"
+        " stands alone."
+    ),
+    "announcing-sentence": (
+        "Check: sentence only announces what follows (advisory). Say the point itself."
+    ),
+    "stock-emphasis": "Stock emphasis phrase; cut it, or state the fact that makes the point.",
+    "history-in-document": (
+        "Edit history in the text; state the current fact and drop what it replaced."
+    ),
+    "all-caps-emphasis": (
+        "Ordinary word in capitals; use italics or plain wording, or backticks if it is code."
+    ),
+    "rather-than": (
+        'Check: contrast with "rather than" or ", not" (advisory). If no reader expects the'
+        " alternative, state only what is true."
+    ),
+    "cannot-rule-out": (
+        '"Cannot rule out" reads a result off an interval edge; quote the point estimate and'
+        " its interval."
+    ),
+    "cleft-sentence": (
+        "Check: cleft sentence (advisory). Try the plain clause with the real subject first."
+    ),
+    "triad-density": (
+        f"Check: more than {FREE_TRIADS_PER_SECTION} lists of three in this section (advisory);"
+        " keep the ones that matter."
+    ),
+    "tldr-shape": (
+        f"Summary runs past {MAX_SUMMARY_SENTENCES} sentences or carries more than the headline"
+        " numbers; keep what and why, the main findings and the ask."
+    ),
+    "undefined-acronym": (
+        "Check: acronym used before it is defined (advisory). Spell it out at first use with"
+        " the short form in parentheses."
+    ),
+    "long-sentence": (
+        "Long sentence with almost no punctuation; split it or mark where its clauses break."
+    ),
+    "complex-sentence": (
+        f"Sentence of {COMPLEX_SENTENCE_WORDS} or more words; split it so each sentence makes"
+        " one point."
+    ),
+    "number-density": (
+        "Too many numbers for body prose; move them to a table or figure and say what they show."
+    ),
+    "heading-density": (
+        "More top-level sections than the length supports; merge sections or nest them."
+    ),
 }
 
 HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+")
@@ -67,6 +153,10 @@ FOOTNOTE_DEFINITION = re.compile(r"^\s*\[\^[^\]]+\]:")
 IMAGE_LINE = re.compile(r"^\s*!\[")
 THEMATIC_BREAK = re.compile(r"^\s{0,3}(?:[-*_]\s*){3,}$")
 LINK_OR_URL = re.compile(r"\]\(|https?://")
+LINK_TEXT = re.compile(r"\[[^\]\n]*\](?=\()")
+CODE_SPAN = re.compile(r"`([^`\n]+)`")
+CODE_ID_SHAPES = (TRACKER_ID, HEX_ID, HASH_NUMBER)  # a short code in backticks is a variable name
+LABEL_SHAPES = (LABEL_PATTERN, *CODE_ID_SHAPES, SHORT_CODE)
 ABBREVIATION_PERIODS = re.compile(r"(?i:\b(?:e\.g|i\.e|vs|dr|fig|et al)\.)|\betc\.(?!\s+[A-Z])")
 SENTENCE_END = re.compile(r"[.!?]+[\"'’”)\]]*(?=\s|\Z)")
 WORD = re.compile(r"[A-Za-z0-9]+(?:['’.,-][A-Za-z0-9]+)*")
@@ -136,6 +226,15 @@ def _mask_inline(text: str) -> str:
     text = re.sub(r"https?://\S*[^\s.,;:!?)\]'\"]", _blank_match, text, flags=re.IGNORECASE)
     text = re.sub(r"\[\^[^\]]+\]", _blank_match, text)
     return text
+
+
+def _mask_quotations(text: str) -> str:
+    """Blank double-quoted spans, which quote other words rather than the writer's own."""
+    return QUOTATION.sub(_blank_match, text)
+
+
+def _in_link_text(source_line: str, column: int) -> bool:
+    return any(link.start() < column - 1 < link.end() for link in LINK_TEXT.finditer(source_line))
 
 
 def _visible_lines(text: str) -> tuple[list[str], list[str], list[str]]:
@@ -268,7 +367,6 @@ def _document_finding(rule: str, line_number: int, measurement: str) -> Finding:
 
 def _line_findings(original_lines: list[str], visible_lines: list[str]) -> list[Finding]:
     findings: list[Finding] = []
-    ordered_items = _ordered_items_by_line(visible_lines)
     for line_number, (source, visible) in enumerate(zip(original_lines, visible_lines), start=1):
         if not visible.strip():
             continue
@@ -284,14 +382,6 @@ def _line_findings(original_lines: list[str], visible_lines: list[str]) -> list[
                 _add_finding(findings, "dash-substitute", line_number, match.start() + 1, source)
         for match in re.finditer(r"(?<=\w) - (?=\w)|(?<=\w) -- (?=\w)|(?<=\w)--(?=\w)", visible):
             _add_finding(findings, "dash-substitute", line_number, match.start() + 1, source)
-        for match in LABEL_PATTERN.finditer(visible):
-            if PRONOUN_I_AFTER_LABEL.match(visible, match.start()):
-                continue
-            word, label = match.group("word", "label")
-            own_step = word.lower() == "step" and re.match(r"\d+", label)
-            if own_step and int(own_step.group()) <= ordered_items[line_number - 1]:
-                continue
-            _add_finding(findings, "coined-label", line_number, match.start() + 1, source)
         if _is_title_case_heading(visible):
             _add_finding(findings, "title-case-heading", line_number, 1, source)
         run_in = re.match(r"^\s*(?:[-*]\s+|\d+\.\s+)?(?:\*\*(.+?)\*\*|__(.+?)__)(.*)$", visible)
@@ -303,6 +393,69 @@ def _line_findings(original_lines: list[str], visible_lines: list[str]) -> list[
             has_following_text = bool(trailing.strip())
             if has_following_text and (terminal_inside or terminal_after):
                 _add_finding(findings, "bold-run-in", line_number, run_in.start(0) + 1, source)
+    return findings
+
+
+def _with_ids_in_code(block: Block, original_lines: list[str]) -> str:
+    """Return the block text with inline code put back where the code is nothing but an ID."""
+    lines = block.text.split("\n")
+    first = block.first_line - 1
+    for index, source in enumerate(original_lines[first : first + len(lines)]):
+        for span in CODE_SPAN.finditer(source):
+            if any(shape.fullmatch(span.group(1)) for shape in CODE_ID_SHAPES):
+                line = lines[index]
+                lines[index] = line[: span.start(1)] + span.group(1) + line[span.end(1) :]
+    return "\n".join(lines)
+
+
+def _label_candidates(text: str) -> list[re.Match[str]]:
+    """Return the label and ID matches in the text, first to last, without overlaps."""
+    matches = sorted(
+        (match for shape in LABEL_SHAPES for match in shape.finditer(text)),
+        key=lambda match: (match.start(), -match.end()),
+    )
+    kept: list[re.Match[str]] = []
+    for match in matches:
+        if not kept or match.start() >= kept[-1].end():
+            kept.append(match)
+    return kept
+
+
+def _is_known_name(match: re.Match[str], text: str, ordered_items: int) -> bool:
+    """Whether a label-shaped match is a public name or an entry of the section's own list."""
+    if match.re is TRACKER_ID:
+        return match.group("prefix") in STANDARD_ID_PREFIXES
+    if match.re is not LABEL_PATTERN:
+        return match.group() in PUBLIC_IDS
+    if PRONOUN_I_AFTER_LABEL.match(text, match.start()):
+        return True
+    word, label = match.group("word", "label")
+    entry = re.match(r"\d+", label)
+    return word.lower() in LIST_ENTRY_WORDS and bool(entry) and int(entry.group()) <= ordered_items
+
+
+def _coined_label_findings(
+    original_lines: list[str], visible_lines: list[str], blocks: list[Block]
+) -> list[Finding]:
+    """Flag labels and IDs, except one in parentheses after a plain description and its reuses."""
+    ordered_items = _ordered_items_by_line(visible_lines)
+    introduced: set[str] = set()
+    findings: list[Finding] = []
+    for block in blocks:
+        if block.kind not in (*PROSE_KINDS, "heading"):
+            continue
+        text = _with_ids_in_code(block, original_lines)
+        described = [match.span("inside") for match in DESCRIBED_ID.finditer(text)]
+        for match in _label_candidates(text):
+            line_number, column = block.position(match.start())
+            name = " ".join(match.group().lower().split())
+            if any(start <= match.start() < end for start, end in described):
+                introduced.add(name)
+                continue
+            known = _is_known_name(match, text, ordered_items[line_number - 1])
+            if name not in introduced and not known:
+                source = original_lines[line_number - 1]
+                _add_finding(findings, "coined-label", line_number, column, source)
     return findings
 
 
@@ -452,8 +605,9 @@ def _number_density_findings(original_lines: list[str], blocks: list[Block]) -> 
 def _phrase_findings(original_lines: list[str], prose: list[Block]) -> list[Finding]:
     findings: list[Finding] = []
     for block in prose:
+        text = _mask_quotations(block.text)
         for rule, pattern in PHRASE_RULES.items():
-            for match in pattern.finditer(block.text):
+            for match in pattern.finditer(text):
                 line_number, column = block.position(match.start("hit"))
                 _add_finding(findings, rule, line_number, column, original_lines[line_number - 1])
     return findings
@@ -490,6 +644,118 @@ def _sentence_findings(original_lines: list[str], prose: list[Block]) -> list[Fi
     return findings
 
 
+def _sentence_shape(sentence: str) -> str | None:
+    """Name the shape rule a sentence breaks: an announcement of what follows, or a cleft."""
+    plain = re.sub(r"[*_]", "", " ".join(sentence.split())).replace("’", "'").lstrip("'(")
+    short = len(WORD.findall(plain)) <= ANNOUNCING_QUESTION_MAX_WORDS
+    if ANNOUNCING_COLON.match(plain) or (short and ANNOUNCING_QUESTION.match(plain)):
+        return "announcing-sentence"
+    if CLEFT.match(plain) and not plain.rstrip("')]").endswith("?"):
+        return "cleft-sentence"
+    return None
+
+
+def _sentence_shape_findings(original_lines: list[str], prose: list[Block]) -> list[Finding]:
+    findings: list[Finding] = []
+    for block in prose:
+        text = _mask_quotations(block.text)
+        for start, end in _sentence_spans(text):
+            rule = _sentence_shape(text[start:end])
+            if rule:
+                line_number, column = block.position(start)
+                _add_finding(findings, rule, line_number, column, original_lines[line_number - 1])
+    return findings
+
+
+def _triad_findings(original_lines: list[str], blocks: list[Block]) -> list[Finding]:
+    """Flag each sentence with a three-item series past the free ones in its H1 or H2 section."""
+    findings: list[Finding] = []
+    series = 0
+    for block in blocks:
+        if block.kind == "heading" and _heading_level(block.text) <= 2:
+            series = 0
+        if block.kind not in ("paragraph", "caption", "footnote"):
+            continue
+        text = _mask_quotations(block.text)
+        for start, end in _sentence_spans(text):
+            match = THREE_ITEM_SERIES.search(text, start, end)
+            if not match:
+                continue
+            series += 1
+            if series > FREE_TRIADS_PER_SECTION:
+                line_number, column = block.position(match.start())
+                source = original_lines[line_number - 1]
+                _add_finding(findings, "triad-density", line_number, column, source)
+    return findings
+
+
+def _is_ordinary_word(token: str) -> bool:
+    return bool(ORDINARY_WORD.fullmatch(token.lower().replace("’", "'")))
+
+
+def _all_caps_findings(original_lines: list[str], prose: list[Block]) -> list[Finding]:
+    """Flag a run of capitals that holds an ordinary word the document does not define."""
+    defined = {
+        match.group("acronym")
+        for block in prose
+        for match in DEFINED_IN_PARENTHESES.finditer(block.text)
+    }
+    findings: list[Finding] = []
+    for block in prose:
+        for run in CAPITALIZED_RUN.finditer(_mask_quotations(block.text)):
+            if any(_is_ordinary_word(word) for word in run.group().split() if word not in defined):
+                line_number, column = block.position(run.start())
+                source = original_lines[line_number - 1]
+                _add_finding(findings, "all-caps-emphasis", line_number, column, source)
+    return findings
+
+
+def _undefined_acronym_findings(original_lines: list[str], prose: list[Block]) -> list[Finding]:
+    """Flag the first use of each acronym when it comes before any definition of it."""
+    first_definition: dict[str, tuple[int, int]] = {}
+    first_use: dict[str, tuple[int, int]] = {}
+    for index, block in enumerate(prose):
+        for match in ACRONYM_DEFINITION.finditer(block.text):
+            acronym = match.group("short") or match.group("long")
+            first_definition.setdefault(acronym, (index, match.start()))
+        for match in ACRONYM.finditer(block.text):
+            acronym = match.group("acronym")
+            line_number, column = block.position(match.start())
+            exempt = acronym in UNIVERSAL_ACRONYMS or acronym in ROMAN_NUMERALS
+            if exempt or _is_ordinary_word(acronym):
+                continue
+            if not _in_link_text(original_lines[line_number - 1], column):
+                first_use.setdefault(acronym, (index, match.start()))
+    findings: list[Finding] = []
+    for acronym, (index, offset) in first_use.items():
+        definition = first_definition.get(acronym)
+        if definition is None or definition > (index, offset):
+            line_number, column = prose[index].position(offset)
+            source = original_lines[line_number - 1]
+            _add_finding(findings, "undefined-acronym", line_number, column, source)
+    return findings
+
+
+def _summary_findings(blocks: list[Block]) -> list[Finding]:
+    """Flag a TL;DR, summary or abstract section that is long or quotes many numbers."""
+    sections: list[tuple[int, list[Block]]] = []
+    for block in blocks:
+        if block.kind == "heading" and _is_summary_heading(block.text):
+            sections.append((block.first_line, []))
+        elif block.section == "summary" and block.kind in PROSE_KINDS:
+            sections[-1][1].append(block)
+    findings: list[Finding] = []
+    for heading_line, prose in sections:
+        sentences = [
+            block.text[start:end] for block in prose for start, end in _sentence_spans(block.text)
+        ]
+        numbers = sum(_number_count(sentence) for sentence in sentences)
+        if len(sentences) > MAX_SUMMARY_SENTENCES or numbers > MAX_SUMMARY_NUMBERS:
+            measurement = f"summary has {len(sentences)} sentences and {numbers} numbers"
+            findings.append(_document_finding("tldr-shape", heading_line, measurement))
+    return findings
+
+
 def _short_paragraph_findings(original_lines: list[str], blocks: list[Block]) -> list[Finding]:
     """Flag three paragraphs of one or two sentences in a row; any other block ends a run."""
     findings: list[Finding] = []
@@ -513,12 +779,18 @@ def lint_text(text: str) -> list[Finding]:
     blocks = _blocks(original_lines, visible_lines, line_kinds)
     prose = [block for block in blocks if block.kind in PROSE_KINDS]
     findings = _line_findings(original_lines, visible_lines)
+    findings.extend(_coined_label_findings(original_lines, visible_lines, blocks))
     findings.extend(_section_findings(original_lines, blocks))
     findings.extend(_short_paragraph_findings(original_lines, blocks))
     findings.extend(_phrase_findings(original_lines, prose))
     findings.extend(_sentence_findings(original_lines, prose))
+    findings.extend(_sentence_shape_findings(original_lines, prose))
+    findings.extend(_triad_findings(original_lines, blocks))
+    findings.extend(_all_caps_findings(original_lines, prose))
+    findings.extend(_undefined_acronym_findings(original_lines, prose))
     findings.extend(_number_density_findings(original_lines, blocks))
     findings.extend(_heading_density_findings(blocks, prose))
+    findings.extend(_summary_findings(blocks))
     return sorted(findings, key=lambda finding: (finding.line, finding.column, finding.rule))
 
 
