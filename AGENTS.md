@@ -206,7 +206,7 @@ Multiple agents work this machine and this tree at the same time, constantly. A 
 
 - **Research repos:** commit to the default branch freely. Branches just lose work and desync; keep the tree clean.
 - **Prod/feature repos:** commit to the feature branch only, NEVER the default branch (a one-way door). If on the prod default branch with changes to save, branch first (with sign-off).
-- **Never `push`.** Ship via the review/publish gate below. Proactive-commit authorization does NOT extend to push, force-push, history rewrites, or publishing a review.
+- **Never `push` without my explicit authorization.** When I grant push authorization (per branch, per repo, or per session, e.g. "you may push the feature branches this session"), pushing the authorized branches is allowed; force-push, history rewrites and publishing a review still need their own sign-off. Without that authorization, ship via the review/publish gate below. Proactive-commit authorization does NOT extend to push.
 - When unsure whether a repo is research or prod, check for prod markers (build package, deploy targets, DAGs); when in doubt, treat as prod and flag it.
 - **Standing exception:** in a user-authorized long-running loop blocked by a scope guard on substrate files I already approved, you may commit those files (only the authorized files, only when the failure is the scope guard). Still no push, no review-publish, no history rewrite.
 
