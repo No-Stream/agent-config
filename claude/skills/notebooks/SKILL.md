@@ -16,7 +16,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to a computa
 ## Structure
 
 - Open with a markdown cell that states the question, the data (source, population, time window) and where the headline result is.
-- Keep each cell to a few named steps. Move substantial logic (more than about 20 lines of transforms, estimation or plotting) into an importable module, or into a helpers cell when it is display-only and one-off. Prefer many small named helpers to one `run_everything(df, a, b, c, ...)` call, which hides the steps instead of showing them:
+- Keep each cell to a few named steps. Move substantial logic (more than about 20 lines of transforms, estimation or plotting) into an importable module, or into a helpers cell when it is display-only and one-off. Prefer many small named helpers to one `run_everything(df, a, b, c, ...)` call that hides the steps:
 
   ```python
   effects = estimate_effects(sessions, covariates)
@@ -30,7 +30,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to a computa
 
 ## Outputs
 
-- Follow every figure and table with markdown that says what it shows and what it means for the question. When a code change changes an output, update that markdown in the same edit.
+- Follow every figure and table with markdown that says what it shows and what it means for the question. When an output changes, check its markdown against the new output and fix what no longer holds.
 - Never type a result into markdown. Render tables as DataFrames, print inline numbers from the result objects (`print(f"lift {res.lift:.1%}, 95% CI [{res.lo:.1%}, {res.hi:.1%}]")`), and assert any claim the prose depends on, such as a sign or an ordering, in the cell that computes it. Markdown says what a result means; code says what it is.
 - Open each section with its headline figure and put breakdowns (per segment, per fold) after it. Say how a pooled headline is weighted.
 - `display()` every frame: only a cell's last bare expression renders, and IPython's output cache keeps that object alive after `del`. Show each matplotlib figure once, with `plt.show()`. Use `print()` for diagnostics.
@@ -74,7 +74,7 @@ An out-of-memory error means the code materializes something the answer does not
 
 ## Reviewing a notebook
 
-Review before an expensive run (when asked to run one, review it first) and before a notebook is shared. Read every cell, code and markdown, against the rules above, and add these checks:
+Review before an expensive run (when asked to run one, review it first) and before a notebook is shared. Read every cell, code and markdown, against the rules above, plus these checks:
 
 - Every number in prose matches the output it cites, and a statistic shown twice agrees.
 - The saved outputs could have come from the current code.
