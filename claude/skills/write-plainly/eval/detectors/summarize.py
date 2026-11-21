@@ -54,8 +54,9 @@ OVERVIEW = (
     "topic? Planted bad writing: does the score move toward AI-like when the same skill draft is "
     f"made worse ({DEGRADED}, read against {NEUTRAL_REWRITE}, which rewords the same sentences "
     f"with every fact kept) or given planted tells ({TELLS_INJECTED})? {NEUTRAL_REWRITE} minus "
-    f"{SKILL_DRAFT} is the null contrast. Each cell counts the topics where the first text scores "
-    "more AI-like."
+    f"{SKILL_DRAFT} is the null contrast. The planted check tests whether a higher score goes "
+    "with worse writing; provenance shows only that a detector tells these published human texts "
+    "from model text. Each cell counts the topics where the first text scores more AI-like."
 )
 
 
