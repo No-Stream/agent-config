@@ -19,7 +19,7 @@ BACK_MATTER_HEADING = re.compile(
 )
 CAPTION_START = re.compile(r"(?i)^[*_]{0,3}(?:fig(?:ure)?\.?|table)\s+\d+[a-z]?\s*[.:]")
 LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
-FOOTNOTE_DEFINITION = re.compile(r"^\s*\[\^[^\]]+\]:")
+FOOTNOTE_DEFINITION = re.compile(r"^\s*(?:\[\^[^\]]+\]:|[⁰¹²³⁴⁵⁶⁷⁸⁹]+\s)")
 IMAGE_LINE = re.compile(r"^\s*!\[")
 THEMATIC_BREAK = re.compile(r"^\s{0,3}(?:[-*_]\s*){3,}$")
 ABBREVIATION_PERIODS = re.compile(r"(?i:\b(?:e\.g|i\.e|vs|dr|fig|et al)\.)|\betc\.(?!\s+[A-Z])")

@@ -258,6 +258,16 @@ class TestNumberDensity:
         )
         assert _lines("number-density", text) == []
 
+    def test_superscript_footnotes_are_footnotes(self) -> None:
+        text = (
+            "The bakery opened in spring.\n\n"
+            "Each loaf weighs 800 g and costs $4.¹ The recipe has not changed.²\n\n"
+            "¹ Prices from the spring menu, at 3 stores, 12 stalls and 40 carts.\n\n"
+            "² The owner confirmed this.\n"
+        )
+        assert _lines("number-density", text) == []
+        assert _lines("short-paragraph-run", text) == []
+
     def test_opening_paragraph_stands_in_for_a_missing_summary(self) -> None:
         text = (
             "The bakery sold 340 loaves on Monday, 410 on Tuesday and 380 on Wednesday.\n\n"
