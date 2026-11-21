@@ -38,7 +38,7 @@ The numbers are counts of pattern matches. They say how often a rule fires on ea
 - One model wrote every agent text, prompted one way. Other models, other prompts or real agent drafts from your own work can fire rules at different rates.
 - The two sides differ in more than authorship. The seven web pages (about 33,000 words) have no agent counterpart, and the matched corpus is plain text with no headings, bold or lists. Rules about markdown structure can therefore fire only on the human web pages, and their agent rate of zero is not evidence. The corpus table counts the texts with markdown structure on each side. HTML conversion can also add or drop structure, such as a bold lead-in or a caption, so when a markdown rule's rate looks wrong, read the converted page in `.cache/pages/`.
 - A third of the matched corpus's human texts were published before 1930, all in non-technical registers: three literary texts and one each of biography, how-to, letters, review and travel. Prose that old differs from the technical documents this skill is for.
-- `lint_prose.py` and its word lists in `lint_prose_patterns.py` change over time. The output header records one sha256 of the two files, so compare runs only when the hashes match.
+- `lint_prose.py` and the modules it imports (`lint_prose_markdown.py`, `lint_prose_document.py` and the word lists in `lint_prose_patterns.py`) change over time. The output header records one sha256 of all four files, so compare runs only when the hashes match.
 
 ## Results
 

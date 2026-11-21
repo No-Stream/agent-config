@@ -11,9 +11,8 @@ FAKES_DIR = Path(__file__).resolve().parent / "fakes"
 sys.path.insert(0, str(EVAL_DIR))
 sys.path.insert(0, str(EVAL_DIR.parent))
 
-import lint_prose
-
 import false_flags
+import lint_prose
 
 HUMAN_PUMP = (
     "The pump moves water from the tank to the field at night — the tank fills again by dawn."
@@ -208,7 +207,10 @@ class TestMain:
 
         assert capsys.readouterr().out == ""
         report = output.read_text(encoding="utf-8")
-        assert "lint_prose.py and lint_prose_patterns.py sha256 " in report.splitlines()[2]
+        modules = (
+            "lint_prose.py, lint_prose_document.py, lint_prose_markdown.py, lint_prose_patterns.py"
+        )
+        assert f"{modules} sha256 " in report.splitlines()[2]
         assert "| **agent total** |  | 2 | 80 | 0 |" in report
         assert "| techdoc agent (41 w) |" in report
         assert (tmp_path / "rights.tsv").read_text(

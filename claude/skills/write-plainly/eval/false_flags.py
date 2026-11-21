@@ -32,6 +32,7 @@ import trafilatura
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import lint_prose
+import lint_prose_markdown
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ PUBLIC_CORPORA = EVAL_DIR / "corpora.toml"
 PRIVATE_DIR = REPO_ROOT / ".private" / "eval"
 PRIVATE_CORPORA = PRIVATE_DIR / "corpora-private.toml"
 PRIVATE_OUTPUT = PRIVATE_DIR / "false-flags-private.md"
-LINT_PROSE_FILES = (SKILL_DIR / "lint_prose.py", SKILL_DIR / "lint_prose_patterns.py")
+LINT_PROSE_FILES = tuple(sorted(SKILL_DIR.glob("lint_prose*.py")))
 SLOP_GUARD_VERSION = "0.5.0"
 SLOP_GUARD = [
     "uvx",
@@ -99,7 +100,7 @@ def _text(path: Path, corpus: str, side: str, register: str, rights: str) -> Tex
     if side not in SIDES:
         raise ValueError(f"{corpus}: side must be one of {SIDES}, got {side!r}")
     content = path.read_text(encoding="utf-8")
-    words = len(lint_prose.WORD.findall(content))
+    words = len(lint_prose_markdown.WORD.findall(content))
     has_markdown = bool(MARKDOWN_STRUCTURE.search(content))
     return Text(str(path), corpus, side, register, words, has_markdown, rights)
 
@@ -121,7 +122,7 @@ def _page_text(page: dict) -> Text:
         include_images=False,
         include_links=False,
     )
-    if markdown is None or len(lint_prose.WORD.findall(markdown)) < MIN_PAGE_WORDS:
+    if markdown is None or len(lint_prose_markdown.WORD.findall(markdown)) < MIN_PAGE_WORDS:
         raise ValueError(
             f"{page['url']} converted to under {MIN_PAGE_WORDS} words; check {html_path}"
         )
@@ -388,10 +389,11 @@ def render(
 def _versions() -> str:
     lint_prose_bytes = b"".join(path.read_bytes() for path in LINT_PROSE_FILES)
     lint_prose_sha = hashlib.sha256(lint_prose_bytes).hexdigest()[:12]
+    lint_prose_names = ", ".join(path.name for path in LINT_PROSE_FILES)
     sloplint_version = _run(["sloplint", "--version"]).strip()
     run_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     return (
-        f"Run {run_at}: lint_prose.py and lint_prose_patterns.py sha256 {lint_prose_sha}, "
+        f"Run {run_at}: {lint_prose_names} sha256 {lint_prose_sha}, "
         f"sloplint {sloplint_version}, "
         f"slop-guard {SLOP_GUARD_VERSION} with slop-guard.jsonl, "
         f"trafilatura {importlib.metadata.version('trafilatura')} for HTML conversion."

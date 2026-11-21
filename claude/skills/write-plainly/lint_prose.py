@@ -7,58 +7,64 @@ import argparse
 import json
 import re
 import sys
-import textwrap
 from collections.abc import Iterator, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
-from typing import Literal
 
+from lint_prose_document import (
+    MAX_SUMMARY_SENTENCES,
+    heading_density_findings,
+    number_density_findings,
+    section_findings,
+    short_paragraph_findings,
+    summary_findings,
+)
+from lint_prose_markdown import (
+    PROSE_KINDS,
+    WORD,
+    Block,
+    Finding,
+    excerpt,
+    heading_words,
+    is_heading,
+    mask_quotations,
+    masked_lines,
+    ordered_items_by_line,
+    parse_blocks,
+    sentence_spans,
+    top_sections,
+)
 from lint_prose_patterns import (
     ACRONYM,
     ACRONYM_DEFINITION,
     ANNOUNCING_COLON,
     ANNOUNCING_QUESTION,
-    ARITHMETIC,
     CAPITALIZED_RUN,
     CLEFT,
     DESCRIBED_ID,
     HASH_NUMBER,
     HEX_ID,
     LABEL_PATTERN,
-    LARGE_SPELLED_NUMBER,
     LIST_ENTRY_WORDS,
-    NOT_A_NUMBER,
-    NUMBER,
     ORDINARY_WORD,
     PHRASE_RULES,
     PRONOUN_I_AFTER_LABEL,
     PUBLIC_IDS,
-    QUOTATION,
     ROMAN_NUMERALS,
     SERIES,
     SHORT_CODE,
-    SPELLED_NUMBER,
     STANDARD_ID_PREFIXES,
     TITLE_SMALL_WORDS,
     TRACKER_ID,
     UNIVERSAL_ACRONYMS,
-    YEAR_ORDINAL_OR_VERSION,
 )
 
-EXCERPT_LEFT_CONTEXT = 30
 LONG_SENTENCE_WORDS = 35
 LONG_SENTENCE_MAX_PUNCTUATION = 1
 COMPLEX_SENTENCE_WORDS = 40
 FREE_COMPLEX_SENTENCES = 1
-NUMBERS_PER_BLOCK = 2
-NUMBERS_PER_100_WORDS = 2
-MIN_BODY_WORDS_FOR_DENSITY = 100
-FREE_TOP_LEVEL_SECTIONS = 6
-WORDS_PER_EXTRA_SECTION = 400
 ANNOUNCING_QUESTION_MAX_WORDS = 12
 FREE_TRIADS_PER_SECTION = 2
-MAX_SUMMARY_SENTENCES = 8
-MAX_SUMMARY_NUMBERS = 4
 
 MESSAGES = {
     "em-dash": "Em dash; use a comma, parentheses, a colon, a semicolon or a new sentence.",
@@ -143,222 +149,21 @@ MESSAGES = {
     ),
 }
 
-HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+")
-FENCE = re.compile(r"^\s*(```+|~~~+)")
-ORDERED_ITEM = re.compile(r"^\s*\d+[.)]\s+")
-SUMMARY_HEADING = re.compile(r"(?i)^(?:tl;?\s?dr|summary|abstract|executive summary)$")
-BACK_MATTER_HEADING = re.compile(
-    r"(?i)^(?:appendix\b.*|appendices|references|bibliography|notes|footnotes)$"
-)
-CAPTION_START = re.compile(r"(?i)^[*_]{0,3}(?:fig(?:ure)?\.?|table)\s+\d+[a-z]?\s*[.:]")
-LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
-FOOTNOTE_DEFINITION = re.compile(r"^\s*\[\^[^\]]+\]:")
-IMAGE_LINE = re.compile(r"^\s*!\[")
-THEMATIC_BREAK = re.compile(r"^\s{0,3}(?:[-*_]\s*){3,}$")
-LINK_OR_URL = re.compile(r"\]\(|https?://")
 LINK_TEXT = re.compile(r"\[[^\]\n]*\](?=\()")
 CODE_SPAN = re.compile(r"`([^`\n]+)`")
 CODE_ID_SHAPES = (TRACKER_ID, HEX_ID, HASH_NUMBER)  # a short code in backticks is a variable name
 LABEL_SHAPES = (LABEL_PATTERN, *CODE_ID_SHAPES, SHORT_CODE)
-ABBREVIATION_PERIODS = re.compile(r"(?i:\b(?:e\.g|i\.e|vs|dr|fig|et al)\.)|\betc\.(?!\s+[A-Z])")
-SENTENCE_END = re.compile(r"[.!?]+[\"'’”)\]]*(?=\s|\Z)")
-WORD = re.compile(r"[A-Za-z0-9]+(?:['’.,-][A-Za-z0-9]+)*")
 INTERNAL_PUNCTUATION = re.compile(r"[,;:](?=\s)|[(—–]|\s--?\s")
-PROSE_KINDS = ("paragraph", "list-item", "caption", "footnote")
-
-Section = Literal["summary", "back-matter", "body"]
-
-
-@dataclass(frozen=True)
-class Finding:
-    """One rule hit; `excerpt` is the source around it, or a measurement for a whole document."""
-
-    rule: str
-    line: int
-    column: int
-    excerpt: str
-
-
-@dataclass(frozen=True)
-class Block:
-    """One markdown block, in document order, with markup blanked from its text.
-
-    The prose kinds are paragraph, list-item, caption and footnote. The others are heading,
-    break, image, code, quote, table and masked (a line that inline masking left blank).
-    """
-
-    kind: str
-    first_line: int
-    text: str
-    section: Section
-    source_lines: tuple[str, ...]
-
-    def position(self, offset: int) -> tuple[int, int]:
-        line_start = self.text.rfind("\n", 0, offset) + 1
-        return self.first_line + self.text.count("\n", 0, offset), offset - line_start + 1
-
-    def source_line(self, line_number: int) -> str:
-        return self.source_lines[line_number - self.first_line]
-
-    def finding(self, rule: str, offset: int) -> Finding:
-        line_number, column = self.position(offset)
-        return Finding(rule, line_number, column, _excerpt(self.source_line(line_number), column))
-
-    @property
-    def start_offset(self) -> int:
-        return len(self.text) - len(self.text.lstrip())
-
-
-@dataclass
-class _BlockDraft:
-    kind: str
-    first_line: int
-    after_image: bool
-    section: Section
-    lines: list[str]
-
-    def finish(self, original_lines: list[str]) -> Block:
-        """Build the block; its lines are consecutive source lines from its first line."""
-        text = "\n".join(self.lines)
-        caption = CAPTION_START.match(text.lstrip()) or (
-            self.after_image and _sentence_count(text) <= 2
-        )
-        kind = "caption" if self.kind == "paragraph" and caption else self.kind
-        first = self.first_line - 1
-        source_lines = tuple(original_lines[first : first + len(self.lines)])
-        return Block(kind, self.first_line, text, self.section, source_lines)
-
-
-def _blank_match(match: re.Match[str]) -> str:
-    return " " * len(match.group())
-
-
-def _mask_inline(text: str) -> str:
-    text = re.sub(r"<!--.*?-->", _blank_match, text, flags=re.DOTALL)
-    text = re.sub(r"`+[^`]*`+", _blank_match, text)
-    text = re.sub(r"\[\d+\]\([^)]*\)", _blank_match, text)
-    text = re.sub(r"\]\([^)]*\)", _blank_match, text)
-    text = re.sub(r"https?://\S*[^\s.,;:!?)\]'\"]", _blank_match, text, flags=re.IGNORECASE)
-    text = re.sub(r"\[\^[^\]]+\]", _blank_match, text)
-    return text
-
-
-def _mask_quotations(text: str) -> str:
-    """Blank double-quoted spans, which quote other words rather than the writer's own."""
-    return QUOTATION.sub(_blank_match, text)
 
 
 def _in_link_text(source_line: str, column: int) -> bool:
     return any(link.start() < column - 1 < link.end() for link in LINK_TEXT.finditer(source_line))
 
 
-def _visible_lines(text: str) -> tuple[list[str], list[str], list[str]]:
-    """Return the source lines, the lines with markup blanked, and each blanked line's kind.
-
-    The kind is frontmatter, code, quote, table or masked for a blanked line, and empty otherwise.
-    """
-    original_lines = text.splitlines()
-    if text.endswith(("\n", "\r")):
-        original_lines.append("")
-    visible_lines = list(original_lines)
-    kinds = [""] * len(original_lines)
-    in_frontmatter = bool(original_lines and original_lines[0].strip() == "---")
-    fence_marker = ""
-    for index, line in enumerate(original_lines):
-        stripped = line.lstrip()
-        fence_match = FENCE.match(line)
-        if in_frontmatter:
-            kinds[index] = "frontmatter"
-            in_frontmatter = index == 0 or stripped != "---"
-        elif fence_marker:
-            kinds[index] = "code"
-            if fence_match and fence_match.group(1)[0] == fence_marker:
-                fence_marker = ""
-        elif fence_match:
-            kinds[index] = "code"
-            fence_marker = fence_match.group(1)[0]
-        elif stripped.startswith(">"):
-            kinds[index] = "quote"
-        elif stripped.startswith("|"):
-            kinds[index] = "table"
-        else:
-            visible_lines[index] = _mask_inline(line)
-            if line.strip() and not visible_lines[index].strip():
-                kinds[index] = "masked"
-            continue
-        visible_lines[index] = ""
-    return original_lines, visible_lines, kinds
-
-
-def _excerpt(line: str, column: int) -> str:
-    """Shorten a source line to a window that starts a few words before the finding."""
-    start = column - 1 - EXCERPT_LEFT_CONTEXT
-    if start > 0:
-        start = line.find(" ", start, column - 1) + 1 or start
-        line = "..." + line[start:]
-    return textwrap.shorten(line, width=120, placeholder="...")
-
-
-def _sentence_spans(text: str) -> list[tuple[int, int]]:
-    """Return (start, end) offsets of each sentence that contains a word."""
-    protected = ABBREVIATION_PERIODS.sub(lambda match: match.group().replace(".", "\0"), text)
-    ends = [match.end() for match in SENTENCE_END.finditer(protected)]
-    spans = []
-    for start, end in zip([0, *ends], [*ends, len(text)]):
-        segment = text[start:end]
-        if WORD.search(segment):
-            spans.append((start + len(segment) - len(segment.lstrip()), end))
-    return spans
-
-
-def _sentence_count(paragraph: str) -> int:
-    return max(1, len(_sentence_spans(paragraph)))
-
-
-def _heading_level(line: str) -> int:
-    heading = HEADING.match(line)
-    return len(heading.group(1)) if heading else 0
-
-
-def _is_heading(line: str) -> bool:
-    return _heading_level(line) > 0
-
-
-def _heading_text(line: str) -> str:
-    heading = re.sub(r"`+[^`]*`+", " ", HEADING.sub("", line))
-    return re.sub(r"[*_~]", "", heading).strip(" #:")
-
-
-def _heading_words(line: str) -> list[str]:
-    return re.findall(r"[A-Za-z][A-Za-z0-9']*", _heading_text(line))
-
-
-def _is_summary_heading(line: str) -> bool:
-    return _is_heading(line) and bool(SUMMARY_HEADING.match(_heading_text(line)))
-
-
-def _section_role(heading_line: str) -> Section:
-    if _is_summary_heading(heading_line):
-        return "summary"
-    if BACK_MATTER_HEADING.match(_heading_text(heading_line)):
-        return "back-matter"
-    return "body"
-
-
-def _ordered_items_by_line(visible_lines: list[str]) -> list[int]:
-    """Count the ordered-list items in the section (between any two headings) of each line."""
-    counts = [0] * len(visible_lines)
-    boundaries = [index for index, line in enumerate(visible_lines) if _is_heading(line)]
-    for start, end in zip([0, *boundaries], [*boundaries, len(visible_lines)]):
-        items = sum(1 for line in visible_lines[start:end] if ORDERED_ITEM.match(line))
-        counts[start:end] = [items] * (end - start)
-    return counts
-
-
 def _is_title_case_heading(line: str) -> bool:
-    if not _is_heading(line):
+    if not is_heading(line):
         return False
-    words = _heading_words(line)
+    words = heading_words(line)
     if len(words) < 4:
         return False
     candidate_words = [word for word in words[1:] if word.lower() not in TITLE_SMALL_WORDS]
@@ -396,7 +201,7 @@ def _line_hits(visible: str) -> Iterator[tuple[str, int]]:
 
 def _line_findings(original_lines: list[str], visible_lines: list[str]) -> list[Finding]:
     return [
-        Finding(rule, line_number, column, _excerpt(source, column))
+        Finding(rule, line_number, column, excerpt(source, column))
         for line_number, (source, visible) in enumerate(zip(original_lines, visible_lines), start=1)
         if visible.strip()
         for rule, column in _line_hits(visible)
@@ -442,7 +247,7 @@ def _is_known_name(match: re.Match[str], text: str, ordered_items: int) -> bool:
 
 def _coined_label_findings(visible_lines: list[str], blocks: list[Block]) -> list[Finding]:
     """Flag labels and IDs, except one in parentheses after a plain description and its reuses."""
-    ordered_items = _ordered_items_by_line(visible_lines)
+    ordered_items = ordered_items_by_line(visible_lines)
     introduced: set[str] = set()
     findings: list[Finding] = []
     for block in blocks:
@@ -462,153 +267,12 @@ def _coined_label_findings(visible_lines: list[str], blocks: list[Block]) -> lis
     return findings
 
 
-def _blocks(
-    original_lines: list[str], visible_lines: list[str], line_kinds: list[str]
-) -> list[Block]:
-    """Split the document into blocks; an indented block after a list item stays in the list."""
-    drafts: list[_BlockDraft] = []
-    open_kind = ""
-    in_list = after_image = False
-    section: Section = "body"
-    section_level = 0
-    lines = zip(original_lines, visible_lines, line_kinds)
-    for line_number, (source, visible, line_kind) in enumerate(lines, start=1):
-        if line_kind == "frontmatter":
-            continue
-        if line_kind:
-            if line_kind != open_kind:
-                drafts.append(_BlockDraft(line_kind, line_number, False, section, []))
-            drafts[-1].lines.append(visible)
-            open_kind, after_image = line_kind, False
-            continue
-        level = _heading_level(visible)
-        if level:
-            if section_level and level <= section_level:
-                section, section_level = "body", 0
-            role = _section_role(visible)
-            if not section_level and role != "body":
-                section, section_level = role, level
-        image = bool(IMAGE_LINE.match(source))
-        if level or image or THEMATIC_BREAK.match(visible):
-            kind = "heading" if level else "image" if image else "break"
-            drafts.append(_BlockDraft(kind, line_number, False, section, [visible]))
-            open_kind, in_list, after_image = "", False, image
-            continue
-        if not visible.strip():
-            open_kind = ""
-            continue
-        footnote = FOOTNOTE_DEFINITION.match(source)
-        list_marker = LIST_ITEM.match(visible)
-        marker = footnote or list_marker
-        if marker or open_kind != "prose":
-            in_list = bool(list_marker) or (in_list and visible.startswith("  "))
-            kind = "footnote" if footnote else "list-item" if in_list else "paragraph"
-            drafts.append(_BlockDraft(kind, line_number, after_image, section, []))
-            open_kind, after_image = "prose", False
-        drafts[-1].lines.append(" " * marker.end() + visible[marker.end() :] if marker else visible)
-    return [draft.finish(original_lines) for draft in drafts]
-
-
-def _top_sections(blocks: list[Block]) -> list[tuple[Block | None, list[Block]]]:
-    """Split the blocks at each H1 or H2 heading; the text before the first one has no heading."""
-    sections: list[tuple[Block | None, list[Block]]] = [(None, [])]
-    for block in blocks:
-        if block.kind == "heading" and _heading_level(block.text) <= 2:
-            sections.append((block, []))
-        else:
-            sections[-1][1].append(block)
-    return sections
-
-
-def _section_findings(blocks: list[Block]) -> list[Finding]:
-    """Flag an H2 section whose body is a single block or a single list."""
-    findings: list[Finding] = []
-    for heading, body in _top_sections(blocks):
-        if heading is None or _heading_level(heading.text) != 2:
-            continue
-        if _is_summary_heading(heading.text):
-            continue
-        kinds = [block.kind for block in body if block.kind not in ("heading", "break")]
-        pairs = zip(["", *kinds], kinds)
-        merged = [kind for previous, kind in pairs if not (kind == previous == "list-item")]
-        thin = len(merged) < 2 or merged == ["list-item"]
-        if thin and not _is_reference_list(body):
-            findings.append(heading.finding("thin-h2-section", 0))
-    return findings
-
-
-def _is_reference_list(body: list[Block]) -> bool:
-    first_lines = [block.source_lines[0] for block in body if block.kind == "list-item"]
-    items = [line for line in first_lines if LIST_ITEM.match(line)]
-    return bool(items) and all(LINK_OR_URL.search(item) for item in items)
-
-
-def _heading_density_findings(blocks: list[Block], prose: list[Block]) -> list[Finding]:
-    """Count sections at the shallowest heading level below a lone H1 title against a budget."""
-    levels = [
-        (block.first_line, _heading_level(block.text))
-        for block in blocks
-        if block.kind == "heading"
-    ]
-    if [level for _, level in levels].count(1) == 1:
-        levels = [(line, level) for line, level in levels if level != 1]
-    top = min((level for _, level in levels), default=0)
-    sections = [line for line, level in levels if level == top]
-    words = sum(len(WORD.findall(block.text)) for block in prose)
-    budget = FREE_TOP_LEVEL_SECTIONS + words // WORDS_PER_EXTRA_SECTION
-    if len(sections) <= budget:
-        return []
-    summary = f"{len(sections)} top-level sections; {budget} fit {words} words of prose"
-    return [Finding("heading-density", sections[budget], 1, summary)]
-
-
-def _number_count(sentence: str) -> int:
-    masked = NOT_A_NUMBER.sub(_blank_match, sentence)
-    numbers = [match.group() for match in NUMBER.finditer(masked)]
-    counted = [number for number in numbers if not YEAR_ORDINAL_OR_VERSION.fullmatch(number)]
-    spelled = [
-        match
-        for match in SPELLED_NUMBER.finditer(masked)
-        if match.group("times") or LARGE_SPELLED_NUMBER.search(match.group())
-    ]
-    return len(counted) + len(spelled)
-
-
-def _number_density_findings(blocks: list[Block]) -> list[Finding]:
-    """Flag number-heavy body prose: whole documents by density, single blocks by count."""
-    body = [
-        block
-        for block in blocks
-        if block.kind in ("paragraph", "list-item") and block.section == "body"
-    ]
-    has_summary = any(block.section == "summary" for block in blocks)
-    opening = next((block for block in blocks if block.kind == "paragraph"), None)
-    if not has_summary and opening in body:
-        body.remove(opening)
-    findings: list[Finding] = []
-    total_numbers = total_words = 0
-    for block in body:
-        sentences = [block.text[start:end] for start, end in _sentence_spans(block.text)]
-        prose = [sentence for sentence in sentences if not ARITHMETIC.search(sentence)]
-        numbers = sum(_number_count(sentence) for sentence in prose)
-        total_numbers += numbers
-        total_words += sum(len(WORD.findall(sentence)) for sentence in prose)
-        if numbers > NUMBERS_PER_BLOCK:
-            findings.append(block.finding("number-density", block.start_offset))
-    dense = total_numbers * 100 > NUMBERS_PER_100_WORDS * total_words
-    if total_words >= MIN_BODY_WORDS_FOR_DENSITY and dense:
-        density = 100 * total_numbers / total_words
-        summary = f"body prose carries {density:.1f} numbers per 100 words"
-        findings.append(Finding("number-density", body[0].first_line, 1, summary))
-    return findings
-
-
 def _phrase_findings(prose: list[Block]) -> list[Finding]:
     return [
         block.finding(rule, match.start("hit"))
         for block in prose
         for rule, pattern in PHRASE_RULES.items()
-        for match in pattern.finditer(_mask_quotations(block.text))
+        for match in pattern.finditer(mask_quotations(block.text))
     ]
 
 
@@ -630,7 +294,7 @@ def _sentence_findings(prose: list[Block]) -> list[Finding]:
     findings: list[Finding] = []
     complex_sentences = 0
     for block in prose:
-        for start, end in _sentence_spans(block.text):
+        for start, end in sentence_spans(block.text):
             rule = _sentence_rule(block.text[start:end])
             if rule is None:
                 continue
@@ -656,8 +320,8 @@ def _sentence_shape(sentence: str) -> str | None:
 def _sentence_shape_findings(prose: list[Block]) -> list[Finding]:
     findings: list[Finding] = []
     for block in prose:
-        text = _mask_quotations(block.text)
-        for start, end in _sentence_spans(text):
+        text = mask_quotations(block.text)
+        for start, end in sentence_spans(text):
             rule = _sentence_shape(text[start:end])
             if rule:
                 findings.append(block.finding(rule, start))
@@ -681,8 +345,8 @@ def _series_sentences(body: list[Block]) -> Iterator[tuple[Block, re.Match[str]]
     for block in body:
         if block.kind not in ("paragraph", "caption", "footnote"):
             continue
-        text = _mask_quotations(block.text)
-        for start, end in _sentence_spans(text):
+        text = mask_quotations(block.text)
+        for start, end in sentence_spans(text):
             match = _three_item_series(text, start, end)
             if match:
                 yield block, match
@@ -692,7 +356,7 @@ def _triad_findings(blocks: list[Block]) -> list[Finding]:
     """Flag each sentence with a three-item series past the free ones in its H1 or H2 section."""
     return [
         block.finding("triad-density", match.start())
-        for _, body in _top_sections(blocks)
+        for _, body in top_sections(blocks)
         for block, match in list(_series_sentences(body))[FREE_TRIADS_PER_SECTION:]
     ]
 
@@ -726,7 +390,7 @@ def _all_caps_findings(prose: list[Block]) -> list[Finding]:
     defined = _defined_acronyms(prose)
     findings: list[Finding] = []
     for block in prose:
-        for run in CAPITALIZED_RUN.finditer(_mask_quotations(block.text)):
+        for run in CAPITALIZED_RUN.finditer(mask_quotations(block.text)):
             if any(_is_ordinary_word(word) for word in run.group().split() if word not in defined):
                 findings.append(block.finding("all-caps-emphasis", run.start()))
     return findings
@@ -753,58 +417,24 @@ def _undefined_acronym_findings(prose: list[Block]) -> list[Finding]:
     return findings
 
 
-def _summary_findings(blocks: list[Block]) -> list[Finding]:
-    """Flag a TL;DR, summary or abstract section that is long or quotes many numbers."""
-    sections: list[tuple[int, list[Block]]] = []
-    for block in blocks:
-        if block.kind == "heading" and _is_summary_heading(block.text):
-            sections.append((block.first_line, []))
-        elif block.section == "summary" and block.kind in PROSE_KINDS:
-            sections[-1][1].append(block)
-    findings: list[Finding] = []
-    for heading_line, prose in sections:
-        sentences = [
-            block.text[start:end] for block in prose for start, end in _sentence_spans(block.text)
-        ]
-        numbers = sum(_number_count(sentence) for sentence in sentences)
-        if len(sentences) > MAX_SUMMARY_SENTENCES or numbers > MAX_SUMMARY_NUMBERS:
-            measurement = f"summary has {len(sentences)} sentences and {numbers} numbers"
-            findings.append(Finding("tldr-shape", heading_line, 1, measurement))
-    return findings
-
-
-def _short_paragraph_findings(blocks: list[Block]) -> list[Finding]:
-    """Flag three paragraphs of one or two sentences in a row; any other block ends a run."""
-    findings: list[Finding] = []
-    run: list[Block] = []
-    for block in blocks:
-        if block.kind != "paragraph" or _sentence_count(block.text) > 2:
-            run = []
-            continue
-        run.append(block)
-        if len(run) == 3:
-            findings.append(run[0].finding("short-paragraph-run", 0))
-    return findings
-
-
 def lint_text(text: str) -> list[Finding]:
     """Return conservative style findings, retaining original line locations."""
-    original_lines, visible_lines, line_kinds = _visible_lines(text)
-    blocks = _blocks(original_lines, visible_lines, line_kinds)
+    original_lines, visible_lines, line_kinds = masked_lines(text)
+    blocks = parse_blocks(original_lines, visible_lines, line_kinds)
     prose = [block for block in blocks if block.kind in PROSE_KINDS]
     findings = _line_findings(original_lines, visible_lines)
     findings.extend(_coined_label_findings(visible_lines, blocks))
-    findings.extend(_section_findings(blocks))
-    findings.extend(_short_paragraph_findings(blocks))
+    findings.extend(section_findings(blocks))
+    findings.extend(short_paragraph_findings(blocks))
     findings.extend(_phrase_findings(prose))
     findings.extend(_sentence_findings(prose))
     findings.extend(_sentence_shape_findings(prose))
     findings.extend(_triad_findings(blocks))
     findings.extend(_all_caps_findings(prose))
     findings.extend(_undefined_acronym_findings(prose))
-    findings.extend(_number_density_findings(blocks))
-    findings.extend(_heading_density_findings(blocks, prose))
-    findings.extend(_summary_findings(blocks))
+    findings.extend(number_density_findings(blocks))
+    findings.extend(heading_density_findings(blocks, prose))
+    findings.extend(summary_findings(blocks))
     return sorted(findings, key=lambda finding: (finding.line, finding.column, finding.rule))
 
 
