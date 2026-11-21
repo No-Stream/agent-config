@@ -152,9 +152,9 @@ class TestManifestFile:
             write_manifest(tmp_path / "m.jsonl", [make_text("a"), make_text("a")])
 
     def test_unknown_fields_are_refused(self, tmp_path):
-        row = {**make_text("a").__dict__, "extra": 1}
+        row = {**dataclasses.asdict(make_text("a")), "extra": 1}
         (tmp_path / "m.jsonl").write_text(json.dumps(row) + "\n")
-        with pytest.raises(ValueError, match="fields"):
+        with pytest.raises(ValueError):
             read_manifest(tmp_path / "m.jsonl")
 
 

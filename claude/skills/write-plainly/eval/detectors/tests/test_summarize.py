@@ -79,14 +79,15 @@ class TestContrastTable:
         )
 
 
-def test_overview_counts_each_check_and_marks_unscored_ones():
-    texts, scores = bheijden_texts(
-        {"human": [0.1, 0.2, 0.9], "corpus-claude-opus-5": [0.5, 0.6, 0.7], **PLANTED}
-    )
-    unplanted = {text_id: row for text_id, row in scores.items() if "corpus" in text_id}
-    table = overview_table(texts, {"gpttrace": scores, "binoculars": unplanted}).splitlines()
-    assert table[2] == "| gpttrace | 2/3 | 3/3 | 3/3 | 2/3 |"
-    assert table[3] == "| binoculars | not scored | not scored | not scored | not scored |"
+class TestOverviewTable:
+    def test_overview_counts_each_check_and_marks_unscored_ones(self):
+        texts, scores = bheijden_texts(
+            {"human": [0.1, 0.2, 0.9], "corpus-claude-opus-5": [0.5, 0.6, 0.7], **PLANTED}
+        )
+        unplanted = {text_id: row for text_id, row in scores.items() if "corpus" in text_id}
+        table = overview_table(texts, {"gpttrace": scores, "binoculars": unplanted}).splitlines()
+        assert table[2] == "| gpttrace | 2/3 | 3/3 | 3/3 | 2/3 |"
+        assert table[3] == "| binoculars | not scored | not scored | not scored | not scored |"
 
 
 class TestSpread:
@@ -110,14 +111,15 @@ class TestSpread:
         )
 
 
-@pytest.mark.parametrize(
-    ("detector", "values", "flagged"),
-    [
-        ("binoculars", [0.80, 0.86, 0.90], "1/3"),
-        ("gpttrace", [9.0, 9.5, 12.0], "2/3"),
-        ("desklib", [-1.0, 1.0, 2.0], "2/3"),
-        ("fast-detectgpt", [-1.0, 1.0, 2.0], "n/a"),
-    ],
-)
-def test_past_cutoff_counts_on_the_detectors_ai_side(detector, values, flagged):
-    assert past_cutoff(DETECTORS[detector], values) == flagged
+class TestPastCutoff:
+    @pytest.mark.parametrize(
+        ("detector", "values", "flagged"),
+        [
+            ("binoculars", [0.80, 0.86, 0.90], "1/3"),
+            ("gpttrace", [9.0, 9.5, 12.0], "2/3"),
+            ("desklib", [-1.0, 1.0, 2.0], "2/3"),
+            ("fast-detectgpt", [-1.0, 1.0, 2.0], "n/a"),
+        ],
+    )
+    def test_past_cutoff_counts_on_the_detectors_ai_side(self, detector, values, flagged):
+        assert past_cutoff(DETECTORS[detector], values) == flagged
