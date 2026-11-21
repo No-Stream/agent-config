@@ -21,28 +21,29 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to get past 
 - Keep each cell to a few named steps rather than one `run_everything(...)` call that hides them. Move substantial logic (more than about 20 lines of transforms, estimation or plotting) into an importable module, or into a helpers cell when it is display-only and one-off. Fix a library you own instead of working around it in a cell.
 - When new work varies something already in the notebook (another estimator, a wider sweep, a re-cut chart), extend that section; search the notebook before adding a cell. Put other new work where it belongs in the argument (main result, then support, then detail), not at the end. Replace what a change supersedes, drop debugging outputs once their bug is fixed, and when patches pile up, rebuild the notebook from an outline.
 - A notebook that replaces or summarizes earlier ones carries every analysis of theirs the question needs: read them all, reuse their code, and list what you leave out.
-- Seed every random step, use repo-relative paths, and import constants (column names, thresholds, paths) from the project's config module.
+- Seed every random step, use repo-relative paths, and import column names, thresholds and paths from the project's config module.
 - Assert the facts a frame must satisfy (unique keys, row counts kept across a join, no nulls in a key, covariates dated before treatment) in the cell that builds it.
 
 ## Outputs
 
-- Follow every figure and table with one or two plain sentences on what it shows and means for the question, quoting only the numbers the claim needs. Give an effect as an estimate with its interval in the reader's units, never a verdict: no pass or fail, no winner where intervals overlap, no "no effect" from an underpowered read. When an output changes, check its markdown against it and fix what no longer holds.
+- Follow every figure and table with one or two plain sentences on what it shows and means for the question, quoting only the numbers the claim needs. Give an effect as an estimate with its interval in the reader's units, never a verdict: no pass or fail, no winner where intervals overlap, no "no effect" from an underpowered read. Asked for a winner the data cannot name, say so, why, and what would settle it. When an output changes, check its markdown against it and fix what no longer holds.
 - Never type a result, or the estimator, window or model behind it, into markdown or a figure title. Render tables as DataFrames, print inline numbers from the result objects (`print(f"lift {res.lift:.1%}, 95% CI [{res.lo:.1%}, {res.hi:.1%}]")`), and assert any claim the prose depends on, such as a sign or an ordering, in the cell that computes it.
 - Open each section with the figure for its core comparison, then breakdowns (per segment, per fold); ablations and diagnostics go after them or in an appendix. Say how a pooled result is weighted.
 - `display()` every frame: only a cell's last bare expression renders, and IPython's output cache keeps that object alive after `del`. Show each matplotlib figure once, with `plt.show()`.
 - Preview a few rows of the columns you need. Show each finding as a figure, with its table after it in full (every candidate, neutral and negative results included), raising the renderer's row limit (`pl.Config.set_tbl_rows`) instead of filtering.
 - Format for reading: round each metric to the precision it needs (a global three decimals shows 0.0004 as 0.000), cast integer-valued floats to integers, and name columns in plain words with units, not abbreviations or labels coined during the work.
-- Keep the saved file small: cap figure sizes in helpers that scale with the data, and put per-iteration logs behind a verbosity flag.
+- Keep the saved file small: cap figure sizes that scale with the data, and put per-iteration logs behind a verbosity flag.
 
 ## Running
 
 - After editing a cell, re-run it and every cell that depends on it, or restart and run all, before reading later outputs or calling the notebook done; the kernel still holds the old state. After editing an imported module, reload it or restart.
 - Leave a finished notebook as it is when upstream code changes, unless the change could move a conclusion; practically identical results count as identical.
 - Run a long job you may still adjust in a live kernel you can address, so a late-cell fix re-runs against in-memory state. Use a fresh-kernel batch runner (papermill, nbconvert, nbclient) for runs you will not touch; a run whose expensive cells have not finished is cheap to restart.
+- Before a long run of changed code, smoke-run the changed cells on a small slice or review them.
 - Never edit a notebook while a run that saves it is in flight; the run writes back the copy it loaded.
-- A tool's timeout on a live kernel does not stop the cell; check whether it is still running before running it again.
-- Run a pipeline of notebooks in its documented order (ask which ones if not told), each in a fresh kernel that you stop before starting the next. Check that each output exists, has a plausible row count and was written by this run (its modification time).
-- Before a big run, list kernels earlier runs left holding memory, and check whose they are before killing any. Confirm a suspected out-of-memory kill in the system log (`dmesg`), since a tool can report a dead kernel as alive.
+- A tool's timeout on a live kernel does not stop the cell; check it before running it again.
+- Run a pipeline of notebooks in its documented order (ask which ones if not told), each in a fresh kernel that you stop before starting the next. Check that each output exists, has a plausible row count and was written by this run.
+- Before a big run, list kernels left holding memory, and check whose they are before killing any. Confirm a suspected out-of-memory kill in the system log (`dmesg`), since a tool can report a dead kernel as alive.
 
 ## Large data and slow cells
 
@@ -62,7 +63,7 @@ A slow cell usually runs Python per row or calls `.collect()` in a loop. Run ind
 
 ## Reviewing a notebook
 
-Review before an expensive run (when asked to run one, review it first) and before a notebook is shared. Read every cell, code and markdown, against the rules above, plus these checks:
+Review before an expensive run (when asked to run one, review it first) and before sharing. Read every cell, code and markdown, against the rules above, plus:
 
 - Every number in prose matches the output it cites, and a statistic shown twice agrees.
 - Main results are plausible against earlier runs and known results, and every change since the last run, NaN in a result, too-exact match to a target or apparent contradiction is explained.
