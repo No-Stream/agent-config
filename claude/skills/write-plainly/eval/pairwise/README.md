@@ -22,7 +22,13 @@ The analysis that unblinds the grades is not in this repo; it runs beside the pr
 2. Check the agent count: `uv run run_pipelines.py plan --config pipelines.toml --tasks tasks/public.toml more-tasks.toml`.
 3. Generate, in tmux, since a full run takes hours: `uv run run_pipelines.py run --config pipelines.toml --tasks ... --out generation/ --jobs 8`. A rerun skips every stage whose output file exists, so after a failure the same command continues where it stopped. `--only-task` and `--only-pipeline` limit a run; the per-task fidelity measurement runs only when all pipelines ran.
 4. Blind: `uv run blind.py --generation generation/ --tasks ... --pipelines current merged merged-style-pass merged-loose-paragraphs no-skill --seed 20261120 --out eval/`. `--only-task` limits the sets to some tasks. It refuses to overwrite an existing `sets.jsonl` or `key.json`, since grades and rankings refer to the set ids, and prints an estimate of the reading time.
-5. Grade: `python3 rater.py build eval/sets.jsonl --out eval/rater.html`, open the page, grade, and copy the result line at the bottom. Then `python3 rater.py record eval/sets.jsonl "<result line>"`.
+5. Grade: `python3 rater.py build eval/sets.jsonl --out eval/rater.html`, open the page, grade, and copy the result line at the bottom. Then pass the line to `record` on stdin in a quoted heredoc, since its notes hold double quotes and may hold apostrophes:
+
+   ```sh
+   python3 rater.py record eval/sets.jsonl <<'EOF'
+   <result line>
+   EOF
+   ```
 6. Judge: `uv run judges.py --sets eval/sets.jsonl --skill ../../SKILL.md --out eval/judges --seed 20261120`. The judge calls run four at a time; `--jobs` changes that. A rerun skips sets already ranked; a ranking on disk of other passages or another letter order (from another sets file or seed) stops the run, so a different set needs a fresh `--out`. At the end it prints each judge's agreement with itself across the two orders.
 
 Tests: `uv run --no-project --with pytest python -m pytest tests` from this directory. The runner and judge tests use stand-in `claude` and `codex` executables from `tests/fakes/`. The grading tests cover the page's HTML and the result line, but not the page's script, which has no automated test.

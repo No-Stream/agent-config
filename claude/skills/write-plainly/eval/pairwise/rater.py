@@ -2,11 +2,15 @@
 """Grade blind passage sets in a browser page, then record the grades the page hands back.
 
 build writes one self-contained HTML page from a sets file: one screen per task, a letter grade
-for each passage, and a result line to copy. record checks a result line against the sets file
-and writes grades.jsonl beside it, one record per set. Standard library only, Python 3.9 or newer.
+for each passage, and a result line to copy. record reads a result line on stdin, checks it
+against the sets file and writes grades.jsonl beside it, one record per set. The line's notes are
+JSON with double quotes and may hold apostrophes, so pass it in a quoted heredoc, never as an
+argument. Standard library only, Python 3.9 or newer.
 
     python3 rater.py build eval/sets.jsonl --out eval/rater.html
-    python3 rater.py record eval/sets.jsonl "wp1 1a2b3c4d 1:B+,A-,C,B,A notes={}"
+    python3 rater.py record eval/sets.jsonl <<'EOF'
+    wp1 1a2b3c4d 1:B+,A-,C,B,A notes={"1":"B's opening is padded"}
+    EOF
 """
 
 from __future__ import annotations
@@ -292,9 +296,10 @@ def main() -> None:
     build_command = commands.add_parser("build", help="write the grading page")
     build_command.add_argument("sets_file", type=Path)
     build_command.add_argument("--out", type=Path, required=True)
-    record_command = commands.add_parser("record", help=f"add a result line to {GRADES_FILE_NAME}")
+    record_command = commands.add_parser(
+        "record", help=f"add the result line on stdin to {GRADES_FILE_NAME}"
+    )
     record_command.add_argument("sets_file", type=Path)
-    record_command.add_argument("line")
     args = parser.parse_args()
     if args.command == "build":
         sets = load_sets(args.sets_file)
@@ -303,7 +308,7 @@ def main() -> None:
         print(f"wrote {args.out}: {len(sets)} tasks from sets file {digest}")
         return
     try:
-        recorded = record(args.sets_file, args.line)
+        recorded = record(args.sets_file, sys.stdin.read())
     except LineRefused as error:
         sys.exit(f"refused: {error}")
     grades_file = args.sets_file.parent / GRADES_FILE_NAME

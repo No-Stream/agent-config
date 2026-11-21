@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -187,7 +188,8 @@ class TestRecord:
 
     def test_the_command_exits_non_zero_with_the_reason(self, sets_file: Path) -> None:
         completed = subprocess.run(
-            [sys.executable, str(RATER_SCRIPT), "record", str(sets_file), "wp1 nope notes={}"],
+            [sys.executable, str(RATER_SCRIPT), "record", str(sets_file)],
+            input="wp1 nope notes={}\n",
             capture_output=True,
             text=True,
             check=False,
@@ -195,13 +197,16 @@ class TestRecord:
         assert completed.returncode == 1
         assert "refused: the line is not for this sets file" in completed.stderr
 
-    def test_the_command_records_and_reports_progress(self, sets_file: Path) -> None:
-        command = [sys.executable, str(RATER_SCRIPT), "record", str(sets_file)]
+    def test_the_documented_heredoc_records_a_note_with_quotes_a_pipe_and_an_apostrophe(
+        self, sets_file: Path
+    ) -> None:
+        note = 'B\'s "lead" is padded | C is fine'
+        result_line = line(sets_file, "2:A,A,B", {"2": note})
+        arguments = (sys.executable, str(RATER_SCRIPT), "record", str(sets_file))
+        command = f"{shlex.join(arguments)} <<'EOF'\n{result_line}\nEOF\n"
         completed = subprocess.run(
-            [*command, line(sets_file, "2:A,A,A")],
-            capture_output=True,
-            text=True,
-            check=True,
+            ["sh", "-c", command], capture_output=True, text=True, check=True
         )
         assert "recorded sets 2" in completed.stdout and "1 of 3 sets graded" in completed.stdout
-        assert grades_on_disk(sets_file)["2"]["grades"] == {"A": "A", "B": "A", "C": "A"}
+        assert grades_on_disk(sets_file)["2"]["grades"] == {"A": "A", "B": "A", "C": "B"}
+        assert grades_on_disk(sets_file)["2"]["note"] == note
