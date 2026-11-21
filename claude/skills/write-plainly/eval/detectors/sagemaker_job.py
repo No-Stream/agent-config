@@ -27,10 +27,15 @@ from botocore.config import Config as BotoConfig
 from scoring import (
     DETECTORS,
     GPU_DETECTORS,
+    MANIFEST_FILE,
+    PRIVATE_DETECTORS,
+    REPO_ROOT,
+    SCORES_DIR,
     prepared_texts,
     read_manifest,
     require_scored,
     reusable_scores,
+    scores_file,
     split_pending,
     text_sha256,
     write_scores,
@@ -39,8 +44,6 @@ from scoring import (
 logger = logging.getLogger(__name__)
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[4]
-PRIVATE_DETECTORS = REPO / ".private" / "eval" / "detectors"
 JOB_PREFIX = "writing-eval-falcon"
 CODE_FILES = ("scoring.py", "job_entry.py")
 CONTAINER_INPUT = "/opt/ml/processing/input"
@@ -89,10 +92,10 @@ def get(s3, uri: str) -> bytes:
 
 def pending_texts(manifest: Path, scores_dir: Path) -> dict[str, str]:
     """The prepared texts that at least one GPU detector has not scored."""
-    prepared = prepared_texts(read_manifest(manifest), REPO)
+    prepared = prepared_texts(read_manifest(manifest), REPO_ROOT)
     pending: dict[str, str] = {}
     for name in GPU_DETECTORS:
-        _, missing = split_pending(prepared, scores_dir / f"{name}.jsonl", DETECTORS[name])
+        _, missing = split_pending(prepared, scores_file(scores_dir, name), DETECTORS[name])
         pending.update(missing)
     return pending
 
@@ -175,17 +178,17 @@ def fetch(
     config: Config, session: boto3.Session, job: str, manifest: Path, scores_dir: Path
 ) -> None:
     s3 = session.client("s3", config=RETRIES)
-    prepared = prepared_texts(read_manifest(manifest), REPO)
+    prepared = prepared_texts(read_manifest(manifest), REPO_ROOT)
     wanted = {text_id: text_sha256(text) for text_id, text in prepared.items()}
     unscored = {}
     for name in GPU_DETECTORS:
-        scores_file = scores_dir / f"{name}.jsonl"
-        kept, _ = split_pending(prepared, scores_file, DETECTORS[name])
+        scores_path = scores_file(scores_dir, name)
+        kept, _ = split_pending(prepared, scores_path, DETECTORS[name])
         lines = get(s3, job_uri(config, job, f"output/{name}.jsonl")).decode().splitlines()
         fetched = [json.loads(line) for line in lines if line.strip()]
         current = reusable_scores(fetched, wanted, DETECTORS[name])
-        unscored[name] = write_scores(scores_file, prepared, {**kept, **current})
-        logger.info(f"{name}: merged {len(current)} scores from {job} into {scores_file}")
+        unscored[name] = write_scores(scores_path, prepared, {**kept, **current})
+        logger.info(f"{name}: merged {len(current)} scores from {job} into {scores_path}")
     logger.info(f"{job}: {get(s3, job_uri(config, job, 'output/job.json')).decode()}")
     require_scored(unscored, job)
 
@@ -196,8 +199,8 @@ def main() -> None:
     parser.add_argument("command", choices=("run", "fetch"))
     parser.add_argument("--job", help="the job to fetch")
     parser.add_argument("--config", type=Path, default=PRIVATE_DETECTORS / "sagemaker.toml")
-    parser.add_argument("--manifest", type=Path, default=PRIVATE_DETECTORS / "manifest.jsonl")
-    parser.add_argument("--scores", type=Path, default=PRIVATE_DETECTORS / "scores")
+    parser.add_argument("--manifest", type=Path, default=MANIFEST_FILE)
+    parser.add_argument("--scores", type=Path, default=SCORES_DIR)
     args = parser.parse_args()
     config = Config.load(args.config)
     session = boto3.Session(profile_name=config.profile, region_name=config.region)

@@ -36,6 +36,9 @@ from safetensors.torch import load_file
 from scoring import (
     CPU_DETECTORS,
     DETECTORS,
+    MANIFEST_FILE,
+    REPO_ROOT,
+    SCORES_DIR,
     ChunkScore,
     Detector,
     chunk_encodings,
@@ -43,6 +46,7 @@ from scoring import (
     read_manifest,
     require_scored,
     score_record,
+    scores_file,
     split_pending,
     text_sha256,
     write_scores,
@@ -50,9 +54,6 @@ from scoring import (
 from transformers import AutoConfig, AutoModel, AutoModelForSequenceClassification, AutoTokenizer
 
 logger = logging.getLogger(__name__)
-
-REPO = Path(__file__).resolve().parents[5]
-PRIVATE_DETECTORS = REPO / ".private" / "eval" / "detectors"
 
 # Lookalike folding from normalize.py in the nakas/gpttrace-v8s-1b model repo.
 HOMOGLYPHS = dict(
@@ -163,8 +164,8 @@ def score_texts(detector: Detector, pending: dict[str, str]) -> dict[str, dict]:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--manifest", type=Path, default=PRIVATE_DETECTORS / "manifest.jsonl")
-    parser.add_argument("--scores", type=Path, default=PRIVATE_DETECTORS / "scores")
+    parser.add_argument("--manifest", type=Path, default=MANIFEST_FILE)
+    parser.add_argument("--scores", type=Path, default=SCORES_DIR)
     parser.add_argument("--detectors", nargs="+", choices=CPU_DETECTORS, default=CPU_DETECTORS)
     parser.add_argument(
         "--threads", type=int, default=int(os.environ.get("TORCH_NUM_THREADS", "8"))
@@ -172,17 +173,17 @@ def main() -> None:
     args = parser.parse_args()
     torch.set_num_threads(args.threads)
     texts = read_manifest(args.manifest)
-    prepared = prepared_texts(texts, REPO)
+    prepared = prepared_texts(texts, REPO_ROOT)
     unscored = {}
     for name in args.detectors:
         detector = DETECTORS[name]
-        scores_file = args.scores / f"{name}.jsonl"
-        kept, pending = split_pending(prepared, scores_file, detector)
+        scores_path = scores_file(args.scores, name)
+        kept, pending = split_pending(prepared, scores_path, detector)
         logger.info(f"{name}: {len(kept)} texts already scored, {len(pending)} to score")
         started = time.monotonic()
         new = score_texts(detector, pending) if pending else {}
-        unscored[name] = write_scores(scores_file, prepared, {**kept, **new})
-        logger.info(f"{name}: wrote {scores_file} in {time.monotonic() - started:.0f} s")
+        unscored[name] = write_scores(scores_path, prepared, {**kept, **new})
+        logger.info(f"{name}: wrote {scores_path} in {time.monotonic() - started:.0f} s")
     require_scored(unscored, "score_local")
 
 

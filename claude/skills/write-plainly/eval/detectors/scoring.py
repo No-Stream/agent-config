@@ -16,6 +16,10 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[5]
+PRIVATE_DETECTORS = REPO_ROOT / ".private" / "eval" / "detectors"
+MANIFEST_FILE = PRIVATE_DETECTORS / "manifest.jsonl"
+SCORES_DIR = PRIVATE_DETECTORS / "scores"
 WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’.%-]*")  # the word rule of pairwise/common.py
 TYPOGRAPHY = str.maketrans(
     {
@@ -281,24 +285,28 @@ def reusable_scores(
     }
 
 
+def scores_file(scores_dir: Path, detector_name: str) -> Path:
+    return scores_dir / f"{detector_name}.jsonl"
+
+
 def prepared_texts(texts: Sequence[Text], repo: Path) -> dict[str, str]:
     return {text.id: prepare_text((repo / text.path).read_text()) for text in texts}
 
 
 def split_pending(
-    prepared: dict[str, str], scores_file: Path, detector: Detector
+    prepared: dict[str, str], scores_path: Path, detector: Detector
 ) -> tuple[dict[str, dict], dict[str, str]]:
     """The score records still valid for these texts, and the texts that need scoring."""
     wanted = {text_id: text_sha256(text) for text_id, text in prepared.items()}
-    existing = read_jsonl(scores_file) if scores_file.exists() else []
+    existing = read_jsonl(scores_path) if scores_path.exists() else []
     kept = reusable_scores(existing, wanted, detector)
     return kept, {text_id: text for text_id, text in prepared.items() if text_id not in kept}
 
 
-def write_scores(scores_file: Path, order: Iterable[str], records: dict[str, dict]) -> list[str]:
+def write_scores(scores_path: Path, order: Iterable[str], records: dict[str, dict]) -> list[str]:
     """Write the records in manifest order, dropping texts no longer in it; return unscored ids."""
     order = list(order)
-    write_jsonl((records[text_id] for text_id in order if text_id in records), scores_file)
+    write_jsonl((records[text_id] for text_id in order if text_id in records), scores_path)
     return [text_id for text_id in order if text_id not in records]
 
 

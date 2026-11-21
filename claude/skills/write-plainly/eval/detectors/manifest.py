@@ -22,12 +22,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from scoring import Text, prepare_text, word_count, write_manifest
+from scoring import MANIFEST_FILE, REPO_ROOT, Text, prepare_text, word_count, write_manifest
 
 logger = logging.getLogger(__name__)
 
 EVAL_DIR = Path(__file__).resolve().parents[1]
-REPO = EVAL_DIR.parents[3]
 BHEIJDEN = "bheijden"
 PAIRWISE = "pairwise"
 BHEIJDEN_ARMS = {"human": "human", "ai": "corpus-claude-opus-5"}
@@ -44,7 +43,7 @@ class Sources:
 
     @classmethod
     def default(cls) -> Sources:
-        private = REPO / ".private" / "eval"
+        private = REPO_ROOT / ".private" / "eval"
         return cls(
             bheijden_corpus=EVAL_DIR / ".cache" / "bheijden-slop" / "data" / "corpus",
             voice_dir=private / "human-private",
@@ -121,7 +120,7 @@ def detector_texts(root: Path, registers: dict[str, str], repo: Path) -> list[Te
     return texts
 
 
-def build(sources: Sources, repo: Path = REPO) -> list[Text]:
+def build(sources: Sources, repo: Path = REPO_ROOT) -> list[Text]:
     doc_types = pairwise_doc_types(sources.pairwise_task_files)
     texts = [
         *bheijden_texts(sources.bheijden_corpus, repo),
@@ -138,9 +137,7 @@ def build(sources: Sources, repo: Path = REPO) -> list[Text]:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--out", type=Path, default=REPO / ".private" / "eval" / "detectors" / "manifest.jsonl"
-    )
+    parser.add_argument("--out", type=Path, default=MANIFEST_FILE)
     args = parser.parse_args()
     texts = build(Sources.default())
     write_manifest(texts, args.out)

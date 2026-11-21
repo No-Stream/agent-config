@@ -19,10 +19,17 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from scipy import stats
-from scoring import DETECTORS, Detector, Text, read_jsonl, read_manifest
+from scoring import (
+    DETECTORS,
+    MANIFEST_FILE,
+    SCORES_DIR,
+    Detector,
+    Text,
+    read_jsonl,
+    read_manifest,
+    scores_file,
+)
 
-REPO = Path(__file__).resolve().parents[5]
-PRIVATE_DETECTORS = REPO / ".private" / "eval" / "detectors"
 HUMAN_ARMS = {"human", "human-jan"}
 CONTROL_CORPUS, CONTROL_HUMAN = "bheijden", "human"
 Z95 = statistics.NormalDist().inv_cdf(0.975)
@@ -152,16 +159,16 @@ def detector_section(detector: Detector, texts: Sequence[Text], scores: dict[str
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--manifest", type=Path, default=PRIVATE_DETECTORS / "manifest.jsonl")
-    parser.add_argument("--scores", type=Path, default=PRIVATE_DETECTORS / "scores")
+    parser.add_argument("--manifest", type=Path, default=MANIFEST_FILE)
+    parser.add_argument("--scores", type=Path, default=SCORES_DIR)
     parser.add_argument("--corpus", help="limit to one corpus")
     args = parser.parse_args()
     texts = [t for t in read_manifest(args.manifest) if args.corpus in (None, t.corpus)]
     sections = []
     for name, detector in DETECTORS.items():
-        scores_file = args.scores / f"{name}.jsonl"
-        if scores_file.exists():
-            scores = {row["id"]: row for row in read_jsonl(scores_file)}
+        scores_path = scores_file(args.scores, name)
+        if scores_path.exists():
+            scores = {row["id"]: row for row in read_jsonl(scores_path)}
             sections.append(detector_section(detector, texts, scores))
     print("\n\n".join(sections))
 
