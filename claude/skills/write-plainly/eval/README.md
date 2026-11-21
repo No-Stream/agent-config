@@ -49,7 +49,7 @@ Each rule falls into one of two groups, and only tell rules can be demoted:
 - House-style rules encode this skill's own preferences: no em dashes, no dashes as pauses, few numbers in body prose, paragraph shape and sentence length. The markdown rules from the skill's Format section are house style too: no bold run-in labels or bold lead-ins, bold only for a decision or a label, sentence-case headings and no thin top-level sections. They stay whatever their human rate, and their rates are reported for information. A rule from another linter that contradicts one of them is removed whatever its rates.
 - Tell rules exist to catch model habits. A tell rule that fires more often per 1,000 words on the human side than on the agent side, on at least three human texts, gets an advisory "Check:" message or is removed. The three-text floor was added during the triage, because two texts against none is within noise for corpora this small, and it is provisional until the skill's owner confirms it. Without it, `stacked-hedge` would get a "Check:" message, `check-prose.sh` would also skip sloplint's `same-determiner-chain` and `stands-serves-as`, and slop-guard's `pithy_fragment` would be turned off.
 
-Two tell rules are about markdown structure: slop-guard's `bullet_density`, and the bold-header and bullet-run checks in its `structural` rule. They cannot fire on the matched corpus, which is plain text, so they are judged on the passages that the pairwise evaluation in `pairwise/` generated, as "Markdown rules on generated passages" describes. Those passages have no bold and no run of six bullets, so the only one judged is `bullet_density`, which is kept.
+Two tell rules are about markdown structure: slop-guard's `bullet_density`, and the bold-header and bullet-run checks in its `structural` rule. They cannot fire on the matched corpus, which is plain text, so they are meant to be judged on the passages that the pairwise evaluation in `pairwise/` generated, as "Markdown rules on generated passages" describes. The public passages have no heading, bold or list, so neither rule is judged yet, and both stay on.
 
 Rates are hits per 1,000 words. "Human" is every human text, "agent" is the model halves of the matched corpus, and "matched human" is the human halves written on the same topics. The texts columns count texts with at least one hit.
 
@@ -84,10 +84,10 @@ Rates are hits per 1,000 words. "Human" is every human text, "agent" is the mode
 | `paragraph_cv` | slop-guard | house | 0.25 | 0.98 | 0.59 | 14/31 | 23/24 | removed, contradicts the paragraph floor |
 | `paragraph_balance` | slop-guard | house | 0.02 | 0.00 | 0.04 | 1/31 | 0/24 | removed, contradicts the paragraph floor |
 | `bold-run-in` | lint_prose | house | 1.68 | 0.00 | 0.00 | 6/31 | 0/24 | kept |
-| `structural`, bold headers and bullet runs | slop-guard | tell | 0.23 | 0.00 | 0.00 | 4/31 | 0/24 | not judged, no bold or bullet run in the passages |
+| `structural`, bold headers and bullet runs | slop-guard | tell | 0.23 | 0.00 | 0.00 | 4/31 | 0/24 | not judged, no bold or list in the passages |
 | `bold_bullet_list` | slop-guard | house | 0.21 | 0.00 | 0.00 | 5/31 | 0/24 | kept |
 | `title-case-heading` | lint_prose | house | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | kept |
-| `bullet_density` | slop-guard | tell | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | kept, one passage hit |
+| `bullet_density` | slop-guard | tell | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | not judged, no list in the passages |
 | `thin-h2-section` | lint_prose | house | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | kept |
 | `intrasentence_keyword_bold` | slop-guard | house | 0.02 | 0.00 | 0.00 | 1/31 | 0/24 | kept |
 
@@ -112,16 +112,7 @@ One kept tell rule flips between the two comparisons: `contrast_pairs` fires mor
 
 ### Markdown rules on generated passages
 
-The pairwise evaluation generated 25 passages, five tasks each written by its five pipelines. Each passage's `final.md` is an agent-side `[[file]]` entry in `.private/eval/corpora-private.toml`. `false_flags.py --private` ran on them on 2026-11-20, with `lint_prose.py` and `lint_prose_patterns.py` at sha256 `0836dddb75c3`. The human side for these rules is the seven web pages, since no other human text has markdown structure. No passage uses bold or has a heading, because the prompt asks for body text with no heading. The bold and heading rules are house style and need no judgment, but the bold-header check in slop-guard's `structural` rule stays unjudged until a source of agent-written documents with bold is added.
-
-| measure | generated passages | human web pages |
-|---|---|---|
-| texts | 25 | 7 |
-| words | 6,258 | 33,024 |
-| `bullet_density` hits per 1,000 words | 0.16 | 0.09 |
-| texts with a `bullet_density` hit | 1 | 3 |
-
-Two passages on one task, from the `merged` and `merged-style-pass` pipelines, have a list of four bullets, and none of the five passages written with no skill has a list. Neither list reaches the six bullets in a row that slop-guard's bullet-run check needs, so that check stays unjudged too. `bullet_density` fired on one of the two, a pull-request description in which four of its seven lines are bullets. Its rate per 1,000 words is higher on the passages, so the rule is kept, but the verdict rests on that single hit. The rule fires at most once per text and compares bullet lines with all non-empty lines. A short text can therefore trip it with one list, and counted per text the comparison runs the other way.
+The pairwise evaluation generated one passage per task and pipeline, and two of its tasks are public. The 10 passages on those two tasks (2,455 words) contain no markdown structure, because the prompt asks for body text with no heading. `bullet_density` and slop-guard's bold-header and bullet-run checks never fire on them, so these rules stay unjudged until a source of agent-written documents with markdown structure is added. The human side for these rules is the seven web pages, since no other human text has markdown structure. The bold and heading rules in `lint_prose.py` are house style and need no judgment.
 
 ### Threats to these results
 
@@ -130,11 +121,11 @@ Beyond the general limits in "What it does not show", four threats bear on these
 - The corpora are small. The matched corpus has at most three pairs per register, about 1,000 words per text, so one text can move a rate several times over. Hits cluster: the two Amodei essays carry more than half of the human `slop_words` hits.
 - One model wrote every agent text, `claude-opus-5` prompted one way. Other models, other prompts and real agent drafts can fire these rules at different rates.
 - The rates are counts of matches. They do not say whether a reader would want a flagged sentence changed. The notes under "Changes" quote the hits that were read for this triage.
-- The matched agent texts are plain text, so the markdown rules rest on the 25 generated passages, whose only markdown structure is two short lists. The human side's 33,024 words of web pages have no agent counterpart on the same topics or at their length. Each tell-rule change above points the same way on the matched corpus alone, where both sides are plain text on the same topics, though `tone` and `impact-noun-bare` fire on only one matched human text each.
+- The matched agent texts are plain text, and the public generated passages have no markdown structure, so no markdown tell rule is judged. The human side's 33,024 words of web pages have no agent counterpart on the same topics or at their length. Each tell-rule change above points the same way on the matched corpus alone, where both sides are plain text on the same topics, though `tone` and `impact-noun-bare` fire on only one matched human text each.
 
 ## Rules from the owner's corrections
 
-The skill's owner collected the writing corrections they had given to models and merged them into rules. The rules below implement the ones a pattern can catch, as new rules in `lint_prose.py` and a wider `coined-label`. Each was first tried as a standalone script on these corpora, then rebuilt in `lint_prose.py` and run through `false_flags.py`. The table comes from a run on 2026-11-20 with `lint_prose.py` and `lint_prose_patterns.py` at sha256 `0836dddb75c3`, on the same corpora as the table above. Each rule was also run on the model text the owner had corrected; that text and those results stay private.
+The skill's owner collected the writing corrections they had given to models and merged them into rules. The rules below implement the ones a pattern can catch, as new rules in `lint_prose.py` and a wider `coined-label`. Each was first tried as a standalone script on these corpora, then rebuilt in `lint_prose.py` and run through `false_flags.py`. The table comes from a run on 2026-11-20 with the four `lint_prose*.py` files at sha256 `2c2a0cf3a7b2`, on the same corpora as the table above. Each rule was also run on the model text the owner had corrected; that text and those results stay private.
 
 The owner gave these rules, so they are house style and stay even where careful human writers break them. A rule that fires on three or more human texts, or whose verdict depends on the reader, has a message that starts with "Check:". Most of the corrections were about chat and status messages: labels coined during the work, pointers back to an earlier message, acronyms nobody defined. The agent texts here are essays written from a brief, which rarely do these things, so an agent rate of zero means the rule stays quiet on essays. It says nothing about how often the rule catches model habits in messages.
 
@@ -146,23 +137,25 @@ The owner gave these rules, so they are house style and stay even where careful 
 | `stock-emphasis` | "honest", "honestly", "frankly", "to be honest", "table stakes", "is a big win", "and that matters." | fix | 0.00 | 0.17 | 0/31 | 4/24 |
 | `history-in-document` | edit history ("was changed from", "the earlier draft", "now counts loans instead of visits", "this revision corrects") | fix | 0.00 | 0.00 | 0/31 | 0/24 |
 | `all-caps-emphasis` | ordinary words in capitals ("NOT", "VERY", "IMPORTANT FOR EVERYONE") | fix | 0.09 | 0.00 | 2/31 | 0/24 |
+| `american-spelling` | British spellings from a closed list ("colour", "organise", "centre", "licence", "modelling") | fix | 0.56 | 2.04 | 11/31 | 15/24 |
 | `rather-than` | "rather than", and a ", not" contrast after a number, bracket or inline code | check | 0.11 | 1.11 | 5/31 | 12/24 |
 | `cannot-rule-out` | "cannot be ruled out", "can't rule out", "we cannot exclude" | fix | 0.00 | 0.00 | 0/31 | 0/24 |
 | `cleft-sentence` | "What keeps the queue short is the second desk.", "It is the narrow door that causes the delay." | check | 0.14 | 0.72 | 7/31 | 11/24 |
-| `triad-density` | the third and later sentence in a section with an "A, B and C" series | check | 2.43 | 4.09 | 24/31 | 21/24 |
+| `triad-density` | the third and later sentence in a section with an "A, B and C" series | check | 1.73 | 2.60 | 24/31 | 17/24 |
 | `tldr-shape` | a TL;DR, Summary or Abstract section of more than eight sentences or four numbers | fix | 0.02 | 0.00 | 1/31 | 0/24 |
 | `undefined-acronym` | the first use of an acronym that comes before its definition | check | 1.50 | 0.55 | 20/31 | 9/24 |
 | `inverted-animacy-check` | a thing that earns, holds, buys, wins, crowds or rescues ("The window display earns most of the new members.") | check | 0.00 | 0.04 | 0/31 | 1/24 |
 
-The human hits were read. `coined-label` fires on product, chip and robot names (R1, V3, H800, PR2), on "L2 regularization" and on two real "described in #3" pointers. `back-reference` fires on cross-references inside long essays ("as noted above"), which the advisory message leaves the writer free to keep. `undefined-acronym` fires mostly on well-known abbreviations outside its skip list (SGD, RNN, IRS, BBC), which is why it is advisory. The `all-caps-emphasis`, `tldr-shape` and `announcing-sentence` hits are real instances: capitals for emphasis in a nineteenth-century biography, a 50-sentence Summary section, and "A few tips and tricks for this step:" before a list. `history-in-document` and `cannot-rule-out` never fired: these corpora have no revised drafts and no statistical readouts.
+The human hits were read. `coined-label` fires on product, chip and robot names (R1, V3, H800, PR2), on "L2 regularization" and on two real "described in #3" pointers. `back-reference` fires on cross-references inside long essays ("as noted above"), which the advisory message leaves the writer free to keep. `undefined-acronym` fires mostly on well-known abbreviations outside its skip list (SGD, RNN, IRS, BBC), which is why it is advisory. The `all-caps-emphasis`, `tldr-shape` and `announcing-sentence` hits are real instances: capitals for emphasis in a nineteenth-century biography, a 50-sentence Summary section, and "A few tips and tricks for this step:" before a list. Every `american-spelling` hit is a British spelling, and the rule fires on more model texts than matched human texts: the model wrote "behaviour" and "licence" even in technical documents whose human halves use none. Its message says fix although it fires on more than three human texts, because every hit is a British spelling, which the owner's rule changes in any text. `history-in-document` and `cannot-rule-out` never fired: these corpora have no revised drafts and no statistical readouts.
 
 How the rules decide:
 
 - `coined-label` reads label words followed by a number or a capital letter ("decision 7", "Track C's", "phase-3"), tracker IDs (`LIB-8.3`), word-and-hex IDs (`req-7c21be`), hash numbers and short letter-and-digit codes. Inside backticks it reads only tracker IDs, hex IDs and hash numbers, because a short code there is usually a variable name such as `W1`. An ID passes when it sits in parentheses right after a plain description ("the roof repair (LIB-12)"), and so do its later uses. Standard prefixes (UTF, SHA, ISO and a few more), common public codes (S3, Q3, P0, A100) and "#1" as a rank also pass.
-- `undefined-acronym` looks for an all-caps word of two to six letters before any "(ACR)" or "ACR (spelled out)" in the document. It skips about 40 universal ones (API, URL, JSON, GPU and others), Roman numerals, ordinary words in capitals, code and link text.
-- `all-caps-emphasis` flags a run of capitals that contains one of about 200 common words that are not also acronyms; a capitalized word the document defines in parentheses passes.
-- `triad-density` allows two sentences with a three-item series per H1 or H2 section, as the owner asked, and counts paragraphs, captions and footnotes. slop-guard's three-item check stays off, because it flags single plain lists.
+- `undefined-acronym` looks for an all-caps word of two to six letters before any "(ACR)" or "ACR (spelled out)" in the document. A parenthesis after the acronym defines it only when its words spell the acronym, by their initials (with or without small words such as "of" and "the") or by their capitals. So "NASA (National Aeronautics and Space Administration)" defines NASA, and "NOT (under any circumstances)" defines nothing. It skips about 40 universal ones (API, URL, JSON, GPU and others), Roman numerals, ordinary words in capitals, code and link text.
+- `all-caps-emphasis` flags a run of capitals that contains one of about 180 common words that are not also acronyms; an acronym the document defines, in the same way `undefined-acronym` reads definitions, passes ("The WHO (World Health Organization)").
+- `triad-density` allows two sentences with a three-item series per H1 or H2 section, as the owner asked, and counts paragraphs, captions and footnotes. It reads the whole comma series and counts it only when it has exactly three items, so a list of four or more does not count. A comma after an opening clause reads as one more item, so "In winter, the branch lends sledges, skates and scarves" does not count either. slop-guard's three-item check stays off, because it flags single plain lists.
+- `american-spelling` reads a closed list of British spellings: -ise and -isation forms of 37 verbs ("organise", "optimisation"), -our words, "centre" and "metre", "licence" and "defence", "modelling" and "labelled", "analyse", "programme", "judgement" and "ageing". It never matches a bare -ise ending, so "advertise", "exercise" and "precise" pass, and so do "analyses" and "catalogue", which are American spellings too.
 - `rather-than` leaves the word-comma-not form ("open, not closed") to slop-guard's `contrast_pairs`, which already flags it.
 - The phrase and sentence rules skip double-quoted spans, which hold someone else's words. `coined-label` and `undefined-acronym` read quoted text, because a quoted button or ticket name is still an unexplained ID.
 
-No rule was dropped. Four rules (`history-in-document`, `tldr-shape`, `all-caps-emphasis` and `triad-density`) caught none of the owner's corrected text, but each is a document rule, and the private text was mostly short message fragments without the headings or revisions those rules need.
+No rule was dropped.
