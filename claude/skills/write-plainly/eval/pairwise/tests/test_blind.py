@@ -105,10 +105,21 @@ class TestCommand:
         generation = self.write_generation(tmp_path)
         completed = self.blind(tmp_path, stub_tasks_file, generation, "--only-task", "stub-bridge")
         assert completed.returncode == 0, completed.stderr
-        assert sorted(self.read_sets(tmp_path)[0]["passages"].values()) == [
+        (only_set,) = self.read_sets(tmp_path)
+        assert sorted(only_set["passages"].values()) == [
             "current on stub-bridge.",
             "merged on stub-bridge.",
         ]
+        key = json.loads((tmp_path / "eval" / "key.json").read_text())
+        assert [entry["task_id"] for entry in key["sets"].values()] == ["stub-bridge"]
+
+    def test_only_task_naming_an_unknown_task_writes_nothing(
+        self, tmp_path: Path, stub_tasks_file: Path
+    ) -> None:
+        generation = self.write_generation(tmp_path)
+        completed = self.blind(tmp_path, stub_tasks_file, generation, "--only-task", "stub-ferry")
+        assert completed.returncode != 0 and "ValueError" in completed.stderr
+        assert not (tmp_path / "eval").exists()
 
     def test_refuses_to_overwrite_sets_that_rankings_may_refer_to(
         self, tmp_path: Path, stub_tasks_file: Path

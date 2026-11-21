@@ -86,6 +86,14 @@ class TestCommand:
         completed = judge(tmp_path, fake_claude, fake_codex, sets=edited)
         assert completed.returncode != 0 and "RuntimeError" in completed.stderr
 
+    def test_a_rerun_with_another_seed_into_the_same_out_stops_the_run(
+        self, tmp_path: Path, fake_claude: Path, fake_codex: Path, claude_calls
+    ) -> None:
+        judge(tmp_path, fake_claude, fake_codex)
+        completed = judge(tmp_path, fake_claude, fake_codex, "--seed", "6")
+        assert completed.returncode != 0 and "RuntimeError" in completed.stderr
+        assert len(claude_calls()) == 6
+
     def test_an_opus_judge_that_skips_the_guidance_stops_the_run(
         self,
         tmp_path: Path,
