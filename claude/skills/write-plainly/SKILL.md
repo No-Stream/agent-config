@@ -81,7 +81,7 @@ Write numbers in their idiomatic form: digits, a percentage for a share ("40%," 
 
 When a number, figure, or conclusion looks inconsistent with an earlier one, say so where the second one appears, and give the reason they differ, such as a different population, time window, or definition. A reader who sees one quantity at two values stops trusting both. Keep a synthetic or simulated test apart from the real result, and say which one each later statement is about. A difference you cannot explain may be a bug, so check it before the document goes out.
 
-Write procedures as numbered imperative steps in execution order, with each prerequisite before the step it affects. Do not invent thresholds or acceptance criteria.
+Write procedures as numbered imperative steps in execution order. Do not invent thresholds or acceptance criteria.
 
 ## Remove mannerisms
 
@@ -100,9 +100,9 @@ Rewrite the underlying claim instead of swapping words, and do not replace a hab
 
 Use paragraphs for reasoning, lists for separate items, numbered lists for sequences, and tables for lookup. Use headings only when they help readers find substantial material, in sentence case with a shallow hierarchy. Bold only a decision or a label the reader must find; no bold lead-ins on every bullet, emojis, or decorative dividers.
 
-Body paragraphs run four to six sentences, and four is the floor. A paragraph of one to three sentences is a fragment: merge it into a neighbor on the same topic, or develop it with content the reader needs, and never pad it. Structural blocks are exempt: list lead-ins, captions, footnotes, and the sentence or two that explains a figure or table. Do not split a coherent longer paragraph to hit the range. Put a figure's explanation directly after the figure, saying what it shows and what to take from it, with no sentence before it that only announces the figure.
+Body paragraphs run four to six sentences. A paragraph of one to three sentences is a fragment: merge it into a neighbor on the same topic, or develop it with content the reader needs, and never pad it. Structural blocks are exempt: list lead-ins, captions, footnotes, and the sentence or two that explains a figure or table. Do not split a coherent longer paragraph to hit the range. Put a figure's explanation directly after the figure, saying what it shows and what to take from it, with no sentence before it that only announces the figure.
 
-Size the main text to the document's job, and agree a word budget with the user along with the outline. Figures do not count against it, and appendices go in a separate linked document. Without a stated budget, aim for these lengths, counting a page as about 300 words:
+Size the main text to the document's job. Figures do not count against the word budget. Without a stated budget, aim for these lengths, counting a page as about 300 words:
 
 | Document | Main text |
 | --- | --- |
@@ -135,10 +135,10 @@ When the user owns the document or has approved its text, leave the document unc
 For a design doc, proposal, report, or similar document written with the user, work in three passes, in order: what to say, how to order it, then the words. No sentence polish fixes a wrong outline, so settle the claims and their order while they are cheap to change. Skip this process for small edits and short messages. Write a document that others will read only when the user asks for one, and show each section's proposed text in the conversation before inserting it into a shared document.
 
 1. Gather context. Start by asking about the audience, the decision or effect the document should produce, the constraints, and whether there is a template. If the user has templates, voice samples, or related documents, read them. Then ask the five to ten questions that close the remaining gaps. You are done when you can discuss edge cases and tradeoffs without needing the basics explained, and can state the document's point in one sentence. If you cannot state it, the problem is in the thinking, and wording will not fix it.
-2. Agree the outline with the user before drafting: the argument in a few beats that chain, the section list, the figures and tables the document will carry, and the word budget ("Format" gives defaults). Never write the whole document in one pass.
+2. Agree the outline with the user before drafting: the argument in a few beats that chain, the section list, the figures and tables the document will carry, and the word budget ("Format" gives defaults).
 3. Draft one section at a time. For each one, brainstorm five to fifteen candidate points, let the user keep, cut, combine, and reorder them, and draft from the curated list. Start with the section that has the most unknowns, usually the core proposal or method; the introduction comes later. Refine each section with surgical edits instead of rewriting it. Where a figure does not exist yet, put a placeholder with its intended file path.
 4. Run a coherence pass when the draft is about 80% complete. Reread the whole document for flow, consistency, contradictions, repetition, and filler, and raise problems with the user before polishing.
-5. Run a cut pass over the full text. Drop each word, sentence, and number that does not change what the reader understands or decides, and move a number that repeats another or adds needless precision to a table or footnote. Required labels and units, caveats that keep a claim true, and the summary the document type requires are locked.
+5. Run a cut pass over the full text. Drop each word, sentence, and number that does not change what the reader understands or decides. Required labels and units, caveats that keep a claim true, and the summary the document type requires are locked.
 
 ## Check before returning
 
@@ -157,13 +157,13 @@ Dispatch two read-only subagents in parallel, and pass neither of them the linte
 - `prose-reviewer` (Opus) gets the document path, the intended reader, and the source material if there is any. It returns at most six findings, each a quoted span with its problem and a fix, and zero findings is a valid result.
 - `prose-reader-test` (Opus) gets only the document path and the intended reader, and reads the document without this skill. It returns the questions a cold reader in that audience would ask, each answered from the document or marked "not answered."
 
-Apply the reviewer findings you agree with, using deletion, replacement or a move where they suffice. Close each gap from information you have, placing the answer where "Route caveats and detail" sends it, and flag the rest for the author. If the edits touched more than a few sentences, dispatch `prose-fidelity-checker` (Sonnet) with the earlier version, the source notes if there are any, and the revision. It marks every change in meaning as supported or unsupported by the source. Revert or fix the unsupported ones.
+Apply the reviewer findings you agree with. Close each gap from information you have, placing the answer where "Route caveats and detail" sends it, and flag the rest for the author. If the edits touched more than a few sentences, dispatch `prose-fidelity-checker` (Sonnet) with the earlier version, the source notes if there are any, and the revision. It marks every change in meaning as supported or unsupported by the source. Revert or fix the unsupported ones.
 
 Run this review once. Do not loop critique and rewrite until a reviewer approves: repeated passes accumulate drift and strip useful detail.
 
 ## Calibration examples
 
-These show the register and the kind of repair. They are not facts to reuse. Make a repair only when the source supports the revised statement, and leave missing information missing.
+These show the register and the kind of repair. They are not facts to reuse.
 
 | Original | Revision |
 | --- | --- |
@@ -179,7 +179,6 @@ These show the register and the kind of repair. They are not facts to reuse. Mak
 | No library clears the bar we set for cold starts. | No library starts in under 200 ms, the limit we set. |
 | No browser has ever shipped this API without a flag. | We could not find a browser that ships this API without a flag. |
 | Fix the broken cache eviction (a proposal title, read by the cache's owners) | Size-aware eviction for the page cache |
-| The service does not retry failed payments. | Keep this sentence. A reader would otherwise assume failed payments are retried. |
 | We did not test on non-English text, so these numbers may not hold there. | Keep this sentence beside the numbers. Without it the claim reads as covering all languages, which would be wrong. |
 
 A developed technical explanation in the target register:
