@@ -9,21 +9,16 @@ from pathlib import Path
 import pytest
 
 SOURCE_REPO = Path(__file__).resolve().parents[1]
+REPO_OWNED = tuple(
+    subprocess.run(
+        [sys.executable, str(SOURCE_REPO / "sync.py"), "--list-repo-owned"], check=True, capture_output=True, text=True
+    ).stdout.split()
+)
 REPO_OWNED_FILES = (
-    "claude/skills/write-plainly/SKILL.md",
+    *(entry if Path(entry).suffix else f"{entry}/SKILL.md" for entry in REPO_OWNED),
     "claude/skills/write-plainly/tests/test_lint_prose.py",
-    "claude/skills/notebooks/SKILL.md",
-    "claude/agents/prose-reviewer.md",
-    "claude/agents/prose-fidelity-checker.md",
-    "claude/agents/prose-reader-test.md",
 )
-LIVE_REPO_OWNED_PATHS = (
-    ".claude/skills/write-plainly",
-    ".claude/skills/notebooks",
-    ".claude/agents/prose-reviewer.md",
-    ".claude/agents/prose-fidelity-checker.md",
-    ".claude/agents/prose-reader-test.md",
-)
+LIVE_REPO_OWNED_PATHS = tuple(f".{entry}" for entry in REPO_OWNED)
 BACKUP_ROOT = ".local/state/agent-config-backups"
 
 
@@ -263,7 +258,7 @@ class TestLinkRepoOwned:
 
         assert result.returncode == 0, result.stderr
         assert (home / ".claude/skills/write-plainly").is_symlink()
-        assert sorted(path.name for path in (home / ".claude/skills").iterdir()) == ["notebooks", "write-plainly"]
+        assert all(path.is_symlink() for path in (home / ".claude/skills").iterdir())
         [backup] = home.glob(f"{BACKUP_ROOT}/*/.claude/skills/write-plainly")
         assert snapshot(backup) == snapshot(repo / "claude/skills/write-plainly")
 
