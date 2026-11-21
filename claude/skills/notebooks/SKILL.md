@@ -1,13 +1,13 @@
 ---
 name: notebooks
-description: Use when creating, editing, reviewing or running a Jupyter or marimo notebook for data analysis or research; before a long or multi-notebook run ("run the pipeline", "re-run from notebook 3"); when asked whether a notebook is ready to share; or when a notebook cell runs out of memory or is slow on a large dataframe or parquet dataset.
+description: Use when creating, editing, reviewing or running a Jupyter or marimo notebook for data analysis or research; before a long or multi-notebook run ("run the pipeline", "re-run from notebook 3"); when asked whether a notebook is ready to share or shown its results; or when a notebook cell runs out of memory or is slow on a large dataframe or parquet dataset.
 ---
 
 # Notebooks
 
-A research notebook displays an analysis. A reader, person or agent, follows it top to bottom as a sequence of named steps and trusts that every output and every number came from the current code, run in order, on all the data. Logic lives in modules; cells orchestrate, display and interpret.
+A research notebook displays an analysis. A reader, person or agent, follows it top to bottom as named steps and trusts that every output and number came from the current code, run in order, on all the data. Logic lives in modules; cells orchestrate, display and interpret.
 
-Prose in markdown cells follows `write-plainly`, and figures follow `visualization`. In marimo, reactive execution makes the kernel-state rules moot; the rest applies.
+Prose in markdown cells follows `write-plainly`, and figures follow `visualization`. In marimo, reactive execution re-runs a cell's dependents for you; the rest applies.
 
 ## Never shrink the data to make a cell finish
 
@@ -33,7 +33,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to a computa
 - Follow every figure and table with markdown that says what it shows and what it means for the question. When a code change changes an output, update that markdown in the same edit.
 - Never type a result into markdown. Render tables as DataFrames, print inline numbers from the result objects (`print(f"lift {res.lift:.1%}, 95% CI [{res.lo:.1%}, {res.hi:.1%}]")`), and assert any claim the prose depends on, such as a sign or an ordering, in the cell that computes it. Markdown says what a result means; code says what it is.
 - Open each section with its headline figure and put breakdowns (per segment, per fold) after it. Say how a pooled headline is weighted.
-- `display()` every frame and figure: only a cell's last bare expression renders, and IPython's output cache keeps that object alive after `del`. Use `print()` for diagnostics.
+- `display()` every frame: only a cell's last bare expression renders, and IPython's output cache keeps that object alive after `del`. Show each matplotlib figure once, with `plt.show()`. Use `print()` for diagnostics.
 - Preview a few rows of the columns you need. Show a finding table (every candidate, every audit row, neutral and negative results included) in full, raising the renderer's row limit (`pl.Config.set_tbl_rows`) rather than filtering it.
 - Format for reading: round each metric to the precision it needs (a global three decimals shows 0.0004 as 0.000), cast integer-valued floats to integers, and shorten column names.
 - Keep the saved file small, since every later reader loads it: cap figure sizes in helpers that scale with the data, and put per-iteration logs behind a verbosity flag.
@@ -51,7 +51,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to a computa
 
 ## Large data
 
-An out-of-memory error means the code materializes something the answer does not need. Compare the step's peak memory with the bytes its needed columns take, and fix the plan before asking for a bigger machine. On a shared machine, estimate the peak first and stay well under the machine's RAM. The examples use Polars; the rules hold for any engine with lazy scans.
+An out-of-memory error means the code materializes something the answer does not need. Compare the step's peak memory with the bytes its needed columns take, and fix the plan before asking for a bigger machine. Every frame a cell binds stays in memory until deleted, so build large intermediates inside functions. On a shared machine, estimate the peak first and stay well under the machine's RAM. The examples use Polars; the rules hold for any engine with lazy scans.
 
 - Put column selection, row filters and casts in the lazy scan, before anything is materialized, and scan once per split with that split's filter:
 
@@ -61,14 +61,14 @@ An out-of-memory error means the code materializes something the answer does not
       .select([*feature_cols, "event_ts"])
       .filter(pl.col("event_ts") >= window_start)
       .with_columns(pl.col(float_feature_cols).cast(pl.Float32))
-      .collect()
+      .collect(engine="streaming")
   )
   ```
 
 - Readers keep the file's types, so downcast in the plan: Float32 for model features, Int32, Int16 or Int8 for counts and codes whose range you checked, Boolean for flags, Categorical or Enum for repeated strings. Keep Float64 for money (Float32 resolves cents only below about $131,000) and for sums over many rows. Keep the dtype map in one module, and make it raise on a column the data lacks.
 - Leave string and JSON columns out unless a later step reads them; they grow several-fold when materialized.
-- Stream file-to-file transforms (`sink_parquet`, the streaming engine) instead of collecting the whole frame.
-- Take row counts and min/max from the parquet footer (`pyarrow.parquet.read_metadata`); a missing statistic means unknown, not zero. Run high-cardinality aggregates (`n_unique`, a `group_by` with many keys) on their own instead of dozens of aggregates in one collect.
+- Stream file-to-file transforms with `sink_parquet` instead of collecting the whole frame. When several cells read one large source, sink its slim version once and scan that.
+- Take row counts, null counts and min/max from the parquet footer (`pyarrow.parquet.read_metadata`); a missing statistic means unknown, not zero. Run high-cardinality aggregates (`n_unique`, a `group_by` with many keys) on their own instead of dozens of aggregates in one collect.
 - Write row-wise logic as dataframe or NumPy expressions. For an expensive per-value transform, compute it on the unique values and join back. `.to_list()` followed by a loop is still per-row Python, and so is `map_elements`. Batch at file level with one `group_by().agg()` instead of many small per-partition calls, and use Numba for genuinely sequential logic.
 - Profile before optimizing, on full-size data: `.collect()` inside a loop and per-element Series indexing are the usual culprits.
 
