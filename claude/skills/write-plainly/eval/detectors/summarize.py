@@ -12,7 +12,6 @@ Writes markdown to stdout. `--corpus bheijden` limits it to the public matched c
 from __future__ import annotations
 
 import argparse
-import math
 import statistics
 from collections import defaultdict
 from collections.abc import Sequence
@@ -32,20 +31,6 @@ from scoring import (
 
 HUMAN_ARMS = {"human", "human-jan"}
 CONTROL_CORPUS, CONTROL_HUMAN = "bheijden", "human"
-Z95 = statistics.NormalDist().inv_cdf(0.975)
-
-
-def wilson(successes: int, n: int) -> tuple[float, float]:
-    share = successes / n
-    centre = (share + Z95**2 / (2 * n)) / (1 + Z95**2 / n)
-    half = Z95 / (1 + Z95**2 / n) * math.sqrt(share * (1 - share) / n + Z95**2 / (4 * n**2))
-    return centre - half, centre + half
-
-
-def mean_interval(values: Sequence[float]) -> tuple[float, float, float]:
-    mean = statistics.fmean(values)
-    half = stats.t.ppf(0.975, len(values) - 1) * statistics.stdev(values) / math.sqrt(len(values))
-    return mean, mean - half, mean + half
 
 
 def quartiles(values: Sequence[float]) -> tuple[float, float, float]:
@@ -109,11 +94,14 @@ def control_table(detector: Detector, texts: Sequence[Text], scores: dict[str, d
             continue
         differences = [human[topic] - model[topic] for topic in topics]
         wins = sum(less_ai_like(detector, human[topic], model[topic]) for topic in topics)
-        low, high = wilson(wins, len(topics))
-        mean, mean_low, mean_high = mean_interval(differences)
+        share = stats.binomtest(wins, len(topics)).proportion_ci(
+            confidence_level=0.95, method="wilson"
+        )
+        mean = stats.ttest_1samp(differences, 0).confidence_interval(0.95)
         lines.append(
-            f"| {arm} | {len(topics)} | {wins}/{len(topics)} | {low:.2f} to {high:.2f} | "
-            f"{statistics.median(differences):.3f} | {mean:.3f} ({mean_low:.3f} to {mean_high:.3f}) |"
+            f"| {arm} | {len(topics)} | {wins}/{len(topics)} | {share.low:.2f} to {share.high:.2f} | "
+            f"{statistics.median(differences):.3f} | {statistics.fmean(differences):.3f} "
+            f"({mean.low:.3f} to {mean.high:.3f}) |"
         )
     return "\n".join(lines)
 

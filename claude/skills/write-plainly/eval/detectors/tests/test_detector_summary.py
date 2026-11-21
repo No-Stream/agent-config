@@ -1,6 +1,6 @@
 import pytest
 from scoring import DETECTORS, Text
-from summarize import control_table, past_cutoff, wilson
+from summarize import control_table, past_cutoff
 
 
 def paired_texts(human: list[float], model: list[float]) -> tuple[list[Text], dict[str, dict]]:
@@ -34,8 +34,3 @@ def test_human_less_ai_like_follows_the_detector_direction(detector, human_wins)
 )
 def test_past_cutoff_counts_on_the_detectors_ai_side(detector, values, flagged):
     assert past_cutoff(DETECTORS[detector], values) == flagged
-
-
-def test_wilson_matches_a_published_value():
-    low, high = wilson(3, 10)
-    assert (round(low, 4), round(high, 4)) == (0.1078, 0.6032)
