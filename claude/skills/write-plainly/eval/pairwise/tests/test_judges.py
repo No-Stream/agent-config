@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 import agents
-from judges import letter_orders, ranking_in_set_letters, set_text
+from judges import letter_orders, order_agreement, ranking_in_set_letters, set_text
 
 PAIRWISE_DIR = Path(__file__).resolve().parents[1]
 LETTERS = ["A", "B", "C", "D", "E"]
@@ -119,6 +119,16 @@ class TestOrders:
     def test_a_ranking_that_misses_a_passage_is_refused(self) -> None:
         with pytest.raises(ValueError):
             ranking_in_set_letters("ABCD", ["C", "A", "B", "E", "D"])
+
+
+class TestOrderAgreement:
+    def test_one_tied_judgment_written_in_two_within_tie_orders_is_identical(self) -> None:
+        orders = letter_orders("1", LETTERS, seed=5)
+        records = [
+            {"set_id": "1", "order": order, "shown": orders[order], "ranking": ranking}
+            for order, ranking in (("drawn", "CA=BDE"), ("reversed", "CB=ADE"))
+        ]
+        assert order_agreement(records) == ([pytest.approx(1.0)], 1)
 
 
 class TestCodex:

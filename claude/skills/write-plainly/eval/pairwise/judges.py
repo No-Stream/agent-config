@@ -184,7 +184,7 @@ def order_agreement(records: list[dict]) -> tuple[list[float], int]:
             ranks(parse_ranking(by_order[order]["ranking"], letters)) for order in ORDERS
         )
         taus.append(kendall_tau_b([first[x] for x in letters], [second[x] for x in letters]))
-        identical += by_order["drawn"]["ranking"] == by_order["reversed"]["ranking"]
+        identical += first == second
     return taus, identical
 
 
