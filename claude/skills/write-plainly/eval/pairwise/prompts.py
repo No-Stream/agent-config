@@ -2,7 +2,19 @@
 
 from __future__ import annotations
 
-from common import read_list
+from common import MAX_PASSAGE_WORDS, MIN_PASSAGE_WORDS, Task, read_list
+
+TASK_BRIEF = """\
+Document type: {doc_type}
+Intended reader: {reader}
+Target length: about {target_words} words; stay between {min_words} and {max_words}.
+
+Source notes (the only facts you may use):
+{notes}"""
+
+TASK_RULES = """\
+- Use only facts from the notes. Do not invent numbers, names or results.
+- The passage is body text only: no title or heading, no preamble, no sign-off."""
 
 DRAFT_PROMPT = """\
 You are drafting one passage for a blind writing evaluation. Write it as the writing guidance in \
@@ -13,18 +25,12 @@ Read these files completely before writing, and follow them:
 
 {instructions}
 
-Document type: {doc_type}
-Intended reader: {reader}
-Target length: about {target_words} words; stay between {min_words} and {max_words}.
-
-Source notes (the only facts you may use):
-{notes}
+{brief}
 
 How this run works:
 - Nobody is available to answer questions. Skip any step of the guidance that needs the person \
 who asked (gap questions, outline agreement, choosing a template) and write from the notes.
-- Use only facts from the notes. Do not invent numbers, names or results.
-- The passage is body text only: no title or heading, no preamble, no sign-off.
+{rules}
 - Later turns in this conversation run the review steps one at a time. Do only what this turn asks.
 {context}
 Return the passage in the `passage` field."""
@@ -35,17 +41,11 @@ handed you these notes and asked for this passage.
 
 {instructions}
 
-Document type: {doc_type}
-Intended reader: {reader}
-Target length: about {target_words} words; stay between {min_words} and {max_words}.
-
-Source notes (the only facts you may use):
-{notes}
+{brief}
 
 How this run works:
 - Nobody is available to answer questions. Write from the notes.
-- Use only facts from the notes. Do not invent numbers, names or results.
-- The passage is body text only: no title or heading, no preamble, no sign-off.
+{rules}
 {context}
 Return the passage in the `passage` field."""
 
@@ -84,6 +84,18 @@ Source notes:
 
 def quoted(text: str) -> str:
     return f"<<<\n{text.strip()}\n>>>"
+
+
+def task_brief(task: Task) -> str:
+    """The task as every draft prompt states it, so the arms differ only in their guidance."""
+    return TASK_BRIEF.format(
+        doc_type=task.doc_type,
+        reader=task.reader,
+        target_words=task.target_words,
+        min_words=MIN_PASSAGE_WORDS,
+        max_words=MAX_PASSAGE_WORDS,
+        notes=quoted(task.notes_for_writer),
+    )
 
 
 def read_first(paths: tuple[str, ...]) -> str:

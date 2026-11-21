@@ -382,11 +382,13 @@ class TestRun:
 
 
 class TestBareDraft:
-    def test_a_draft_that_reads_no_files_gets_no_guidance_tools_or_path_note(
+    def test_a_bare_draft_gets_the_task_but_no_guidance_tools_or_path_note(
         self, tmp_path: Path, fake_claude: Path, stub_tasks_file: Path, claude_calls
     ) -> None:
         config_file = write_config(tmp_path)
-        bare_pipeline = '\n[[pipeline]]\nname = "bare"\n  [[pipeline.stage]]\n  kind = "draft"\n'
+        bare_pipeline = (
+            '\n[[pipeline]]\nname = "bare"\n  [[pipeline.stage]]\n  kind = "bare_draft"\n'
+        )
         config_file.write_text(config_file.read_text() + bare_pipeline + '  name = "draft"\n')
         out_dir = tmp_path / "out"
         make_runner(config_file, fake_claude, stub_tasks_file, out_dir).run(
@@ -396,8 +398,7 @@ class TestBareDraft:
         arguments, prompt = call["arguments"], call["prompt"]
         assert arguments[arguments.index("--tools") + 1] == ""
         assert logged_model(call) == "opus"
-        assert prompt.startswith("You are drafting") and "bimetal" in prompt
-        assert "about 180 words" in prompt and "Nobody is available" in prompt
+        assert "bimetal" in prompt and "about 180 words" in prompt
         for absent in ("guidance", "files", "Later turns", "Path note for the test."):
             assert absent not in prompt, absent
         draft = stage(out_dir, "stub-kettle", "bare", "00-draft")
@@ -459,9 +460,11 @@ class TestConfigChecks:
             ('lint = ["score"]', 'lint = ["plain"]'),
             (
                 'kind = "author"\n  name = "lint"\n  lint = ["plain"]',
-                'kind = "draft"\n  name = "lint"',
+                'kind = "bare_draft"\n  name = "lint"',
             ),
             ('from_pipeline = "base"', 'from_pipeline = "variant"'),
+            ('  from_pipeline = "base"\n', ""),
+            ('from_pipeline = "base"\n', 'from_pipeline = "base"\n  read = ["guide.md"]\n'),
             ('name = "reviewer"\n', 'name = "reviewer"\n  brief = "Review it."\n'),
             ('kind = "agent"\n  name = "style"', 'kind = "critic"\n  name = "style"'),
             ('sees = ["passage"]\n  group', 'sees = ["passage", "mood"]\n  group'),
@@ -475,6 +478,8 @@ class TestConfigChecks:
             "loop-lint-not-run",
             "second-draft",
             "draft-copied-from-a-copy",
+            "draft-reads-nothing",
+            "copied-draft-also-reads",
             "agent-file-and-brief",
             "unknown-kind",
             "sees-outside-the-list",

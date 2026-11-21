@@ -29,6 +29,21 @@ class DraftStage:
     read: tuple[str, ...] = ()
     from_pipeline: str | None = None
 
+    def __post_init__(self) -> None:
+        if bool(self.read) == bool(self.from_pipeline):
+            raise ValueError(
+                f"stage {self.name}: a draft stage takes exactly one of read, from_pipeline"
+            )
+
+
+@dataclass(frozen=True)
+class BareDraftStage:
+    """The model's own draft: no guidance files, no path note and no tools."""
+
+    kind: ClassVar[str] = "bare_draft"
+    name: str
+    instructions: str = ""
+
 
 @dataclass(frozen=True)
 class AgentStage:
@@ -78,8 +93,10 @@ class FidelityGate:
     min_changed_sentences: int = 4
 
 
-Stage = DraftStage | AgentStage | AuthorStage | FidelityGate
-STAGE_TYPES = {kind.kind: kind for kind in (DraftStage, AgentStage, AuthorStage, FidelityGate)}
+Stage = DraftStage | BareDraftStage | AgentStage | AuthorStage | FidelityGate
+STAGE_TYPES = {
+    kind.kind: kind for kind in (DraftStage, BareDraftStage, AgentStage, AuthorStage, FidelityGate)
+}
 
 
 @dataclass(frozen=True)
@@ -173,15 +190,20 @@ def validate_config(config: Config) -> None:
         raise ValueError(f"duplicate pipeline names: {names}")
     for pipeline in config.pipelines:
         validate_stages(pipeline, config.lints)
-    for pipeline in config.pipelines:
-        source = pipeline.stages[0].from_pipeline
-        if source and (source not in names or config.pipeline(source).stages[0].from_pipeline):
-            raise ValueError(f"pipeline {pipeline.name}: draft source {source!r} must draft itself")
+    copied_drafts = {
+        pipeline.name: pipeline.stages[0].from_pipeline
+        for pipeline in config.pipelines
+        if isinstance(pipeline.stages[0], DraftStage) and pipeline.stages[0].from_pipeline
+    }
+    for name, source in copied_drafts.items():
+        if source not in names or source in copied_drafts:
+            raise ValueError(f"pipeline {name}: draft source {source!r} must draft itself")
 
 
 def validate_stages(pipeline: Pipeline, lints: dict[str, LintCommand]) -> None:
     first, *rest = pipeline.stages
-    if not isinstance(first, DraftStage) or any(isinstance(stage, DraftStage) for stage in rest):
+    drafts = DraftStage | BareDraftStage
+    if not isinstance(first, drafts) or any(isinstance(stage, drafts) for stage in rest):
         raise ValueError(f"pipeline {pipeline.name}: the first stage, and only it, is a draft")
     stage_names = [stage.name for stage in pipeline.stages]
     if len(set(stage_names)) != len(stage_names):
@@ -204,7 +226,8 @@ def validate_stages(pipeline: Pipeline, lints: dict[str, LintCommand]) -> None:
                         f"or lints {unknown_lints} are not defined"
                     )
             case FidelityGate() if not isinstance(
-                earlier.get(stage.compare_to), DraftStage | AuthorStage | FidelityGate
+                earlier.get(stage.compare_to),
+                DraftStage | BareDraftStage | AuthorStage | FidelityGate,
             ):
                 raise ValueError(f"{where}: compare_to {stage.compare_to!r} is no earlier passage")
 
@@ -214,6 +237,8 @@ def named_files(stage: Stage) -> list[str]:
     match stage:
         case DraftStage() | AuthorStage():
             return list(stage.read)
+        case BareDraftStage():
+            return []
         case AgentStage():
             return [*stage.read, *([stage.agent_file] if stage.agent_file else [])]
         case FidelityGate():

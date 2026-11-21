@@ -6,7 +6,15 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from pipeline_config import AgentStage, AuthorStage, Config, DraftStage, FidelityGate, LintLoop
+from pipeline_config import (
+    AgentStage,
+    AuthorStage,
+    BareDraftStage,
+    Config,
+    DraftStage,
+    FidelityGate,
+    LintLoop,
+)
 
 
 def call_bounds(config: Config) -> dict[str, dict[str, tuple[int, int]]]:
@@ -17,7 +25,7 @@ def call_bounds(config: Config) -> dict[str, dict[str, tuple[int, int]]]:
         turns = [0, 0]
         for stage in pipeline.stages:
             match stage:
-                case DraftStage(from_pipeline=None) | AgentStage():
+                case DraftStage(from_pipeline=None) | BareDraftStage() | AgentStage():
                     fresh = [fresh[0] + 1, fresh[1] + 1]
                 case DraftStage():  # copied from another pipeline, so no call
                     pass

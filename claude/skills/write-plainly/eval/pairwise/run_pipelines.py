@@ -27,8 +27,6 @@ from pathlib import Path
 from agents import PASSAGE_SCHEMA, ClaudeCall, ClaudeResult, run_claude
 from budget import cost_summary, format_plan
 from common import (
-    MAX_PASSAGE_WORDS,
-    MIN_PASSAGE_WORDS,
     Task,
     load_tasks,
     read_list,
@@ -41,6 +39,7 @@ from fidelity import changed_sentence_count, unsupported_by_passage, unsupported
 from pipeline_config import (
     AgentStage,
     AuthorStage,
+    BareDraftStage,
     Config,
     DraftStage,
     FidelityGate,
@@ -56,10 +55,12 @@ from prompts import (
     DRAFT_PROMPT,
     GATE_FIDELITY_PROMPT,
     MEASURE_FIDELITY_PROMPT,
+    TASK_RULES,
     inputs_block,
     lint_block,
     quoted,
     read_first,
+    task_brief,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -245,6 +246,8 @@ class Runner:
         )
         if isinstance(stage, DraftStage):
             return self.draft(run)
+        if isinstance(stage, BareDraftStage):
+            return self.bare_draft(run)
         passage, session_id = latest(previous, "passage"), latest(previous, "session_id")
         agent_outputs = {r["stage"]: r["text"] for r in previous if r["kind"] == AgentStage.kind}
         match stage:
@@ -264,25 +267,26 @@ class Runner:
             source_pipeline = self.config.pipeline(stage.from_pipeline)
             source = self.ensure_stage(task.task_id, source_pipeline, 0, previous=[])
             return {**source, "copied_from": stage.from_pipeline}
-        fields = {
-            "instructions": stage.instructions.strip(),
-            "doc_type": task.doc_type,
-            "reader": task.reader,
-            "target_words": task.target_words,
-            "min_words": MIN_PASSAGE_WORDS,
-            "max_words": MAX_PASSAGE_WORDS,
-            "notes": quoted(task.notes_for_writer),
-        }
-        if stage.read:
-            prompt = DRAFT_PROMPT.format(
-                read_list=read_list(stage.read), context=self.context(run.pipeline), **fields
-            )
-            result = self.author_call(prompt, resume_session_id=None)
-        else:
-            # The model's own draft: no path note to the skill and no tool to open it.
-            prompt = BARE_DRAFT_PROMPT.format(context=run.pipeline.override, **fields)
-            result = self.author_call(prompt, resume_session_id=None, tools=())
+        prompt = DRAFT_PROMPT.format(
+            read_list=read_list(stage.read),
+            instructions=stage.instructions.strip(),
+            brief=task_brief(task),
+            rules=TASK_RULES,
+            context=self.context(run.pipeline),
+        )
+        result = self.author_call(prompt, resume_session_id=None)
         require_reads(stage, result)
+        return with_passage(run.record, result, "author")
+
+    def bare_draft(self, run: StageRun) -> dict:
+        """The model's own draft: no path note to the skill and no tool to open it."""
+        prompt = BARE_DRAFT_PROMPT.format(
+            instructions=run.stage.instructions.strip(),
+            brief=task_brief(run.task),
+            rules=TASK_RULES,
+            context=run.pipeline.override,
+        )
+        result = self.author_call(prompt, resume_session_id=None, tools=())
         return with_passage(run.record, result, "author")
 
     def agent_stage(self, run: StageRun, passage: str) -> dict:
