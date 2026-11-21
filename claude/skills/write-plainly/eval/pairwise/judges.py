@@ -27,15 +27,17 @@ from pathlib import Path
 
 from agents import ClaudeCall, ClaudeSettings, run_claude, run_codex
 from common import (
+    format_ranking,
     kendall_tau_b,
+    parse_ranking,
     passage_digest,
+    ranks,
     read_jsonl,
     read_list,
     run_parallel,
     write_json,
     write_text_atomic,
 )
-from label import format_ranking, parse_ranking, ranks
 
 logger: logging.Logger = logging.getLogger(__name__)
 

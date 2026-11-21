@@ -90,6 +90,51 @@ def word_count(text: str) -> int:
     return len(WORD.findall(text))
 
 
+def parse_ranking(typed: str, letters: Sequence[str]) -> list[list[str]]:
+    """Places best first, each a list of tied letters: "CA=EBD" is C, then A tied with E, B, D."""
+    text = "".join(typed.split()).upper()
+    groups: list[list[str]] = []
+    joining = False
+    for position, character in enumerate(text):
+        if character == "=":
+            if joining or not groups or position == len(text) - 1:
+                raise ValueError("= goes between two letters, as in CA=EBD")
+            joining = True
+        elif character in letters:
+            if joining:
+                groups[-1].append(character)
+            else:
+                groups.append([character])
+            joining = False
+        else:
+            raise ValueError(f"{character} is not one of the letters {''.join(letters)}")
+    placed = [letter for group in groups for letter in group]
+    repeated = sorted({letter for letter in placed if placed.count(letter) > 1})
+    if repeated:
+        raise ValueError(f"{', '.join(repeated)} placed more than once")
+    missing = [letter for letter in letters if letter not in placed]
+    if missing:
+        raise ValueError(f"{', '.join(missing)} missing")
+    if len(groups) < 2:
+        raise ValueError("a ranking needs at least two places")
+    return groups
+
+
+def format_ranking(groups: list[list[str]]) -> str:
+    return "".join("=".join(group) for group in groups)
+
+
+def ranks(groups: list[list[str]]) -> dict[str, float]:
+    """Each letter's place, 1 for the best; tied letters share the mean of the places they span."""
+    result: dict[str, float] = {}
+    place = 1
+    for group in groups:
+        for letter in group:
+            result[letter] = place + (len(group) - 1) / 2
+        place += len(group)
+    return result
+
+
 def kendall_tau_b(x: Sequence[float], y: Sequence[float]) -> float:
     """Kendall's tau-b between two equal-length sequences, which may hold ties."""
     if len(x) != len(y):

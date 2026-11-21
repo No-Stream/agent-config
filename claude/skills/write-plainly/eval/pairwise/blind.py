@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Assemble blind ranking sets: one set per task, holding every pipeline's passage once.
+"""Assemble blind passage sets: one set per task, holding every pipeline's passage once.
 
 Writes `sets.jsonl` (what the labeler and the judges see: document type, reader and the passages
 under letters A, B, C and so on) and `key.json` (which pipeline wrote the passage under each
@@ -23,7 +23,7 @@ from common import Task, load_tasks, passage_digest, word_count, write_json, wri
 logger: logging.Logger = logging.getLogger(__name__)
 
 READING_WORDS_PER_MINUTE = 250
-RANKING_SECONDS_PER_SET = 30
+GRADING_SECONDS_PER_SET = 30
 
 
 def build_sets(
@@ -55,7 +55,7 @@ def build_sets(
 
 def reading_minutes(passages: dict[tuple[str, str], str], set_count: int) -> float:
     words = sum(word_count(text) for text in passages.values())
-    return words / READING_WORDS_PER_MINUTE + set_count * RANKING_SECONDS_PER_SET / 60
+    return words / READING_WORDS_PER_MINUTE + set_count * GRADING_SECONDS_PER_SET / 60
 
 
 def main() -> None:
@@ -72,7 +72,9 @@ def main() -> None:
     args = parser.parse_args()
     sets_file, key_file = args.out / "sets.jsonl", args.out / "key.json"
     if sets_file.exists() or key_file.exists():
-        raise FileExistsError(f"{args.out} already holds sets; rankings may refer to them")
+        raise FileExistsError(
+            f"{args.out} already holds sets; grades and rankings may refer to them"
+        )
     tasks = load_tasks(args.tasks)
     if args.only_task:
         unknown = set(args.only_task) - {task.task_id for task in tasks}
