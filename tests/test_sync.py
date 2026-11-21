@@ -12,12 +12,14 @@ SOURCE_REPO = Path(__file__).resolve().parents[1]
 REPO_OWNED_FILES = (
     "claude/skills/write-plainly/SKILL.md",
     "claude/skills/write-plainly/tests/test_lint_prose.py",
+    "claude/skills/notebooks/SKILL.md",
     "claude/agents/prose-reviewer.md",
     "claude/agents/prose-fidelity-checker.md",
     "claude/agents/prose-reader-test.md",
 )
 LIVE_REPO_OWNED_PATHS = (
     ".claude/skills/write-plainly",
+    ".claude/skills/notebooks",
     ".claude/agents/prose-reviewer.md",
     ".claude/agents/prose-fidelity-checker.md",
     ".claude/agents/prose-reader-test.md",
@@ -261,7 +263,7 @@ class TestLinkRepoOwned:
 
         assert result.returncode == 0, result.stderr
         assert (home / ".claude/skills/write-plainly").is_symlink()
-        assert [path.name for path in (home / ".claude/skills").iterdir()] == ["write-plainly"]
+        assert sorted(path.name for path in (home / ".claude/skills").iterdir()) == ["notebooks", "write-plainly"]
         [backup] = home.glob(f"{BACKUP_ROOT}/*/.claude/skills/write-plainly")
         assert snapshot(backup) == snapshot(repo / "claude/skills/write-plainly")
 

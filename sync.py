@@ -44,6 +44,7 @@ COPIED_DIRS: dict[str, str] = {
 }
 REPO_OWNED: tuple[str, ...] = (
     "claude/skills/write-plainly",
+    "claude/skills/notebooks",
     "claude/agents/prose-reviewer.md",
     "claude/agents/prose-fidelity-checker.md",
     "claude/agents/prose-reader-test.md",
