@@ -44,11 +44,12 @@ The numbers are counts of pattern matches. They say how often a rule fires on ea
 
 The table comes from runs on 2026-11-20 with `lint_prose.py` and `lint_prose_patterns.py` at sha256 `c5638c2cb0e3`, sloplint 0.10.0 and slop-guard 0.5.0. slop-guard ran with the version of `slop-guard.jsonl` from before the changes below, so the rules they removed still have rates. The three-item part of `structural` is the difference between that run and a run with the current file. The human side has 56,689 words and the agent side 23,484.
 
-Each rule falls into one of three groups, and only tell rules can be demoted:
+Each rule falls into one of two groups, and only tell rules can be demoted:
 
-- House-style rules encode this skill's own preferences: no em dashes, no dashes as pauses, few numbers in body prose, paragraph shape and sentence length. They stay whatever their human rate, and their rates are reported for information. A rule from another linter that contradicts one of them is removed whatever its rates.
+- House-style rules encode this skill's own preferences: no em dashes, no dashes as pauses, few numbers in body prose, paragraph shape and sentence length. The markdown rules from the skill's Format section are house style too: no bold run-in labels or bold lead-ins, bold only for a decision or a label, sentence-case headings and no thin top-level sections. They stay whatever their human rate, and their rates are reported for information. A rule from another linter that contradicts one of them is removed whatever its rates.
 - Tell rules exist to catch model habits. A tell rule that fires more often per 1,000 words on the human side than on the agent side, on at least three human texts, gets an advisory "Check:" message or is removed. The three-text floor was added during the triage, because two texts against none is within noise for corpora this small, and it is provisional until the skill's owner confirms it. Without it, `stacked-hedge` would get a "Check:" message, `check-prose.sh` would also skip sloplint's `same-determiner-chain` and `stands-serves-as`, and slop-guard's `pithy_fragment` would be turned off.
-- Markdown-structure rules (headings, bold, bullets) cannot fire on the matched corpus, which is plain text, so they are judged on the passages that the pairwise evaluation in `pairwise/` generated, as "Markdown rules on generated passages" describes. Those passages have no bold and no headings, so the only one judged is `bullet_density`, which is kept.
+
+Two tell rules are about markdown structure: slop-guard's `bullet_density`, and the bold-header and bullet-run checks in its `structural` rule. They cannot fire on the matched corpus, which is plain text, so they are judged on the passages that the pairwise evaluation in `pairwise/` generated, as "Markdown rules on generated passages" describes. Those passages have no bold and no run of six bullets, so the only one judged is `bullet_density`, which is kept.
 
 Rates are hits per 1,000 words. "Human" is every human text, "agent" is the model halves of the matched corpus, and "matched human" is the human halves written on the same topics. The texts columns count texts with at least one hit.
 
@@ -82,13 +83,13 @@ Rates are hits per 1,000 words. "Human" is every human text, "agent" is the mode
 | `complex-sentence` | lint_prose | house | 4.04 | 4.43 | 3.38 | 25/31 | 23/24 | kept |
 | `paragraph_cv` | slop-guard | house | 0.25 | 0.98 | 0.59 | 14/31 | 23/24 | removed, contradicts the paragraph floor |
 | `paragraph_balance` | slop-guard | house | 0.02 | 0.00 | 0.04 | 1/31 | 0/24 | removed, contradicts the paragraph floor |
-| `bold-run-in` | lint_prose | markdown | 1.68 | 0.00 | 0.00 | 6/31 | 0/24 | not judged, no bold in the passages |
-| `structural`, bold headers and bullet runs | slop-guard | markdown | 0.23 | 0.00 | 0.00 | 4/31 | 0/24 | not judged, no bold or bullet run in the passages |
-| `bold_bullet_list` | slop-guard | markdown | 0.21 | 0.00 | 0.00 | 5/31 | 0/24 | not judged, no bold in the passages |
-| `title-case-heading` | lint_prose | markdown | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | not judged, no headings in the passages |
-| `bullet_density` | slop-guard | markdown | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | kept, one passage hit |
-| `thin-h2-section` | lint_prose | markdown | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | not judged, no headings in the passages |
-| `intrasentence_keyword_bold` | slop-guard | markdown | 0.02 | 0.00 | 0.00 | 1/31 | 0/24 | not judged, no bold in the passages |
+| `bold-run-in` | lint_prose | house | 1.68 | 0.00 | 0.00 | 6/31 | 0/24 | kept |
+| `structural`, bold headers and bullet runs | slop-guard | tell | 0.23 | 0.00 | 0.00 | 4/31 | 0/24 | not judged, no bold or bullet run in the passages |
+| `bold_bullet_list` | slop-guard | house | 0.21 | 0.00 | 0.00 | 5/31 | 0/24 | kept |
+| `title-case-heading` | lint_prose | house | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | kept |
+| `bullet_density` | slop-guard | tell | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | kept, one passage hit |
+| `thin-h2-section` | lint_prose | house | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | kept |
+| `intrasentence_keyword_bold` | slop-guard | house | 0.02 | 0.00 | 0.00 | 1/31 | 0/24 | kept |
 
 Nine more rules fired on a single text, too few to read: sloplint's `not-by-x-but-by-y`, `actually-not-x`, `impact-verb`, `real-x-real-y` and `is-is` and slop-guard's `ai_disclosure` on one human text each, and sloplint's `short-run`, `notice-what` and `thats-how-x` on one agent text each. Most of sloplint's default rules, two in five of slop-guard's categories and `lint_prose.py`'s `heading-density` never fired, so these corpora say nothing about them; the last section of the output lists them.
 
@@ -111,7 +112,7 @@ One kept tell rule flips between the two comparisons: `contrast_pairs` fires mor
 
 ### Markdown rules on generated passages
 
-The pairwise evaluation generated 25 passages, five tasks each written by its five pipelines. Each passage's `final.md` is an agent-side `[[file]]` entry in `.private/eval/corpora-private.toml`. `false_flags.py --private` ran on them on 2026-11-21, with `lint_prose.py` and `lint_prose_patterns.py` at sha256 `0836dddb75c3`. The human side for these rules is the seven web pages, since no other human text has markdown structure. No passage uses bold or has a heading, because the prompt asks for body text with no heading, so no bold or heading rule can be judged until a source of agent-written documents with bold and headings is added.
+The pairwise evaluation generated 25 passages, five tasks each written by its five pipelines. Each passage's `final.md` is an agent-side `[[file]]` entry in `.private/eval/corpora-private.toml`. `false_flags.py --private` ran on them on 2026-11-20, with `lint_prose.py` and `lint_prose_patterns.py` at sha256 `0836dddb75c3`. The human side for these rules is the seven web pages, since no other human text has markdown structure. No passage uses bold or has a heading, because the prompt asks for body text with no heading. The bold and heading rules are house style and need no judgment, but the bold-header check in slop-guard's `structural` rule stays unjudged until a source of agent-written documents with bold is added.
 
 | measure | generated passages | human web pages |
 |---|---|---|
