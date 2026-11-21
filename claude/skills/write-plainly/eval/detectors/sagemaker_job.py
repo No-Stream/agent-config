@@ -41,13 +41,14 @@ from scoring import (
     write_scores,
 )
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 HERE = Path(__file__).resolve().parent
 JOB_PREFIX = "writing-eval-falcon"
 CODE_FILES = ("scoring.py", "job_entry.py")
 CONTAINER_INPUT = "/opt/ml/processing/input"
 CONTAINER_OUTPUT = "/opt/ml/processing/output"
+TEXTS_FILE = "texts.jsonl"
 POLL_SECONDS = 60
 TERMINAL = {"Completed", "Failed", "Stopped"}
 RETRIES = BotoConfig(retries={"max_attempts": 12, "mode": "adaptive"})  # the account is shared
@@ -64,9 +65,9 @@ class Config:
     volume_gb: int
     max_runtime_s: int
 
-    @classmethod
-    def load(cls, path: Path) -> Config:
-        return cls(**tomllib.loads(path.read_text()))
+
+def load_config(path: Path) -> Config:
+    return Config(**tomllib.loads(path.read_text()))
 
 
 def split_s3(uri: str) -> tuple[str, str]:
@@ -110,13 +111,20 @@ def launch(config: Config, session: boto3.Session, pending: dict[str, str]) -> s
         for text_id, text in pending.items()
     ]
     body = "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
-    put(s3, job_uri(config, job, "texts/texts.jsonl"), body.encode())
+    put(s3, job_uri(config, job, f"texts/{TEXTS_FILE}"), body.encode())
     session.client("sagemaker", config=RETRIES).create_processing_job(
         ProcessingJobName=job,
         RoleArn=config.role_arn,
         AppSpecification={
             "ImageUri": config.image_uri,
-            "ContainerEntrypoint": ["python3", f"{CONTAINER_INPUT}/code/job_entry.py"],
+            "ContainerEntrypoint": [
+                "python3",
+                f"{CONTAINER_INPUT}/code/job_entry.py",
+                "--texts",
+                f"{CONTAINER_INPUT}/texts/{TEXTS_FILE}",
+                "--out",
+                CONTAINER_OUTPUT,
+            ],
         },
         ProcessingInputs=[
             {
@@ -202,7 +210,7 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, default=MANIFEST_FILE)
     parser.add_argument("--scores", type=Path, default=SCORES_DIR)
     args = parser.parse_args()
-    config = Config.load(args.config)
+    config = load_config(args.config)
     session = boto3.Session(profile_name=config.profile, region_name=config.region)
     if args.command == "fetch":
         if not args.job:

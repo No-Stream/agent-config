@@ -53,7 +53,7 @@ from scoring import (
 )
 from transformers import AutoConfig, AutoModel, AutoModelForSequenceClassification, AutoTokenizer
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # Lookalike folding from normalize.py in the nakas/gpttrace-v8s-1b model repo.
 HOMOGLYPHS = dict(

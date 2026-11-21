@@ -144,12 +144,12 @@ def make_text(text_id: str) -> Text:
 class TestManifestFile:
     def test_round_trip(self, tmp_path):
         texts = [make_text("a"), make_text("b")]
-        write_manifest(texts, tmp_path / "m.jsonl")
+        write_manifest(tmp_path / "m.jsonl", texts)
         assert read_manifest(tmp_path / "m.jsonl") == texts
 
     def test_duplicate_ids_are_refused(self, tmp_path):
         with pytest.raises(ValueError):
-            write_manifest([make_text("a"), make_text("a")], tmp_path / "m.jsonl")
+            write_manifest(tmp_path / "m.jsonl", [make_text("a"), make_text("a")])
 
     def test_unknown_fields_are_refused(self, tmp_path):
         row = {**make_text("a").__dict__, "extra": 1}

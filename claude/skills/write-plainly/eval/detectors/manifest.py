@@ -18,6 +18,7 @@ import argparse
 import json
 import logging
 import tomllib
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,7 +37,7 @@ from scoring import (
     write_manifest,
 )
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 EVAL_DIR = Path(__file__).resolve().parents[1]
 BHEIJDEN_CORPUS_DIR = EVAL_DIR / ".cache" / "bheijden-slop" / "data" / "corpus"
@@ -51,19 +52,19 @@ class Sources:
     pairwise_task_files: tuple[Path, ...]
     detector_texts: Path
 
-    @classmethod
-    def default(cls) -> Sources:
-        private = REPO_ROOT / ".private" / "eval"
-        return cls(
-            bheijden_corpus=BHEIJDEN_CORPUS_DIR,
-            voice_dir=private / "human-private",
-            pairwise_generation=private / "pairwise" / "generation",
-            pairwise_task_files=(
-                EVAL_DIR / "pairwise" / "tasks" / "public.toml",
-                private / "pairwise" / "tasks" / "work.toml",
-            ),
-            detector_texts=private / "detector-texts",
-        )
+
+def default_sources() -> Sources:
+    private = REPO_ROOT / ".private" / "eval"
+    return Sources(
+        bheijden_corpus=BHEIJDEN_CORPUS_DIR,
+        voice_dir=private / "human-private",
+        pairwise_generation=private / "pairwise" / "generation",
+        pairwise_task_files=(
+            EVAL_DIR / "pairwise" / "tasks" / "public.toml",
+            private / "pairwise" / "tasks" / "work.toml",
+        ),
+        detector_texts=private / "detector-texts",
+    )
 
 
 def make_text(corpus: str, arm: str, topic: str, register: str, path: Path, repo: Path) -> Text:
@@ -82,12 +83,7 @@ def bheijden_pairs(corpus_dir: Path) -> list[dict]:
     return json.loads((corpus_dir / "pairs.json").read_text())["pairs"]
 
 
-def bheijden_registers(corpus_dir: Path) -> dict[str, str]:
-    return {pair["id"]: pair["register"] for pair in bheijden_pairs(corpus_dir)}
-
-
-def bheijden_texts(corpus_dir: Path, repo: Path) -> list[Text]:
-    pairs = json.loads((corpus_dir / "pairs.json").read_text())["pairs"]
+def bheijden_texts(pairs: Iterable[dict], corpus_dir: Path, repo: Path) -> list[Text]:
     return [
         make_text(
             BHEIJDEN, arm, pair["id"], pair["register"], corpus_dir / pair[side]["file"], repo
@@ -135,9 +131,11 @@ def detector_texts(root: Path, registers: dict[str, str], repo: Path) -> list[Te
 
 def build(sources: Sources, repo: Path = REPO_ROOT) -> list[Text]:
     doc_types = pairwise_doc_types(sources.pairwise_task_files)
+    pairs = bheijden_pairs(sources.bheijden_corpus)
+    registers = {pair["id"]: pair["register"] for pair in pairs}
     texts = [
-        *bheijden_texts(sources.bheijden_corpus, repo),
-        *detector_texts(sources.detector_texts, bheijden_registers(sources.bheijden_corpus), repo),
+        *bheijden_texts(pairs, sources.bheijden_corpus, repo),
+        *detector_texts(sources.detector_texts, registers, repo),
         *voice_texts(sources.voice_dir, repo),
         *pairwise_texts(sources.pairwise_generation, doc_types, repo),
     ]
@@ -152,11 +150,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=MANIFEST_FILE)
     args = parser.parse_args()
-    texts = build(Sources.default())
-    write_manifest(texts, args.out)
-    counts: dict[tuple[str, str], int] = {}
-    for text in texts:
-        counts[text.corpus, text.arm] = counts.get((text.corpus, text.arm), 0) + 1
+    texts = build(default_sources())
+    write_manifest(args.out, texts)
+    counts = Counter((text.corpus, text.arm) for text in texts)
     for (corpus, arm), count in sorted(counts.items()):
         logger.info(f"{corpus:16} {arm:26} {count:3}")
     logger.info(f"wrote {len(texts)} texts to {args.out}")

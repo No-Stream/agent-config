@@ -47,7 +47,7 @@ EMPHASIS = re.compile(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])")
 EXTRA_BLANK_LINES = re.compile(r"\n{3,}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Detector:
     """`window` is the model's input length in tokens, special tokens included."""
 
@@ -67,44 +67,46 @@ DETECTORS = {
     detector.name: detector
     for detector in (
         Detector(
-            "desklib",
-            "desklib/ai-text-detector-v1.01",
-            "5fdea974cd4287c61674951ec78803aa274e2fb7",
-            768,
-            True,
-            "log-odds of P(AI)",
-            0.0,
-            "P(AI) = 0.5, the model card's cut-off",
+            name="desklib",
+            model="desklib/ai-text-detector-v1.01",
+            revision="5fdea974cd4287c61674951ec78803aa274e2fb7",
+            window=768,
+            higher_is_ai=True,
+            unit="log-odds of P(AI)",
+            threshold=0.0,
+            threshold_source="P(AI) = 0.5, the model card's cut-off",
         ),
         Detector(
-            "gpttrace",
-            "nakas/gpttrace-v8s-1b",
-            "ac748e32ca8c90bb8858fadc427757728e27b063",
-            512,
-            True,
-            "machine logit minus human logit",
-            9.3,
-            "the model card's 1% false-positive cut-off",
+            name="gpttrace",
+            model="nakas/gpttrace-v8s-1b",
+            revision="ac748e32ca8c90bb8858fadc427757728e27b063",
+            window=512,
+            higher_is_ai=True,
+            unit="machine logit minus human logit",
+            threshold=9.3,
+            threshold_source="the model card's 1% false-positive cut-off",
         ),
         Detector(
-            "binoculars",
-            f"{FALCON[0]} observer, {FALCON_INSTRUCT[0]} performer",
-            f"{FALCON[1][:12]}, {FALCON_INSTRUCT[1][:12]}",
-            512,
-            False,
-            "log-perplexity over cross-perplexity",
-            0.8536432310785527,
-            "the reference code's low false-positive cut-off; AI below it",
+            name="binoculars",
+            model=f"{FALCON[0]} observer, {FALCON_INSTRUCT[0]} performer",
+            revision=f"{FALCON[1][:12]}, {FALCON_INSTRUCT[1][:12]}",
+            window=512,
+            higher_is_ai=False,
+            unit="log-perplexity over cross-perplexity",
+            threshold=0.8536432310785527,
+            threshold_source="the reference code's low false-positive cut-off; AI below it",
         ),
         Detector(
-            "fast-detectgpt",
-            f"{FALCON[0]} sampling, {FALCON_INSTRUCT[0]} scoring",
-            f"{FALCON[1][:12]}, {FALCON_INSTRUCT[1][:12]}",
-            512,
-            True,
-            "analytic sampling discrepancy",
-            None,
-            "none published; the reference fit puts human texts near 0 and AI near 2.9",
+            name="fast-detectgpt",
+            model=f"{FALCON[0]} sampling, {FALCON_INSTRUCT[0]} scoring",
+            revision=f"{FALCON[1][:12]}, {FALCON_INSTRUCT[1][:12]}",
+            window=512,
+            higher_is_ai=True,
+            unit="analytic sampling discrepancy",
+            threshold=None,
+            threshold_source=(
+                "none published; the reference fit puts human texts near 0 and AI near 2.9"
+            ),
         ),
     )
 }
@@ -163,7 +165,7 @@ def text_sha256(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def write_jsonl(rows: Iterable[dict], path: Path) -> None:
+def write_jsonl(path: Path, rows: Iterable[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows))
@@ -174,9 +176,9 @@ def read_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def write_manifest(texts: Sequence[Text], path: Path) -> None:
+def write_manifest(path: Path, texts: Sequence[Text]) -> None:
     check_unique_ids(texts)
-    write_jsonl((asdict(text) for text in texts), path)
+    write_jsonl(path, (asdict(text) for text in texts))
 
 
 def read_manifest(path: Path) -> list[Text]:
@@ -312,7 +314,7 @@ def split_pending(
 def write_scores(scores_path: Path, order: Iterable[str], records: dict[str, dict]) -> list[str]:
     """Write the records in manifest order, dropping texts no longer in it; return unscored ids."""
     order = list(order)
-    write_jsonl((records[text_id] for text_id in order if text_id in records), scores_path)
+    write_jsonl(scores_path, (records[text_id] for text_id in order if text_id in records))
     return [text_id for text_id in order if text_id not in records]
 
 

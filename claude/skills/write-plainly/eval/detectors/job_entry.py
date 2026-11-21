@@ -19,19 +19,22 @@ from scoring import (
     DETECTORS,
     FALCON,
     FALCON_INSTRUCT,
+    GPU_DETECTORS,
     ChunkScore,
     chunk_encodings,
     read_jsonl,
     score_record,
+    scores_file,
     write_jsonl,
 )
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
-WINDOW = DETECTORS["binoculars"].window
-if DETECTORS["fast-detectgpt"].window != WINDOW:
-    raise ValueError("both Falcon detectors share one forward pass, so they need one window")
+WINDOWS = {DETECTORS[name].window for name in GPU_DETECTORS}
+if len(WINDOWS) != 1:
+    raise ValueError(f"both Falcon detectors share one forward pass, so need one window: {WINDOWS}")
+(WINDOW,) = WINDOWS
 
 
 def load(name_and_revision: tuple[str, str], device: str) -> AutoModelForCausalLM:
@@ -83,10 +86,8 @@ def chunk_scores(
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--texts", type=Path, default=Path("/opt/ml/processing/input/texts/texts.jsonl")
-    )
-    parser.add_argument("--out", type=Path, default=Path("/opt/ml/processing/output"))
+    parser.add_argument("--texts", type=Path, required=True, help="JSONL of id, sha256, text")
+    parser.add_argument("--out", type=Path, required=True, help="directory for the score files")
     args = parser.parse_args()
 
     devices = [f"cuda:{index}" for index in range(torch.cuda.device_count())]
@@ -103,22 +104,21 @@ def main() -> None:
         raise ValueError("observer and performer tokenizers differ")
     logger.info(f"loaded both models on {devices} in {time.monotonic() - started:.0f} s")
 
-    records: dict[str, list[dict]] = {"binoculars": [], "fast-detectgpt": []}
+    records: dict[str, list[dict]] = {name: [] for name in GPU_DETECTORS}
     rows = read_jsonl(args.texts)
     for index, row in enumerate(rows, 1):
-        binoculars_chunks, fast_chunks = [], []
+        chunks: dict[str, list[ChunkScore]] = {name: [] for name in GPU_DETECTORS}
         for encoding, size in chunk_encodings(tokenizer, row["id"], row["text"], WINDOW):
-            scores = chunk_scores(encoding["input_ids"], observer, performer)
-            binoculars_chunks.append(ChunkScore(size, scores["binoculars"]))
-            fast_chunks.append(ChunkScore(size, scores["fast-detectgpt"]))
-        for name, chunks in (("binoculars", binoculars_chunks), ("fast-detectgpt", fast_chunks)):
-            records[name].append(score_record(row["id"], row["sha256"], DETECTORS[name], chunks))
-        logger.info(
-            f"{index}/{len(rows)} {row['id']}: binoculars {records['binoculars'][-1]['score']:.4f}"
-            f" fast-detectgpt {records['fast-detectgpt'][-1]['score']:.3f}"
-        )
-    for name, rows_out in records.items():
-        write_jsonl(rows_out, args.out / f"{name}.jsonl")
+            for name, score in chunk_scores(encoding["input_ids"], observer, performer).items():
+                chunks[name].append(ChunkScore(size, score))
+        for name in GPU_DETECTORS:
+            records[name].append(
+                score_record(row["id"], row["sha256"], DETECTORS[name], chunks[name])
+            )
+        scored = ", ".join(f"{name} {records[name][-1]['score']:.4f}" for name in GPU_DETECTORS)
+        logger.info(f"{index}/{len(rows)} {row['id']}: {scored}")
+    for name, detector_records in records.items():
+        write_jsonl(scores_file(args.out, name), detector_records)
     (args.out / "job.json").write_text(
         json.dumps(
             {
