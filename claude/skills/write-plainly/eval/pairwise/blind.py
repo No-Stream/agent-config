@@ -4,10 +4,10 @@
 # ///
 """Assemble blind passage sets: one set per task, holding every pipeline's passage once.
 
-Writes `sets.jsonl` (what the labeler and the judges see: document type, reader and the passages
-under letters A, B, C and so on) and `key.json` (which pipeline wrote the passage under each
-letter). The labeler never reads the key. The seed shuffles the task order and, separately for
-each task, which pipeline gets which letter.
+Writes `sets.jsonl` (what the person grading and the judges see: document type, reader and the
+passages under letters A, B, C and so on) and `key.json` (which pipeline wrote the passage under
+each letter). The person grading never reads the key. The seed shuffles the task order and,
+separately for each task, which pipeline gets which letter.
 """
 
 from __future__ import annotations

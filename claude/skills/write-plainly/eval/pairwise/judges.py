@@ -5,9 +5,9 @@
 # ///
 """Ask LLM judges to rank each blind passage set, twice, under two different letter orders.
 
-Judges see what the labeler sees: document type, reader and the passages. For each set, the seed
-draws one order of the passages and the second order is its reverse, so a passage shown early in
-one is shown late in the other; the letters follow the order shown. Each judge ranks one set per
+Judges see what the person grading sees: document type, reader and the passages. For each set,
+the seed draws one order of the passages and the second order is its reverse, so a passage shown
+early in one is shown late in the other; the letters follow the order shown. Each judge ranks one set per
 call, and the calls run in parallel. Each ranking is written as soon as its call returns, in the
 sets file's letters, and a rerun skips it; a ranking on disk whose set or order differs from this
 run's stops the run. At the end, each judge's agreement with itself across the two orders is
@@ -119,7 +119,8 @@ class JudgeRun:
     effort: str
 
 
-def judge_set(run: JudgeRun, judge: str, order: str, passage_set: dict, shown: list[str]) -> None:
+def judge_set(run: JudgeRun, judge: str, order: str, passage_set: dict, shown: list[str]) -> dict:
+    """The judge's ranking of the set in this order: from disk if ranked before, else a new call."""
     set_id = passage_set["set_id"]
     result_file = run.out_dir / f"{judge}-{order}-set{set_id}.json"
     digests = {letter: passage_digest(text) for letter, text in passage_set["passages"].items()}
@@ -130,7 +131,7 @@ def judge_set(run: JudgeRun, judge: str, order: str, passage_set: dict, shown: l
                 f"{result_file} ranked other passages or another order than this run's set "
                 f"{set_id}; a different sets file or seed needs a fresh --out"
             )
-        return
+        return on_disk
     set_file = run.out_dir / "sets" / f"{order}-set{set_id}.md"
     write_text_atomic(set_file, set_text(passage_set, shown))
     prompt = JUDGE_PROMPT.format(
@@ -174,6 +175,7 @@ def judge_set(run: JudgeRun, judge: str, order: str, passage_set: dict, shown: l
     }
     write_json(result_file, record)
     logger.info(f"finished {result_file.name}")
+    return record
 
 
 def order_agreement(records: list[dict]) -> tuple[list[float], int]:
@@ -227,14 +229,11 @@ def main() -> None:
             set_id, sorted(sets[set_id]["passages"]), args.seed
         ).items()
     ]
-    run_parallel(jobs, args.jobs)
+    records = run_parallel(jobs, args.jobs)
     for judge in args.judges:
-        records = [
-            json.loads((run.out_dir / f"{judge}-{order}-set{set_id}.json").read_text())
-            for set_id in set_ids
-            for order in ORDERS
-        ]
-        taus, identical = order_agreement(records)
+        taus, identical = order_agreement(
+            [record for record in records if record["judge"] == judge]
+        )
         logger.info(
             f"{judge}: Kendall tau between the two orders' rankings, mean "
             f"{statistics.mean(taus):.2f} over {len(taus)} sets (lowest {min(taus):.2f}); "

@@ -20,10 +20,13 @@ import hashlib
 import html
 import itertools
 import json
+import logging
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 LINE_VERSION = "wp1"
 GRADE_POINTS = {
@@ -193,7 +196,9 @@ def build_page(sets: list[dict], digest: str) -> str:
     meta = {
         "version": LINE_VERSION,
         "digest": digest,
-        "sets": [{"id": s["set_id"], "letters": letters(s)} for s in sets],
+        "sets": [
+            {"id": passage_set["set_id"], "letters": letters(passage_set)} for passage_set in sets
+        ],
     }
     fills = {
         "NAV": "".join(
@@ -285,10 +290,15 @@ def record(sets_file: Path, line: str) -> list[str]:
         "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in ordered),
         encoding="utf-8",
     )
+    logger.info(
+        f"recorded sets {', '.join(graded)} in {grades_file}; "
+        f"{len(records)} of {len(sets)} sets graded"
+    )
     return list(graded)
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -305,17 +315,12 @@ def main() -> None:
         sets = load_sets(args.sets_file)
         digest = sets_digest(args.sets_file)
         args.out.write_text(build_page(sets, digest), encoding="utf-8")
-        print(f"wrote {args.out}: {len(sets)} tasks from sets file {digest}")
+        logger.info(f"wrote {args.out}: {len(sets)} tasks from sets file {digest}")
         return
     try:
-        recorded = record(args.sets_file, sys.stdin.read())
+        record(args.sets_file, sys.stdin.read())
     except LineRefused as error:
         sys.exit(f"refused: {error}")
-    grades_file = args.sets_file.parent / GRADES_FILE_NAME
-    print(
-        f"recorded sets {', '.join(recorded)} in {grades_file}; "
-        f"{len(latest_grades(grades_file))} of {len(load_sets(args.sets_file))} sets graded"
-    )
 
 
 if __name__ == "__main__":

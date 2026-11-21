@@ -58,7 +58,7 @@ class TestDesign:
         assert build_sets(tasks, make_passages(tasks), PIPELINES, seed=11) == first
         assert build_sets(tasks, make_passages(tasks), PIPELINES, seed=12) != first
 
-    def test_what_the_labeler_sees_names_no_pipeline_or_task(self, ten_task_design) -> None:
+    def test_what_the_grader_sees_names_no_pipeline_or_task(self, ten_task_design) -> None:
         sets, _, _ = ten_task_design
         for passage_set in sets:
             assert set(passage_set) == {"set_id", "doc_type", "reader", "passages"}

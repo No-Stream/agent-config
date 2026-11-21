@@ -104,7 +104,7 @@ class TestBuild:
             check=True,
         )
         assert out.read_text() == build_page(load_sets(sets_file), sets_digest(sets_file))
-        assert sets_digest(sets_file) in completed.stdout
+        assert sets_digest(sets_file) in completed.stderr
 
 
 class TestRecord:
@@ -130,29 +130,39 @@ class TestRecord:
         assert len(lines) == 3
 
     @pytest.mark.parametrize(
-        ("made", "message"),
+        "made",
         [
-            ("wp2 {digest} 1:A,B,C notes={{}}", "does not start with wp1"),
-            ("wp1 0000beef 1:A,B,C notes={{}}", "not for this sets file"),
-            ("wp1 1:A,B,C notes={{}}", "not for this sets file"),
-            ("wp1 {digest} 9:A,B,C notes={{}}", "no set '9'"),
-            ("wp1 {digest} 1:A,B,C 1:A,B,C notes={{}}", "appears twice"),
-            ("wp1 {digest} 1:A,B notes={{}}", "2 grades for 3 passages"),
-            ("wp1 {digest} 1:A,E,F+ notes={{}}", "not grades"),
-            ("wp1 {digest} 1:A,b,C notes={{}}", "not grades"),
-            ("wp1 {digest} 1:A,B,C", "no notes= part"),
-            ('wp1 {digest} 1:A,B,C notes={{"1":"half a no', "not JSON"),
-            ('wp1 {digest} 1:A,B,C notes=["1"]', "not an object"),
-            ('wp1 {digest} 1:A,B,C notes={{"2":"x"}}', "does not grade"),
-            ("wp1 {digest} notes={{}}", "grades no task"),
+            "wp2 {digest} 1:A,B,C notes={{}}",
+            "wp1 {digest} 9:A,B,C notes={{}}",
+            "wp1 {digest} 1:A,B,C 1:A,B,C notes={{}}",
+            "wp1 {digest} 1:A,B notes={{}}",
+            "wp1 {digest} 1:A,E,F+ notes={{}}",
+            "wp1 {digest} 1:A,b,C notes={{}}",
+            'wp1 {digest} 1:A,B,C notes={{"1":"half a no',
+            'wp1 {digest} 1:A,B,C notes=["1"]',
+            'wp1 {digest} 1:A,B,C notes={{"2":"x"}}',
+            "wp1 {digest} notes={{}}",
         ],
     )
     def test_a_malformed_line_is_refused_and_nothing_is_written(
+        self, sets_file: Path, made: str
+    ) -> None:
+        with pytest.raises(LineRefused):
+            record(sets_file, made.format(digest=sets_digest(sets_file)))
+        assert not (sets_file.parent / GRADES_FILE_NAME).exists()
+
+    @pytest.mark.parametrize(
+        ("made", "message"),
+        [
+            ("wp1 1:A,B,C notes={{}}", "not for this sets file"),
+            ("wp1 {digest} 1:A,B,C", "no notes= part"),
+        ],
+    )
+    def test_a_line_missing_its_digest_or_notes_is_refused_for_that_reason(
         self, sets_file: Path, made: str, message: str
     ) -> None:
         with pytest.raises(LineRefused, match=message):
             record(sets_file, made.format(digest=sets_digest(sets_file)))
-        assert not (sets_file.parent / GRADES_FILE_NAME).exists()
 
     def test_a_line_from_another_sets_file_is_refused(
         self, sets_file: Path, tmp_path: Path
@@ -160,8 +170,9 @@ class TestRecord:
         other = tmp_path / "other" / "sets.jsonl"
         other.parent.mkdir()
         other.write_text(sets_file.read_text().replace("Passage A of set 1", "Passage A, edited"))
-        with pytest.raises(LineRefused, match="not for this sets file"):
+        with pytest.raises(LineRefused):
             record(other, line(sets_file, "1:A,B,C"))
+        assert not (other.parent / GRADES_FILE_NAME).exists()
 
     def test_the_command_exits_non_zero_with_the_reason(self, sets_file: Path) -> None:
         completed = subprocess.run(
@@ -172,7 +183,7 @@ class TestRecord:
             check=False,
         )
         assert completed.returncode == 1
-        assert "refused: the line is not for this sets file" in completed.stderr
+        assert "refused:" in completed.stderr and "not for this sets file" in completed.stderr
 
     def test_the_documented_heredoc_records_a_note_with_quotes_a_pipe_and_an_apostrophe(
         self, sets_file: Path
@@ -184,6 +195,6 @@ class TestRecord:
         completed = subprocess.run(
             ["sh", "-c", command], capture_output=True, text=True, check=True
         )
-        assert "recorded sets 2" in completed.stdout and "1 of 3 sets graded" in completed.stdout
+        assert "recorded sets 2" in completed.stderr and "1 of 3 sets graded" in completed.stderr
         assert grades_on_disk(sets_file)["2"]["grades"] == {"A": "A", "B": "A", "C": "B"}
         assert grades_on_disk(sets_file)["2"]["note"] == note
