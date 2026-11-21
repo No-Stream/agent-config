@@ -1,26 +1,113 @@
 import pytest
 from scoring import DETECTORS, Text
-from summarize import control_table, past_cutoff
+from summarize import (
+    PLANTED_CONTRASTS,
+    chunk_noise_line,
+    contrast_table,
+    overview_table,
+    past_cutoff,
+    provenance_table,
+    spread_line,
+)
+
+YEARS = {"t0": 1900, "t1": 1900, "t2": 2010, "t3": 2010}
+PLANTED = {
+    "skill-draft": [1.0, 2.0, 3.0],
+    "neutral-rewrite": [1.5, 1.5, 3.5],
+    "degraded": [3.0, 2.0, 6.0],
+    "tells-injected": [2.0, 2.5, 3.5],
+}
+WORDS = {"skill-draft": 100, "neutral-rewrite": 100, "degraded": 120, "tells-injected": 105}
 
 
-def paired_texts(human: list[float], model: list[float]) -> tuple[list[Text], dict[str, dict]]:
+def bheijden_texts(arms: dict[str, list[float]]) -> tuple[list[Text], dict[str, dict]]:
+    """One text per topic t0, t1, ... in each arm, scored as given, each one chunk."""
     texts, scores = [], {}
-    for arm, values in (("human", human), ("no-skill", model)):
+    for arm, values in arms.items():
         for index, value in enumerate(values):
-            text = Text(f"bheijden/{arm}/t{index}", "bheijden", arm, f"t{index}", "r", 100, "p")
+            words = WORDS.get(arm, 100)
+            text = Text(f"bheijden/{arm}/t{index}", "bheijden", arm, f"t{index}", "r", words, "p")
             texts.append(text)
-            scores[text.id] = {"score": value}
+            scores[text.id] = {"score": value, "chunk_scores": [value]}
     return texts, scores
 
 
-@pytest.mark.parametrize(
-    ("detector", "human_wins"),
-    [("desklib", "3/4 | 0.30 to 0.95"), ("binoculars", "1/4 | 0.05 to 0.70")],
-)
-def test_human_less_ai_like_follows_the_detector_direction(detector, human_wins):
-    texts, scores = paired_texts(human=[0.1, 0.2, 0.3, 0.9], model=[0.5, 0.6, 0.7, 0.8])
-    row = control_table(DETECTORS[detector], texts, scores).splitlines()[-1]
-    assert row == f"| no-skill | 4 | {human_wins} | -0.400 | -0.275 (-0.673 to 0.123) |"
+class TestProvenanceTable:
+    @pytest.mark.parametrize(
+        ("detector", "human_less_ai_like"),
+        [
+            ("desklib", "3/4 | 0.30 to 0.95 | 2/2 | 1/2"),
+            ("binoculars", "1/4 | 0.05 to 0.70 | 0/2 | 1/2"),
+        ],
+    )
+    def test_human_less_ai_like_follows_the_detector_direction(self, detector, human_less_ai_like):
+        texts, scores = bheijden_texts(
+            {"human": [0.1, 0.2, 0.3, 0.9], "no-skill": [0.5, 0.6, 0.7, 0.8]}
+        )
+        row = provenance_table(DETECTORS[detector], texts, scores, YEARS).splitlines()[-1]
+        assert row == f"| no-skill | 4 | {human_less_ai_like} | -0.400 | -0.275 (-0.673 to 0.123) |"
+
+    def test_planted_arms_are_left_out(self):
+        texts, scores = bheijden_texts({"human": [0.1, 0.2, 0.3], **PLANTED})
+        rows = provenance_table(DETECTORS["gpttrace"], texts, scores, YEARS).splitlines()[2:]
+        assert [row.split(" | ")[0] for row in rows] == ["| skill-draft"]
+
+
+class TestContrastTable:
+    def test_each_contrast_is_paired_by_topic_with_its_word_counts(self):
+        texts, scores = bheijden_texts(PLANTED)
+        rows = contrast_table(DETECTORS["gpttrace"], texts, scores, PLANTED_CONTRASTS).splitlines()[
+            2:
+        ]
+        assert rows[0] == (
+            "| degraded minus neutral-rewrite | 3 | 3/3 | 0.44 to 1.00 | 1.500 | "
+            "1.500 (-0.984 to 3.984) | 1.000 | 120 / 100 |"
+        )
+        assert [row.split(" | ")[2] for row in rows] == ["3/3", "3/3", "2/3"]
+
+    def test_more_ai_like_follows_the_detector_direction(self):
+        texts, scores = bheijden_texts(PLANTED)
+        rows = contrast_table(
+            DETECTORS["binoculars"], texts, scores, PLANTED_CONTRASTS
+        ).splitlines()[2:]
+        assert [row.split(" | ")[2] for row in rows] == ["0/3", "0/3", "1/3"]
+
+    def test_says_so_when_no_contrast_is_scored(self):
+        texts, scores = bheijden_texts({"human": [0.1, 0.2], "no-skill": [0.5, 0.6]})
+        assert contrast_table(DETECTORS["gpttrace"], texts, scores, PLANTED_CONTRASTS).startswith(
+            "No topic"
+        )
+
+
+def test_overview_counts_each_check_and_marks_unscored_ones():
+    texts, scores = bheijden_texts(
+        {"human": [0.1, 0.2, 0.9], "corpus-claude-opus-5": [0.5, 0.6, 0.7], **PLANTED}
+    )
+    unplanted = {text_id: row for text_id, row in scores.items() if "corpus" in text_id}
+    table = overview_table(texts, {"gpttrace": scores, "binoculars": unplanted}).splitlines()
+    assert table[2] == "| gpttrace | 2/3 | 3/3 | 3/3 | 2/3 |"
+    assert table[3] == "| binoculars | not scored | not scored | not scored | not scored |"
+
+
+class TestSpread:
+    def test_planted_and_human_arms_stay_out_of_the_model_spread(self):
+        texts, scores = bheijden_texts(
+            {"human": [0.0, 1.0], "no-skill": [1.0, 3.0], "degraded": [50.0, 90.0]}
+        )
+        line = spread_line(DETECTORS["gpttrace"], texts, scores)
+        assert line.startswith(
+            "Model-drafted texts, planted controls left out (n = 2): standard deviation 1.414,"
+        )
+
+    def test_chunk_noise_is_the_median_deviation_over_ordinary_texts_with_several_chunks(self):
+        texts, scores = bheijden_texts({"no-skill": [1.0, 2.0, 3.0, 4.0], "degraded": [9.0]})
+        chunks = ([1.0, 3.0], [0.0, 4.0, 8.0], [5.0, 5.0], [7.0], [0.0, 100.0])
+        for text_id, chunk_scores in zip(scores, chunks, strict=True):
+            scores[text_id]["chunk_scores"] = chunk_scores
+        assert chunk_noise_line(texts, scores) == (
+            "Median standard deviation between the chunks of one text, over the 3 texts outside "
+            "the planted controls with two or more chunks: 1.414."
+        )
 
 
 @pytest.mark.parametrize(

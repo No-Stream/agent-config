@@ -111,6 +111,12 @@ DETECTORS = {
 CPU_DETECTORS = ("desklib", "gpttrace")
 GPU_DETECTORS = ("binoculars", "fast-detectgpt")
 
+BHEIJDEN, PAIRWISE, VOICE_CORPUS = "bheijden", "pairwise", "human-private"
+BHEIJDEN_ARMS = {"human": "human", "ai": "corpus-claude-opus-5"}  # pairs.json side: arm
+VOICE_ARM = "human-jan"
+NO_SKILL, SKILL_DRAFT = "no-skill", "skill-draft"
+DEGRADED, TELLS_INJECTED, NEUTRAL_REWRITE = "degraded", "tells-injected", "neutral-rewrite"
+
 
 @dataclass(frozen=True)
 class Text:

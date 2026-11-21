@@ -22,15 +22,25 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from scoring import MANIFEST_FILE, REPO_ROOT, Text, prepare_text, word_count, write_manifest
+from scoring import (
+    BHEIJDEN,
+    BHEIJDEN_ARMS,
+    MANIFEST_FILE,
+    PAIRWISE,
+    REPO_ROOT,
+    VOICE_ARM,
+    VOICE_CORPUS,
+    Text,
+    prepare_text,
+    word_count,
+    write_manifest,
+)
 
 logger = logging.getLogger(__name__)
 
 EVAL_DIR = Path(__file__).resolve().parents[1]
-BHEIJDEN = "bheijden"
-PAIRWISE = "pairwise"
-BHEIJDEN_ARMS = {"human": "human", "ai": "corpus-claude-opus-5"}
-VOICE_CORPUS, VOICE_ARM, VOICE_REGISTER = "human-private", "human-jan", "work-doc"
+BHEIJDEN_CORPUS_DIR = EVAL_DIR / ".cache" / "bheijden-slop" / "data" / "corpus"
+VOICE_REGISTER = "work-doc"
 
 
 @dataclass(frozen=True)
@@ -45,7 +55,7 @@ class Sources:
     def default(cls) -> Sources:
         private = REPO_ROOT / ".private" / "eval"
         return cls(
-            bheijden_corpus=EVAL_DIR / ".cache" / "bheijden-slop" / "data" / "corpus",
+            bheijden_corpus=BHEIJDEN_CORPUS_DIR,
             voice_dir=private / "human-private",
             pairwise_generation=private / "pairwise" / "generation",
             pairwise_task_files=(
@@ -68,9 +78,12 @@ def make_text(corpus: str, arm: str, topic: str, register: str, path: Path, repo
     )
 
 
+def bheijden_pairs(corpus_dir: Path) -> list[dict]:
+    return json.loads((corpus_dir / "pairs.json").read_text())["pairs"]
+
+
 def bheijden_registers(corpus_dir: Path) -> dict[str, str]:
-    pairs = json.loads((corpus_dir / "pairs.json").read_text())["pairs"]
-    return {pair["id"]: pair["register"] for pair in pairs}
+    return {pair["id"]: pair["register"] for pair in bheijden_pairs(corpus_dir)}
 
 
 def bheijden_texts(corpus_dir: Path, repo: Path) -> list[Text]:
