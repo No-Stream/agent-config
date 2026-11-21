@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import itertools
 import json
-import math
 import os
 import re
 import tempfile
@@ -133,23 +131,6 @@ def ranks(groups: list[list[str]]) -> dict[str, float]:
             result[letter] = place + (len(group) - 1) / 2
         place += len(group)
     return result
-
-
-def kendall_tau_b(x: Sequence[float], y: Sequence[float]) -> float:
-    """Kendall's tau-b between two equal-length sequences, which may hold ties."""
-    if len(x) != len(y):
-        raise ValueError(f"tau needs equal lengths, got {len(x)} and {len(y)}")
-    concordant = discordant = tied_x = tied_y = 0
-    for (x1, y1), (x2, y2) in itertools.combinations(zip(x, y), 2):
-        x_order, y_order = (x1 > x2) - (x1 < x2), (y1 > y2) - (y1 < y2)
-        tied_x += x_order == 0
-        tied_y += y_order == 0
-        concordant += x_order * y_order > 0
-        discordant += x_order * y_order < 0
-    pairs = len(x) * (len(x) - 1) // 2
-    if tied_x == pairs or tied_y == pairs:
-        raise ValueError(f"tau is undefined when every value ties: {list(x)}, {list(y)}")
-    return (concordant - discordant) / math.sqrt((pairs - tied_x) * (pairs - tied_y))
 
 
 def read_jsonl(path: Path) -> list[dict]:

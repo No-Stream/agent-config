@@ -68,7 +68,11 @@ class TestCommand:
         assert all("--safe-mode" in call["arguments"] for call in claude_calls())
         skill_line = f"- {(tmp_path / 'SKILL.md').resolve()}\n"
         assert all(skill_line in call["prompt"] for call in claude_calls())
-        assert "opus: Kendall tau between the two orders' rankings, mean -1.00" in completed.stderr
+        opus_records = [
+            *recorded(out_dir, "opus", "drawn").values(),
+            *recorded(out_dir, "opus", "reversed").values(),
+        ]
+        assert order_agreement(opus_records) == ([pytest.approx(-1.0)] * 3, 0)
 
     def test_a_rerun_skips_sets_already_ranked(
         self, tmp_path: Path, fake_claude: Path, fake_codex: Path, claude_calls

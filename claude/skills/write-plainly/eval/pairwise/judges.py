@@ -1,6 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
+# dependencies = ["scipy>=1.14"]
 # ///
 """Ask LLM judges to rank each blind passage set, twice, under two different letter orders.
 
@@ -25,10 +26,11 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
+from scipy import stats
+
 from agents import ClaudeCall, ClaudeSettings, run_claude, run_codex
 from common import (
     format_ranking,
-    kendall_tau_b,
     parse_ranking,
     passage_digest,
     ranks,
@@ -185,7 +187,9 @@ def order_agreement(records: list[dict]) -> tuple[list[float], int]:
         first, second = (
             ranks(parse_ranking(by_order[order]["ranking"], letters)) for order in ORDERS
         )
-        taus.append(kendall_tau_b([first[x] for x in letters], [second[x] for x in letters]))
+        first_ranks = [first[letter] for letter in letters]
+        second_ranks = [second[letter] for letter in letters]
+        taus.append(stats.kendalltau(first_ranks, second_ranks).statistic)
         identical += first == second
     return taus, identical
 
