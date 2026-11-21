@@ -69,7 +69,7 @@ MESSAGES = {
     ),
     "bold-run-in": "Bold run-in heading; use a heading or plain prose.",
     "thin-h2-section": (
-        "Section has little body; merge it into a neighbour or make it a minor heading."
+        "Section has little body; merge it into a neighbor or make it a minor heading."
     ),
     "short-paragraph-run": (
         "Run of very short paragraphs; combine related sentences and state how they connect."
@@ -104,6 +104,10 @@ MESSAGES = {
     "rather-than": (
         'Check: contrast with "rather than" or ", not" (advisory). If no reader expects the'
         " alternative, state only what is true."
+    ),
+    "american-spelling": (
+        "British spelling; use the American form (color, center, license, organize, analyze,"
+        " modeling)."
     ),
     "cannot-rule-out": (
         '"Cannot rule out" reads a result off an interval edge; quote the point estimate and'

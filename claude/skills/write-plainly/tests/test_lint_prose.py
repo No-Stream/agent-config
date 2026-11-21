@@ -454,6 +454,28 @@ class TestHistoryInDocument:
         assert _lines("history-in-document", text) == []
 
 
+class TestAmericanSpelling:
+    def test_flags_british_spellings(self) -> None:
+        text = (
+            "The colour of each line marks its branch.\n"
+            "Staff organised the reading lists and are personalising them.\n"
+            "We will optimise the rota so the centre opens on time.\n"
+            "The volunteers analysed the loans, and the modelling took a week.\n"
+            "Each labelled box holds behaviour notes, a licence and a programme.\n"
+        )
+        assert _lines("american-spelling", text) == [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5]
+
+    def test_leaves_american_spellings_and_other_ise_words_alone(self) -> None:
+        text = (
+            "We advertise the exercise class with a precise timetable.\n"
+            "The analyses cover two weeks, and the catalogue lists every organism.\n"
+            "An optimist would call the characteristic delay realistic.\n"
+            "We organized the center, analyzed the loans and practice programming.\n"
+            'The British sign said "colour" and the `colour` field stays.\n'
+        )
+        assert _lines("american-spelling", text) == []
+
+
 class TestAllCapsEmphasis:
     def test_flags_ordinary_words_in_capitals_once_per_run(self) -> None:
         text = (
@@ -716,11 +738,11 @@ class TestComplexSentence:
 
 TREE_SURVEY = (
     "Our street counts its trees every spring.\n\n"
-    "The oak by the school grew 40 centimetres this year and now shades 12 parked cars on sunny"
+    "The oak by the school grew 40 centimeters this year and now shades 12 parked cars on sunny"
     " afternoons in June.\n\n"
     "Some of the young maples lost their leaves early, and the council replaced {maples} of them"
     " with {hornbeams} hornbeams in autumn.\n\n"
-    "The plane trees along the main road are {height} metres tall and drop {bags} bags of bark"
+    "The plane trees along the main road are {height} meters tall and drop {bags} bags of bark"
     " each week.\n\n"
     "A survey found {hedge} bird nests in the hedges and {cherry} in the cherry trees near the"
     " corner shop on the hill.\n\n"

@@ -75,6 +75,22 @@ DISCOURSE_NOUNS = (
     "|summary|update"
 )
 CANNOT = r"(?:can(?:not| not|['’]t)|could(?:n['’]t| not))"
+ISE_STEMS = (
+    "apolog|author|capital|categor|central|character|critic|custom|emphas|final|general|initial"
+    "|local|maxim|memor|minim|modern|normal|optim|organ|parallel|personal|priorit|random|real"
+    "|recogn|regular|serial|special|stabil|standard|summar|synchron|token|util|vector|visual"
+)
+# A closed list: "analyses", "catalogue" and "programming" are American spellings too.
+BRITISH_SPELLING = (
+    rf"(?:{ISE_STEMS})is(?:e|es|ed|er|ers|ing|ation|ations|ational)"
+    r"|(?:analy|cataly|paraly)s(?:e|ed|er|ers|ing)"
+    r"|(?:arm|behavi|col|endeav|fav|flav|harb|hon|hum|lab|neighb|rum|sav|vap)our"
+    r"(?:s|ed|ing|ful|able|ite|ites|al|ally|hood|er|ers)?"
+    r"|(?:cent|fib|lit|(?:centi|kilo|milli)?met)re[sd]?"
+    r"|(?:defen|licen|offen|preten)ces?"
+    r"|(?:model|label|travel|signal)l(?:ed|ing|er|ers)"
+    r"|programmes?|practis(?:e|es|ed|ing)|judgements?|ageing"
+)
 PHRASE_RULES = {
     "stacked-hedge": re.compile(
         r"(?i)\b(?P<hit>(?:may|might|could|can)\s+(?:possibly|potentially|perhaps|conceivably))\b"
@@ -131,6 +147,7 @@ PHRASE_RULES = {
         rf"|(?:we|I)\s+{CANNOT}\s+exclude|{CANNOT}\s+be\s+excluded)\b"
     ),
     "rather-than": re.compile(r"(?i)(?P<hit>\brather than\b|(?<!\w), not\b)"),
+    "american-spelling": re.compile(rf"(?i)\b(?P<hit>{BRITISH_SPELLING})\b"),
 }
 QUOTATION = re.compile(r'"[^"]{1,300}"|“[^”]{1,300}”')
 
