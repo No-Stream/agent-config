@@ -21,7 +21,6 @@ from lint_prose_patterns import (
     ARITHMETIC,
     CAPITALIZED_RUN,
     CLEFT,
-    DEFINED_IN_PARENTHESES,
     DESCRIBED_ID,
     HASH_NUMBER,
     HEX_ID,
@@ -36,10 +35,10 @@ from lint_prose_patterns import (
     PUBLIC_IDS,
     QUOTATION,
     ROMAN_NUMERALS,
+    SERIES,
     SHORT_CODE,
     SPELLED_NUMBER,
     STANDARD_ID_PREFIXES,
-    THREE_ITEM_SERIES,
     TITLE_SMALL_WORDS,
     TRACKER_ID,
     UNIVERSAL_ACRONYMS,
@@ -667,6 +666,18 @@ def _sentence_shape_findings(original_lines: list[str], prose: list[Block]) -> l
     return findings
 
 
+def _three_item_series(text: str, start: int, end: int) -> re.Match[str] | None:
+    """Return the first comma series in the span with exactly two items before its conjunction."""
+    return next(
+        (
+            match
+            for match in SERIES.finditer(text, start, end)
+            if match.group("before_conjunction").count(",") == 1
+        ),
+        None,
+    )
+
+
 def _triad_findings(original_lines: list[str], blocks: list[Block]) -> list[Finding]:
     """Flag each sentence with a three-item series past the free ones in its H1 or H2 section."""
     findings: list[Finding] = []
@@ -678,7 +689,7 @@ def _triad_findings(original_lines: list[str], blocks: list[Block]) -> list[Find
             continue
         text = _mask_quotations(block.text)
         for start, end in _sentence_spans(text):
-            match = THREE_ITEM_SERIES.search(text, start, end)
+            match = _three_item_series(text, start, end)
             if not match:
                 continue
             series += 1
@@ -693,13 +704,29 @@ def _is_ordinary_word(token: str) -> bool:
     return bool(ORDINARY_WORD.fullmatch(token.lower().replace("’", "'")))
 
 
+def _spells(acronym: str, words: str) -> bool:
+    """Whether the initials of the words, with or without small words, or their capitals spell it."""
+    parts = re.split(r"[\s-]+", words)
+    initials = "".join(part[0] for part in parts)
+    content_initials = "".join(part[0] for part in parts if part.lower() not in TITLE_SMALL_WORDS)
+    capitals = re.sub(r"[^A-Z]", "", words)
+    return acronym in (initials.upper(), content_initials.upper(), capitals)
+
+
+def _defined_acronyms(prose: list[Block]) -> dict[str, tuple[int, int]]:
+    """Map each acronym the document defines to the block index and offset of its definition."""
+    defined: dict[str, tuple[int, int]] = {}
+    for index, block in enumerate(prose):
+        for match in ACRONYM_DEFINITION.finditer(block.text):
+            short, long, spelled = match.group("short", "long", "spelled")
+            if short or _spells(long, spelled):
+                defined.setdefault(short or long, (index, match.start()))
+    return defined
+
+
 def _all_caps_findings(original_lines: list[str], prose: list[Block]) -> list[Finding]:
     """Flag a run of capitals that holds an ordinary word the document does not define."""
-    defined = {
-        match.group("acronym")
-        for block in prose
-        for match in DEFINED_IN_PARENTHESES.finditer(block.text)
-    }
+    defined = _defined_acronyms(prose)
     findings: list[Finding] = []
     for block in prose:
         for run in CAPITALIZED_RUN.finditer(_mask_quotations(block.text)):
@@ -712,12 +739,9 @@ def _all_caps_findings(original_lines: list[str], prose: list[Block]) -> list[Fi
 
 def _undefined_acronym_findings(original_lines: list[str], prose: list[Block]) -> list[Finding]:
     """Flag the first use of each acronym when it comes before any definition of it."""
-    first_definition: dict[str, tuple[int, int]] = {}
+    first_definition = _defined_acronyms(prose)
     first_use: dict[str, tuple[int, int]] = {}
     for index, block in enumerate(prose):
-        for match in ACRONYM_DEFINITION.finditer(block.text):
-            acronym = match.group("short") or match.group("long")
-            first_definition.setdefault(acronym, (index, match.start()))
         for match in ACRONYM.finditer(block.text):
             acronym = match.group("acronym")
             line_number, column = block.position(match.start())

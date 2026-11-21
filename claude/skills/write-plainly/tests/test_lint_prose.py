@@ -472,6 +472,18 @@ class TestAllCapsEmphasis:
         )
         assert _lines("all-caps-emphasis", text) == []
 
+    def test_a_word_spelled_out_in_parentheses_is_an_acronym(self) -> None:
+        text = (
+            "The WHO (World Health Organization) published new guidance on clean water this"
+            " spring.\nThe WHO also pays for village wells.\n"
+        )
+        assert _lines("all-caps-emphasis", text) == []
+        assert _lines("undefined-acronym", text) == []
+
+    def test_an_aside_in_parentheses_does_not_excuse_emphasis(self) -> None:
+        text = "Do NOT (under any circumstances) leave the door open.\n"
+        assert _lines("all-caps-emphasis", text) == [1]
+
 
 class TestRatherThan:
     def test_flags_contrasts_the_other_linters_miss(self) -> None:
@@ -539,6 +551,30 @@ class TestTriadDensity:
         text = "## Services\n\n" + "\n".join(THREE_SERIES) + "\n"
         assert _lines("triad-density", text) == [5]
 
+    def test_counts_a_series_with_a_serial_comma(self) -> None:
+        text = (
+            "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
+            "The café sells tea, coffee, and cake.\n"
+        )
+        assert _lines("triad-density", text) == [5]
+
+    def test_a_longer_list_is_not_a_list_of_three(self) -> None:
+        text = (
+            "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
+            "The café sells tea, coffee, cake, soup and bread.\n"
+            "The shop sells maps, pens, cards, and stamps.\n"
+            "Tea gets a shelf, and coffee or cocoa gets a cupboard.\n"
+            "The desk lends laptops, chargers and headphones.\n"
+        )
+        assert _lines("triad-density", text) == [8]
+
+    def test_an_opening_clause_before_a_list_of_three_hides_it(self) -> None:
+        text = (
+            "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
+            "In winter, the branch lends sledges, skates and scarves.\n"
+        )
+        assert _lines("triad-density", text) == []
+
     def test_counts_each_section_and_skips_list_items(self) -> None:
         text = (
             "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n\n"
@@ -592,12 +628,18 @@ class TestUndefinedAcronym:
         text = (
             "We measured time to first page (TTFP), and TTFP fell.\n"
             "TTFB (time to first byte) also fell.\n"
+            "NASA (National Aeronautics and Space Administration) and the AUC (area under the"
+            " curve) both use the CRDT (Conflict-free Replicated Data Type) format.\n"
             "The API returns JSON, and the GPUs and CPUs sit idle.\n"
             "See [the RFC](https://example.com/rfc) and the `CMS` notes.\n"
             "Chapter II covers the TL;DR format. Do NOT skip it.\n"
             "The scans take 60 MB.\n"
         )
         assert _lines("undefined-acronym", text) == []
+
+    def test_an_aside_that_does_not_spell_the_acronym_is_not_a_definition(self) -> None:
+        text = "The CMS (the old catalogue software) stores every loan.\n"
+        assert _lines("undefined-acronym", text) == [1]
 
 
 RIVER_RUN_ON = (

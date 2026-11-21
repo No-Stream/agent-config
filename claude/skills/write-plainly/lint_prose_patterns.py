@@ -148,13 +148,14 @@ CLEFT = re.compile(
     r"|my|your|by|in|with|from|because|when|then|something|what|how|why)\b[^.?!]{0,60}?"
     r" (?:that|who)\b)"
 )
-SERIES_ITEM = r"[\w'’-]+(?:\s+[\w'’-]+){0,3}"
-THREE_ITEM_SERIES = re.compile(rf"\b{SERIES_ITEM},\s+{SERIES_ITEM},?\s+(?:and|or)\s+[\w'’-]+")
+SERIES_ITEM = r"(?!(?:and|or)\b)[\w'’-]+(?:\s+[\w'’-]+){0,3}"
+SERIES = re.compile(
+    rf"\b(?P<before_conjunction>{SERIES_ITEM}(?:,\s+{SERIES_ITEM})+),?\s+(?:and|or)\s+[\w'’-]+"
+)
 
 CAPITALIZED_RUN = re.compile(
     r"(?<![\w'’-])[A-Z]{2,}(?:['’][A-Z]+)?(?:\s+[A-Z]{2,}(?:['’][A-Z]+)?)*(?![\w'’-])"
 )
-DEFINED_IN_PARENTHESES = re.compile(r"\((?P<acronym>[A-Z][A-Za-z0-9]*[A-Z0-9])s?\)")
 # In capitals these words are emphasis; words that are also acronyms (IT, US, OR) are left out.
 ORDINARY_WORDS = (
     "about|above|after|again|against|all|also|always|an|any|anyone|anything|are|as|at|bad|be"
@@ -172,7 +173,8 @@ ORDINARY_WORDS = (
 ORDINARY_WORD = re.compile(rf"(?:{ORDINARY_WORDS})")
 ACRONYM = re.compile(r"(?<![\w&'’-])(?P<acronym>[A-Z]{2,6})s?(?![\w&]|-[\dA-Z]|['’][A-Z])")
 ACRONYM_DEFINITION = re.compile(
-    r"\((?P<short>[A-Z]{2,6})s?\)|(?P<long>[A-Z]{2,6})s?\s+\([A-Za-z][\w'’-]*(?:\s+[\w'’-]+)+[^)]*\)"
+    r"\((?P<short>[A-Z]{2,6})s?\)"
+    r"|\b(?P<long>[A-Z]{2,6})s?\s+\((?P<spelled>[A-Za-z][\w'’-]*(?:\s+[\w'’-]+)+)[^)]*\)"
 )
 UNIVERSAL_ACRONYMS = {"AI", "AM", "API", "CEO", "CPU", "CSS", "CSV", "DR", "EU", "FAQ", "GB", "GPU"}
 UNIVERSAL_ACRONYMS |= {"HTML", "HTTP", "HTTPS", "ID", "IT", "JSON", "KB", "LLM", "MB", "ML", "OK"}
