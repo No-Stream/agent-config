@@ -129,8 +129,16 @@ def files_read(messages: list[dict]) -> tuple[Path, ...]:
     )
 
 
-def run_codex(prompt: str, workdir: Path, output_file: Path, codex_bin: str, timeout_s: int) -> str:
-    """Run `codex exec` read-only and return its final message.
+@dataclass(frozen=True)
+class CodexResult:
+    text: str
+    commands: tuple[str, ...]
+
+
+def run_codex(
+    prompt: str, workdir: Path, output_file: Path, codex_bin: str, timeout_s: int
+) -> CodexResult:
+    """Run `codex exec` read-only; return its final message and the shell commands that succeeded.
 
     The `review` profile is what makes the run read-only; codex silently ignores a missing
     profile and runs write-capable, so its absence is an error here.
@@ -146,6 +154,7 @@ def run_codex(prompt: str, workdir: Path, output_file: Path, codex_bin: str, tim
         "-C",
         str(workdir),
         "--skip-git-repo-check",
+        "--json",
         "-o",
         str(output_file),
         prompt,
@@ -162,4 +171,12 @@ def run_codex(prompt: str, workdir: Path, output_file: Path, codex_bin: str, tim
         raise RuntimeError(f"codex exited {completed.returncode}: {completed.stderr[-2000:]}")
     if not output_file.is_file() or not output_file.read_text().strip():
         raise RuntimeError(f"codex wrote no final message to {output_file}")
-    return output_file.read_text()
+    events = [json.loads(line) for line in completed.stdout.splitlines() if line.strip()]
+    commands = tuple(
+        event["item"]["command"]
+        for event in events
+        if event["type"] == "item.completed"
+        and event["item"]["type"] == "command_execution"
+        and event["item"]["exit_code"] == 0
+    )
+    return CodexResult(text=output_file.read_text(), commands=commands)

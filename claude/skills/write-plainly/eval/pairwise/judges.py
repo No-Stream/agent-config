@@ -155,8 +155,10 @@ def judge_set(run: JudgeRun, judge: str, order: str, passage_set: dict, shown: l
         answer, cost_usd = result.structured, result.cost_usd
     else:
         raw_file = run.out_dir / "raw" / f"codex-{order}-set{set_id}.txt"
-        text = run_codex(prompt, set_file.parent, raw_file, run.codex_bin, run.settings.timeout_s)
-        answer = parse_codex_answer(text)
+        result = run_codex(prompt, set_file.parent, raw_file, run.codex_bin, run.settings.timeout_s)
+        if not any(str(run.skill_file) in command for command in result.commands):
+            raise RuntimeError(f"the codex judge did not read {run.skill_file}")
+        answer = parse_codex_answer(result.text)
     record = {
         "judge": judge,
         "order": order,

@@ -98,6 +98,18 @@ class TestCommand:
         assert completed.returncode != 0 and "RuntimeError" in completed.stderr
         assert not list((tmp_path / "judges").glob("*.json"))
 
+    def test_a_codex_judge_that_skips_the_guidance_stops_the_run(
+        self,
+        tmp_path: Path,
+        fake_claude: Path,
+        fake_codex: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("FAKE_CODEX_SKIP_READS", "1")
+        completed = judge(tmp_path, fake_claude, fake_codex, "--judges", "codex")
+        assert completed.returncode != 0 and "the codex judge did not read" in completed.stderr
+        assert not list((tmp_path / "judges").glob("*.json"))
+
 
 class TestOrders:
     def test_the_second_order_reverses_the_first(self) -> None:
