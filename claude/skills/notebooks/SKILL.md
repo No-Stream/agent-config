@@ -36,7 +36,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to a computa
 - `display()` every frame: only a cell's last bare expression renders, and IPython's output cache keeps that object alive after `del`. Show each matplotlib figure once, with `plt.show()`. Use `print()` for diagnostics.
 - Preview a few rows of the columns you need. Show a finding table (every candidate, every audit row, neutral and negative results included) in full, raising the renderer's row limit (`pl.Config.set_tbl_rows`) instead of filtering.
 - Format for reading: round each metric to the precision it needs (a global three decimals shows 0.0004 as 0.000), cast integer-valued floats to integers, and shorten column names.
-- Keep the saved file small, since every reader loads it: cap figure sizes in helpers that scale with the data, and put per-iteration logs behind a verbosity flag.
+- Keep the saved file small: cap figure sizes in helpers that scale with the data, and put per-iteration logs behind a verbosity flag.
 
 ## Running
 
@@ -51,7 +51,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to a computa
 
 ## Large data
 
-An out-of-memory error means the code materializes something the answer does not need. Compare the step's peak memory with the bytes its needed columns take, and fix the plan before asking for a bigger machine. Every frame a cell binds stays in memory until deleted, so build large intermediates inside functions. On a shared machine, estimate the peak first and stay well under its RAM. The examples use Polars; with pandas, pass `columns=` and `filters=` to `read_parquet` for the same pushdown.
+An out-of-memory error means the code materializes something the answer does not need. Compare the step's peak memory with the bytes its needed columns take, and fix the plan before asking for a bigger machine. Every frame a cell binds stays in memory until deleted, so build large intermediates inside functions. On a shared machine, estimate the peak first and stay well under its RAM. Use Polars for new work and keep pandas only where the code already uses it; there, `read_parquet(columns=, filters=)` gives the same pushdown.
 
 - Put column selection and row filters in the lazy scan, and scan once per split with that split's filter:
 
