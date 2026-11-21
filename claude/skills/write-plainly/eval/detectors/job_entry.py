@@ -20,7 +20,7 @@ from scoring import (
     FALCON,
     FALCON_INSTRUCT,
     ChunkScore,
-    chunk_texts,
+    chunk_encodings,
     read_jsonl,
     score_record,
     write_jsonl,
@@ -41,24 +41,21 @@ def load(name_and_revision: tuple[str, str], device: str) -> AutoModelForCausalL
     ).eval()
 
 
-@torch.inference_mode()
-def chunk_scores(
-    input_ids: torch.Tensor, observer: AutoModelForCausalLM, performer: AutoModelForCausalLM
-) -> tuple[float, float]:
-    """Binoculars as in ahans30/Binoculars `metrics.py`, Fast-DetectGPT's analytic criterion as in
-    baoguangsheng/fast-detect-gpt `get_sampling_discrepancy_analytic`."""
-    observer_logits = observer(input_ids=input_ids.to(observer.device)).logits[0].float()
-    performer_logits = performer(input_ids=input_ids.to(performer.device)).logits[0].float()
-    performer_logits = performer_logits.to(observer_logits.device)
-    labels = input_ids[0, 1:].to(observer_logits.device)
+def falcon_scores(
+    observer_logits: torch.Tensor, performer_logits: torch.Tensor, labels: torch.Tensor
+) -> dict[str, float]:
+    """Both scores of one chunk from each model's logits ([tokens, vocab]) and the next tokens.
 
+    Binoculars as in ahans30/Binoculars `metrics.py`, Fast-DetectGPT's analytic criterion as in
+    baoguangsheng/fast-detect-gpt `get_sampling_discrepancy_analytic`. The observer is
+    Binoculars' observer and Fast-DetectGPT's sampling model; the performer is the other.
+    """
     performer_log_probs = torch.log_softmax(performer_logits, dim=-1)
     observer_probs = torch.softmax(observer_logits, dim=-1)
     label_log_probs = performer_log_probs[:-1].gather(-1, labels[:, None]).squeeze(-1)
-    log_perplexity = -label_log_probs.mean()
     # The reference averages cross-entropy over every position, the last one included.
     cross_entropy = -(observer_probs * performer_log_probs).sum(-1).mean()
-    binoculars = (log_perplexity / cross_entropy).item()
+    binoculars = -label_log_probs.mean() / cross_entropy
 
     reference_probs = observer_probs[:-1]
     scoring_log_probs = performer_log_probs[:-1]
@@ -67,7 +64,20 @@ def chunk_scores(
     fast_detectgpt = (
         label_log_probs.sum() - mean_reference.sum()
     ) / variance_reference.sum().sqrt()
-    return binoculars, fast_detectgpt.item()
+    return {"binoculars": binoculars.item(), "fast-detectgpt": fast_detectgpt.item()}
+
+
+@torch.inference_mode()
+def chunk_scores(
+    input_ids: torch.Tensor, observer: AutoModelForCausalLM, performer: AutoModelForCausalLM
+) -> dict[str, float]:
+    observer_logits = observer(input_ids=input_ids.to(observer.device)).logits[0].float()
+    performer_logits = performer(input_ids=input_ids.to(performer.device)).logits[0].float()
+    return falcon_scores(
+        observer_logits,
+        performer_logits.to(observer_logits.device),
+        input_ids[0, 1:].to(observer_logits.device),
+    )
 
 
 def main() -> None:
@@ -96,19 +106,13 @@ def main() -> None:
     records: dict[str, list[dict]] = {"binoculars": [], "fast-detectgpt": []}
     rows = read_jsonl(args.texts)
     for index, row in enumerate(rows, 1):
-        offsets = tokenizer(row["text"], add_special_tokens=False, return_offsets_mapping=True)[
-            "offset_mapping"
-        ]
         binoculars_chunks, fast_chunks = [], []
-        for chunk, size in chunk_texts(row["text"], offsets, WINDOW):
-            input_ids = tokenizer(
-                chunk, truncation=True, max_length=WINDOW, return_tensors="pt"
-            ).input_ids
-            binoculars, fast_detectgpt = chunk_scores(input_ids, observer, performer)
-            binoculars_chunks.append(ChunkScore(size, binoculars))
-            fast_chunks.append(ChunkScore(size, fast_detectgpt))
+        for encoding, size in chunk_encodings(tokenizer, row["id"], row["text"], WINDOW):
+            scores = chunk_scores(encoding["input_ids"], observer, performer)
+            binoculars_chunks.append(ChunkScore(size, scores["binoculars"]))
+            fast_chunks.append(ChunkScore(size, scores["fast-detectgpt"]))
         for name, chunks in (("binoculars", binoculars_chunks), ("fast-detectgpt", fast_chunks)):
-            records[name].append(score_record(row["id"], row["sha256"], name, WINDOW, chunks))
+            records[name].append(score_record(row["id"], row["sha256"], DETECTORS[name], chunks))
         logger.info(
             f"{index}/{len(rows)} {row['id']}: binoculars {records['binoculars'][-1]['score']:.4f}"
             f" fast-detectgpt {records['fast-detectgpt'][-1]['score']:.3f}"

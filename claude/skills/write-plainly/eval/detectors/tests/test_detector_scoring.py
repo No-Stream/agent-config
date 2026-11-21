@@ -9,10 +9,12 @@ from scoring import (
     ChunkScore,
     Text,
     aggregate,
+    chunk_encodings,
     chunk_spans,
     chunk_texts,
     prepare_text,
     read_manifest,
+    require_scored,
     score_record,
     split_pending,
     text_sha256,
@@ -23,6 +25,27 @@ from scoring import (
 
 def word_offsets(text: str) -> list[tuple[int, int]]:
     return [match.span() for match in re.finditer(r"\S+", text)]
+
+
+@dataclasses.dataclass
+class WordTokenizer:
+    """One token per word, `special` tokens around each encoding, and `extra` more on a chunk."""
+
+    special: int
+    extra: int = 0
+
+    def __call__(
+        self,
+        text: str,
+        add_special_tokens: bool = True,
+        return_offsets_mapping: bool = False,
+        return_tensors: str | None = None,
+    ) -> dict:
+        offsets = word_offsets(text)
+        ids = list(range(len(offsets) + self.special * add_special_tokens))
+        if return_tensors:
+            return {"input_ids": [ids + list(range(self.extra))]}
+        return {"input_ids": ids, "offset_mapping": offsets}
 
 
 class TestChunkSpans:
@@ -61,6 +84,19 @@ class TestChunkTexts:
         assert chunk_texts(text, word_offsets(text), window=512) == [(text, 3)]
 
 
+class TestChunkEncodings:
+    def test_chunks_leave_room_for_special_tokens_and_fill_the_window(self):
+        text = " ".join(f"word{index}" for index in range(12))
+        chunks = chunk_encodings(WordTokenizer(special=2), "t", text, window=6)
+        assert [size for _, size in chunks] == [4, 4, 4]
+        assert [len(encoding["input_ids"][0]) for encoding, _ in chunks] == [6, 6, 6]
+
+    def test_a_chunk_that_tokenizes_past_the_window_is_refused(self):
+        text = " ".join(f"word{index}" for index in range(8))
+        with pytest.raises(ValueError, match="t-long"):
+            chunk_encodings(WordTokenizer(special=2, extra=1), "t-long", text, window=6)
+
+
 class TestAggregate:
     def test_token_weighted_mean_and_extremes(self):
         result = aggregate([ChunkScore(300, 2.0), ChunkScore(100, -2.0)])
@@ -71,6 +107,11 @@ class TestAggregate:
     def test_no_chunks_is_an_error(self):
         with pytest.raises(ValueError):
             aggregate([])
+
+    @pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+    def test_a_non_finite_chunk_score_is_an_error(self, bad):
+        with pytest.raises(ValueError):
+            aggregate([ChunkScore(3, 1.0), ChunkScore(3, bad)])
 
 
 class TestPrepareText:
@@ -118,14 +159,13 @@ class TestManifestFile:
 
 
 class TestRescoring:
-    def test_only_new_or_changed_texts_or_a_changed_window_are_rescored(self, tmp_path):
+    @pytest.mark.parametrize("change", [{"window": 512}, {"revision": "0" * 40}])
+    def test_only_new_or_changed_texts_or_a_changed_detector_are_rescored(self, tmp_path, change):
         detector = DETECTORS["desklib"]
         scores_file = tmp_path / "desklib.jsonl"
         old = {"same": "unchanged text", "edited": "old text", "gone": "removed text"}
         records = {
-            text_id: score_record(
-                text_id, text_sha256(text), detector.name, detector.window, [ChunkScore(3, 1.0)]
-            )
+            text_id: score_record(text_id, text_sha256(text), detector, [ChunkScore(3, 1.0)])
             for text_id, text in old.items()
         }
         write_scores(scores_file, old, records)
@@ -133,8 +173,7 @@ class TestRescoring:
         kept, pending = split_pending(now, scores_file, detector)
         assert set(kept) == {"same"} and set(pending) == {"edited", "added"}
 
-        rewindowed = dataclasses.replace(detector, window=512)
-        _, pending = split_pending(now, scores_file, rewindowed)
+        _, pending = split_pending(now, scores_file, dataclasses.replace(detector, **change))
         assert set(pending) == set(now)
 
     def test_write_scores_keeps_manifest_order_and_reports_unscored(self, tmp_path):
@@ -142,3 +181,12 @@ class TestRescoring:
         unscored = write_scores(tmp_path / "s.jsonl", ["a", "b", "c"], records)
         rows = [json.loads(line) for line in (tmp_path / "s.jsonl").read_text().splitlines()]
         assert [row["id"] for row in rows] == ["a", "b"] and unscored == ["c"]
+
+
+class TestRequireScored:
+    def test_names_every_detector_with_unscored_texts(self):
+        with pytest.raises(RuntimeError, match="binoculars.*fast-detectgpt"):
+            require_scored({"binoculars": ["a"], "fast-detectgpt": ["a", "b"]}, "job-1")
+
+    def test_passes_when_every_text_is_scored(self):
+        require_scored({"binoculars": [], "fast-detectgpt": []}, "job-1")

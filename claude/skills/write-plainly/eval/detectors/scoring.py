@@ -7,12 +7,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import unicodedata
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, fields
 from itertools import pairwise
 from pathlib import Path
+from typing import Any
 
 WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’.%-]*")  # the word rule of pairwise/common.py
 TYPOGRAPHY = str.maketrans(
@@ -186,7 +188,7 @@ def check_unique_ids(texts: Sequence[Text]) -> None:
 
 
 def chunk_spans(n_tokens: int, window: int) -> list[tuple[int, int]]:
-    """Split n tokens into the fewest chunks of at most `window` tokens, as equal in size as possible.
+    """Split n tokens into the fewest chunks of at most `window` tokens, of nearly equal size.
 
     Equal sizes keep a short tail chunk, whose score is noisy, from deciding the per-chunk extremes.
     """
@@ -212,10 +214,37 @@ def chunk_texts(
     ]
 
 
+def chunk_encodings(
+    tokenizer: Callable[..., Mapping[str, Any]], text_id: str, text: str, window: int
+) -> list[tuple[Mapping[str, Any], int]]:
+    """Each chunk's model input from a `transformers` tokenizer, with the chunk's size in tokens.
+
+    A chunk holds at most `window` tokens less the tokenizer's special tokens. A chunk that
+    tokenizes on its own to more than `window` tokens raises rather than lose its tail.
+    """
+    content_window = window - len(tokenizer("")["input_ids"])
+    offsets = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)[
+        "offset_mapping"
+    ]
+    encodings = []
+    for chunk, size in chunk_texts(text, offsets, content_window):
+        encoding = tokenizer(chunk, return_tensors="pt")
+        length = len(encoding["input_ids"][0])
+        if length > window:
+            raise ValueError(
+                f"{text_id}: a {size}-token chunk tokenizes to {length} tokens, over {window=}"
+            )
+        encodings.append((encoding, size))
+    return encodings
+
+
 def aggregate(chunks: Sequence[ChunkScore]) -> dict:
     """Token-weighted mean over chunks, plus the per-chunk extremes and the chunk scores."""
     if not chunks:
         raise ValueError("no chunks to aggregate")
+    non_finite = [chunk.score for chunk in chunks if not math.isfinite(chunk.score)]
+    if non_finite:
+        raise ValueError(f"non-finite chunk scores: {non_finite}")
     total = sum(chunk.tokens for chunk in chunks)
     return {
         "score": sum(chunk.tokens * chunk.score for chunk in chunks) / total,
@@ -227,25 +256,27 @@ def aggregate(chunks: Sequence[ChunkScore]) -> dict:
     }
 
 
-def score_record(text_id: str, sha: str, detector: str, window: int, chunks: Sequence[ChunkScore]):
+def score_record(text_id: str, sha: str, detector: Detector, chunks: Sequence[ChunkScore]):
     return {
         "id": text_id,
         "sha256": sha,
-        "detector": detector,
-        "window": window,
+        "detector": detector.name,
+        "revision": detector.revision,
+        "window": detector.window,
         **aggregate(chunks),
     }
 
 
 def reusable_scores(
-    existing: Sequence[dict], wanted: dict[str, str], detector: str, window: int
+    existing: Sequence[dict], wanted: dict[str, str], detector: Detector
 ) -> dict[str, dict]:
-    """Existing records still valid for the wanted {id: sha256}: same text, detector and window."""
+    """Records still valid for the wanted {id: sha256}: same text, detector, revision and window."""
     return {
         row["id"]: row
         for row in existing
-        if row["detector"] == detector
-        and row["window"] == window
+        if row["detector"] == detector.name
+        and row["revision"] == detector.revision
+        and row["window"] == detector.window
         and wanted.get(row["id"]) == row["sha256"]
     }
 
@@ -260,7 +291,7 @@ def split_pending(
     """The score records still valid for these texts, and the texts that need scoring."""
     wanted = {text_id: text_sha256(text) for text_id, text in prepared.items()}
     existing = read_jsonl(scores_file) if scores_file.exists() else []
-    kept = reusable_scores(existing, wanted, detector.name, detector.window)
+    kept = reusable_scores(existing, wanted, detector)
     return kept, {text_id: text for text_id, text in prepared.items() if text_id not in kept}
 
 
@@ -269,3 +300,10 @@ def write_scores(scores_file: Path, order: Iterable[str], records: dict[str, dic
     order = list(order)
     write_jsonl((records[text_id] for text_id in order if text_id in records), scores_file)
     return [text_id for text_id in order if text_id not in records]
+
+
+def require_scored(unscored: dict[str, list[str]], context: str) -> None:
+    """Raise naming every detector that left texts unscored, once all their scores are written."""
+    missing = {name: text_ids for name, text_ids in unscored.items() if text_ids}
+    if missing:
+        raise RuntimeError(f"{context}: texts left unscored: {missing}")

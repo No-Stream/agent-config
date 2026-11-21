@@ -16,8 +16,8 @@
 # ///
 """Score every manifest text with the CPU classifiers, writing one JSONL per detector.
 
-A text already scored with the same prepared text and window keeps its record, so a rerun scores
-only new or changed texts.
+A text already scored with the same prepared text, model revision and window keeps its record, so
+a rerun scores only new or changed texts.
 """
 
 from __future__ import annotations
@@ -38,9 +38,10 @@ from scoring import (
     DETECTORS,
     ChunkScore,
     Detector,
-    chunk_texts,
+    chunk_encodings,
     prepared_texts,
     read_manifest,
+    require_scored,
     score_record,
     split_pending,
     text_sha256,
@@ -63,6 +64,7 @@ HOMOGLYPHS = dict(
 )
 LOOKALIKE = re.compile("[" + "".join(HOMOGLYPHS) + "]")
 GREEK_CYRILLIC = re.compile("[Ͱ-ϿЀ-ԯ]")
+VARIATION_SELECTORS = re.compile("[\ufe00-\ufe0f]")
 LATIN = re.compile("[A-Za-z]")
 LETTERS = re.compile(r"[^\W\d_]+")
 
@@ -71,6 +73,7 @@ Scorer = Callable[[dict[str, torch.Tensor]], float]
 
 def gpttrace_normalize(text: str) -> str:
     """normalize_text from gpttrace's normalize.py; `prepare_text` already did the rest."""
+    text = VARIATION_SELECTORS.sub("", text)
     lookalikes = LOOKALIKE.findall(text)
     if not lookalikes:
         return text
@@ -142,22 +145,15 @@ LOADERS = {"desklib": load_desklib, "gpttrace": load_gpttrace}
 @torch.inference_mode()
 def score_texts(detector: Detector, pending: dict[str, str]) -> dict[str, dict]:
     tokenizer, score, normalize = LOADERS[detector.name](detector)
-    content_window = detector.window - len(tokenizer("").input_ids)
     records = {}
     for index, (text_id, text) in enumerate(pending.items(), 1):
-        model_text = normalize(text)
-        offsets = tokenizer(model_text, add_special_tokens=False, return_offsets_mapping=True)[
-            "offset_mapping"
-        ]
-        chunks = []
-        for chunk, size in chunk_texts(model_text, offsets, content_window):
-            encoding = tokenizer(
-                chunk, truncation=True, max_length=detector.window, return_tensors="pt"
+        chunks = [
+            ChunkScore(size, score(encoding))
+            for encoding, size in chunk_encodings(
+                tokenizer, text_id, normalize(text), detector.window
             )
-            chunks.append(ChunkScore(size, score(encoding)))
-        records[text_id] = score_record(
-            text_id, text_sha256(text), detector.name, detector.window, chunks
-        )
+        ]
+        records[text_id] = score_record(text_id, text_sha256(text), detector, chunks)
         logger.info(
             f"{detector.name} {index}/{len(pending)} {text_id}: {records[text_id]['score']:.3f}"
         )
@@ -177,6 +173,7 @@ def main() -> None:
     torch.set_num_threads(args.threads)
     texts = read_manifest(args.manifest)
     prepared = prepared_texts(texts, REPO)
+    unscored = {}
     for name in args.detectors:
         detector = DETECTORS[name]
         scores_file = args.scores / f"{name}.jsonl"
@@ -184,10 +181,9 @@ def main() -> None:
         logger.info(f"{name}: {len(kept)} texts already scored, {len(pending)} to score")
         started = time.monotonic()
         new = score_texts(detector, pending) if pending else {}
-        unscored = write_scores(scores_file, prepared, {**kept, **new})
-        if unscored:
-            raise RuntimeError(f"{name}: texts left unscored: {unscored}")
+        unscored[name] = write_scores(scores_file, prepared, {**kept, **new})
         logger.info(f"{name}: wrote {scores_file} in {time.monotonic() - started:.0f} s")
+    require_scored(unscored, "score_local")
 
 
 if __name__ == "__main__":

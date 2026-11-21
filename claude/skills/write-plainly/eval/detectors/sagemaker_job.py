@@ -29,6 +29,8 @@ from scoring import (
     GPU_DETECTORS,
     prepared_texts,
     read_manifest,
+    require_scored,
+    reusable_scores,
     split_pending,
     text_sha256,
     write_scores,
@@ -174,21 +176,18 @@ def fetch(
 ) -> None:
     s3 = session.client("s3", config=RETRIES)
     prepared = prepared_texts(read_manifest(manifest), REPO)
+    wanted = {text_id: text_sha256(text) for text_id, text in prepared.items()}
+    unscored = {}
     for name in GPU_DETECTORS:
         scores_file = scores_dir / f"{name}.jsonl"
         kept, _ = split_pending(prepared, scores_file, DETECTORS[name])
         lines = get(s3, job_uri(config, job, f"output/{name}.jsonl")).decode().splitlines()
         fetched = [json.loads(line) for line in lines if line.strip()]
-        current = {
-            row["id"]: row
-            for row in fetched
-            if row["id"] in prepared and row["sha256"] == text_sha256(prepared[row["id"]])
-        }
-        unscored = write_scores(scores_file, prepared, {**kept, **current})
+        current = reusable_scores(fetched, wanted, DETECTORS[name])
+        unscored[name] = write_scores(scores_file, prepared, {**kept, **current})
         logger.info(f"{name}: merged {len(current)} scores from {job} into {scores_file}")
-        if unscored:
-            logger.warning(f"{name}: {len(unscored)} texts still unscored: {unscored}")
     logger.info(f"{job}: {get(s3, job_uri(config, job, 'output/job.json')).decode()}")
+    require_scored(unscored, job)
 
 
 def main() -> None:
