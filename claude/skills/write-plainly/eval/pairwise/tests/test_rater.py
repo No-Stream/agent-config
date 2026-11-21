@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from conftest import SET_LETTERS, SET_PIPELINES
 
 from rater import (
     GRADE_POINTS,
@@ -22,30 +23,6 @@ from rater import (
 )
 
 RATER_SCRIPT = Path(__file__).resolve().parents[1] / "rater.py"
-LETTERS = ("A", "B", "C")
-PIPELINES = ("kestrel-pipeline", "osprey-pipeline", "plover-pipeline")
-
-
-def make_set(set_id: str) -> dict:
-    return {
-        "set_id": set_id,
-        "doc_type": "README section",
-        "reader": "Ana, who asks <why> & how",
-        "passages": {
-            letter: f'Passage {letter} of set {set_id} says 5 < 6 & "quotes" stay.'
-            for letter in LETTERS
-        },
-    }
-
-
-@pytest.fixture
-def sets_file(tmp_path: Path) -> Path:
-    """Three sets of three passages, with a key beside them naming the pipelines."""
-    path = tmp_path / "sets.jsonl"
-    path.write_text("".join(json.dumps(make_set(set_id)) + "\n" for set_id in ("1", "2", "3")))
-    key = {"sets": {set_id: dict(zip(LETTERS, PIPELINES)) for set_id in ("1", "2", "3")}}
-    (tmp_path / "key.json").write_text(json.dumps(key))
-    return path
 
 
 def line(sets_file: Path, sets: str, notes: dict | None = None) -> str:
@@ -103,7 +80,7 @@ class TestBuild:
             for text in passage_set["passages"].values():
                 assert f"<p>{html.escape(text)}</p>" in page
         assert "<why>" not in page and "5 < 6" not in page
-        assert not [name for name in PIPELINES if name in page]
+        assert not [name for name in SET_PIPELINES if name in page]
         assert page.count('<section class="task"') == 3
         assert page.count("data-grade=") == 3 * 3 * len(GRADE_POINTS)
 
@@ -115,7 +92,7 @@ class TestBuild:
         assert json.loads(meta_text) == {
             "version": "wp1",
             "digest": sets_digest(sets_file),
-            "sets": [{"id": set_id, "letters": list(LETTERS)} for set_id in ("1", "2", "3")],
+            "sets": [{"id": set_id, "letters": list(SET_LETTERS)} for set_id in ("1", "2", "3")],
         }
 
     def test_the_command_writes_the_page(self, sets_file: Path) -> None:

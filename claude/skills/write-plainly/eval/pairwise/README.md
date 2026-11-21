@@ -31,7 +31,7 @@ The analysis that unblinds the grades is not in this repo; it runs beside the pr
    ```
 6. Judge: `uv run judges.py --sets eval/sets.jsonl --skill ../../SKILL.md --out eval/judges --seed 20261120`. The judge calls run four at a time; `--jobs` changes that. A rerun skips sets already ranked; a ranking on disk of other passages or another letter order (from another sets file or seed) stops the run, so a different set needs a fresh `--out`. At the end it prints each judge's agreement with itself across the two orders.
 
-Tests: `uv run --no-project --with pytest python -m pytest tests` from this directory. The runner and judge tests use stand-in `claude` and `codex` executables from `tests/fakes/`. The grading tests cover the page's HTML and the result line, but not the page's script, which has no automated test.
+Tests: `uv run --no-project --with pytest --with playwright==1.64.0 python -m pytest tests` from this directory. The runner and judge tests use stand-in `claude` and `codex` executables from `tests/fakes/`. The grading tests cover the page's HTML and the result line, and drive the page's script in headless Chromium under the sandbox header: grading, clearing and changing a grade, a note, moving between tasks, restoring from `window.name` and from the `#` fragment, and recording the page's line. That test needs Playwright's Chromium (`uv run --no-project --with playwright==1.64.0 playwright install chromium` once) and is skipped when Playwright is not installed.
 
 ## Grading
 

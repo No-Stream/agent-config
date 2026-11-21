@@ -7,6 +7,8 @@ import pytest
 PAIRWISE_DIR = Path(__file__).resolve().parents[1]
 FAKES_DIR = Path(__file__).resolve().parent / "fakes"
 sys.path.insert(0, str(PAIRWISE_DIR))
+SET_LETTERS = ("A", "B", "C")
+SET_PIPELINES = ("kestrel-pipeline", "osprey-pipeline", "plover-pipeline")
 
 STUB_TASKS = '''
 [[task]]
@@ -63,6 +65,28 @@ def claude_calls(tmp_path: Path):
         return [json.loads(line) for line in log_file.read_text().splitlines()]
 
     return read
+
+
+def make_set(set_id: str) -> dict:
+    return {
+        "set_id": set_id,
+        "doc_type": "README section",
+        "reader": "Ana, who asks <why> & how",
+        "passages": {
+            letter: f'Passage {letter} of set {set_id} says 5 < 6 & "quotes" stay.'
+            for letter in SET_LETTERS
+        },
+    }
+
+
+@pytest.fixture
+def sets_file(tmp_path: Path) -> Path:
+    """Three sets of three passages, with a key beside them naming the pipelines."""
+    path = tmp_path / "sets.jsonl"
+    path.write_text("".join(json.dumps(make_set(set_id)) + "\n" for set_id in ("1", "2", "3")))
+    key = {"sets": {set_id: dict(zip(SET_LETTERS, SET_PIPELINES)) for set_id in ("1", "2", "3")}}
+    (tmp_path / "key.json").write_text(json.dumps(key))
+    return path
 
 
 @pytest.fixture
