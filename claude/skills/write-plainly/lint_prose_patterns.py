@@ -226,8 +226,9 @@ SPELLED_NUMBER = re.compile(
     r"(?P<times>\s+times\b)?"
 )
 LARGE_SPELLED_NUMBER = re.compile(rf"(?i)\b{LARGE_NUMBER_WORD}\b")
-YEAR_ORDINAL_OR_VERSION = re.compile(r"(?:1[6-9]|20)\d\ds?|\d+(?:st|nd|rd|th)|\d+(?:\.\d+){2,}")
-ENDPOINT = r"[-+−]?[$€£]?\d[\d.,]*%?"
+YEAR = r"(?:1[6-9]|20)\d\d"
+YEAR_ORDINAL_OR_VERSION = re.compile(rf"{YEAR}s?|\d+(?:st|nd|rd|th)|\d+(?:\.\d+){{2,}}")
+ENDPOINT = rf"(?!{YEAR}\b)[-+−]?[$€£]?\d[\d.,]*%?"
 INTERVAL_PAIR = rf"\s*{ENDPOINT}\s*,(?!\d{{3}}(?!\d))\s*{ENDPOINT}\s*"
 INTERVAL_LABEL = (
     r"(?:\d+(?:\.\d+)?%\s*(?:[\w-]+\s+)?|(?i:confidence|credible)\s+)(?:CI|(?i:intervals?))\b"
