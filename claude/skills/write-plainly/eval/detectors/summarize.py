@@ -238,14 +238,15 @@ def chunk_noise_line(texts: Sequence[Text], scores: dict[str, dict]) -> str:
         statistics.stdev(scores[text.id]["chunk_scores"])
         for text in texts
         if text.id in scores
+        and text.arm not in HUMAN_ARMS
         and text.arm not in PLANTED_ARMS
         and len(scores[text.id]["chunk_scores"]) > 1
     ]
     if not deviations:
-        return "No text outside the planted controls has two or more chunks."
+        return "No model draft outside the planted controls has two or more chunks."
     return (
         "Median standard deviation between the chunks of one text, over the "
-        f"{len(deviations)} texts outside the planted controls with two or more chunks: "
+        f"{len(deviations)} model drafts outside the planted controls with two or more chunks: "
         f"{statistics.median(deviations):.3f}."
     )
 
