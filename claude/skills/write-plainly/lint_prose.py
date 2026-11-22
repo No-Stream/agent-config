@@ -42,6 +42,7 @@ from lint_prose_patterns import (
     ACRONYM,
     ACRONYM_DEFINITION,
     ANNOUNCING_COLON,
+    ANNOUNCING_NOTES,
     ANNOUNCING_QUESTION,
     CAPITALIZED_RUN,
     CLEFT,
@@ -57,6 +58,7 @@ from lint_prose_patterns import (
     PHRASE_RULES,
     PRONOUN_I_AFTER_LABEL,
     PUBLIC_IDS,
+    REVERSE_CLEFT,
     ROMAN_NUMERALS,
     SECTION_LABEL_HEADING,
     SECTION_LABEL_RUN_IN,
@@ -102,29 +104,33 @@ MESSAGES = {
     ),
     "inverted-animacy-check": (
         "Check: a thing that earns, holds, buys or wins (advisory). Make the person the subject,"
-        " or say what the thing has or contains."
+        " or say what the thing has or contains. Another verb that gives the thing the same"
+        ' agency ("came out ahead") is not a fix.'
     ),
     "back-reference": (
         "Check: points back to earlier text (advisory). Restate the thing here so this text"
         " stands alone."
     ),
     "announcing-sentence": (
-        "Check: sentence only announces what follows (advisory). Say the point itself."
+        "Check: sentence only announces what follows (advisory). Say the point itself. Dropping"
+        ' the colon or a word such as "honest" still announces.'
     ),
     "stock-emphasis": (
         "Stock emphasis phrase; cut it, or state the fact that makes the point. Another emphasis"
         " phrase in its place is not a fix."
     ),
     "history-in-document": (
-        "Edit history in the text; state the current fact and drop what it replaced."
+        "Edit history in the text; state the current fact and drop what it replaced. Rewording"
+        ' the old state ("also called", "initially") is not a fix.'
     ),
     "all-caps-emphasis": (
         "Ordinary word in capitals; use italics or plain wording, or backticks if it is code."
     ),
     "rather-than": (
-        'Check: contrast with "rather than", ", not" or "less about ... more about" (advisory).'
-        " If no reader expects the alternative, state only what is true;"
-        ' "instead of" is the same contrast.'
+        "Check: a contrast with an alternative the reader may not hold (advisory). If no reader"
+        ' expects the alternative, state what the thing is and what follows from it ("the branch'
+        ' lends tools, so members can borrow a drill"). Swapping in "instead of", "as opposed to"'
+        " or a second sentence about what it is not is the same contrast."
     ),
     "american-spelling": (
         "British spelling; use the American form (color, center, license, organize, analyze,"
@@ -137,6 +143,23 @@ MESSAGES = {
     ),
     "cleft-sentence": (
         "Check: cleft sentence (advisory). Try the plain clause with the real subject first."
+        ' Moving the frame into another form ("is the thing that", "is why") is not a fix.'
+    ),
+    "power-read": (
+        "Check: a result read off the test's power, or a winner the intervals do not separate"
+        " (advisory). Give the point estimate and say in words how large an effect it is. If"
+        ' power matters, say it plainly ("the survey is too small to show a difference between'
+        ' branches, and we found none"), with the detectable size in a table or footnote. Show'
+        " overlapping results as ranks with their intervals."
+    ),
+    "universal-negative": (
+        "Check: a claim that nothing exists or ever happened (advisory). Say what you searched"
+        ' and that you found none ("we could not find a branch that..."); the same absolute'
+        ' claim in other words ("branches to date have not...") is not a fix.'
+    ),
+    "number-notation": (
+        "Write a share as a percentage (1.8%) and a ranking metric at a cutoff as NDCG@10."
+        ' "Per hundred", "in every 100" and spelled-out forms are the same notation.'
     ),
     "triad-density": (
         f"Check: more than {FREE_TRIADS_PER_SECTION} lists of three in this section (advisory);"
@@ -394,9 +417,12 @@ def _sentence_shape(sentence: str) -> str | None:
     """Name the shape rule a sentence breaks: an announcement of what follows, or a cleft."""
     plain = re.sub(r"[*_]", "", " ".join(sentence.split())).replace("’", "'").lstrip("'(")
     short = len(WORD.findall(plain)) <= ANNOUNCING_QUESTION_MAX_WORDS
-    if ANNOUNCING_COLON.match(plain) or (short and ANNOUNCING_QUESTION.match(plain)):
+    if ANNOUNCING_COLON.match(plain) or ANNOUNCING_NOTES.match(plain):
         return "announcing-sentence"
-    if CLEFT.match(plain) and not plain.rstrip("')]").endswith("?"):
+    if short and ANNOUNCING_QUESTION.match(plain):
+        return "announcing-sentence"
+    cleft = CLEFT.match(plain) or REVERSE_CLEFT.search(plain)
+    if cleft and not plain.rstrip("')]").endswith("?"):
         return "cleft-sentence"
     return None
 
