@@ -2,9 +2,12 @@ import pytest
 from scoring import DETECTORS, ChunkScore, Text, score_record, scores_file, text_sha256, write_jsonl
 from summarize import (
     PLANTED_CONTRASTS,
+    bheijden_scores,
+    bheijden_words,
     chunk_noise_line,
     contrast_table,
     overview_table,
+    paired,
     past_cutoff,
     provenance_table,
     spread_line,
@@ -33,33 +36,49 @@ def bheijden_texts(arms: dict[str, list[float]]) -> tuple[list[Text], dict[str, 
     return texts, scores
 
 
+def by_arm_of(arms: dict[str, list[float]]) -> dict[str, dict[str, float]]:
+    return bheijden_scores(*bheijden_texts(arms))
+
+
+class TestPaired:
+    def test_pairs_the_topics_both_arms_scored_in_topic_order(self):
+        by_arm = {"first": {"t2": 3.0, "t0": 1.0, "t1": 2.0}, "second": {"t1": 5.0, "t0": 4.0}}
+        assert paired(by_arm, "first", "second") == [("t0", 1.0, 4.0), ("t1", 2.0, 5.0)]
+
+    def test_one_shared_topic_or_a_missing_arm_is_no_pairing(self):
+        by_arm = {"first": {"t0": 1.0, "t1": 2.0}, "second": {"t0": 4.0}}
+        assert paired(by_arm, "first", "second") == []
+        assert paired(by_arm, "first", "absent") == []
+
+
 class TestProvenanceTable:
     @pytest.mark.parametrize(
-        ("detector", "human_less_ai_like"),
+        ("detector", "model_more_ai_like"),
         [
             ("desklib", "3/4 | 0.30 to 0.95 | 2/2 | 1/2"),
             ("binoculars", "1/4 | 0.05 to 0.70 | 0/2 | 1/2"),
         ],
     )
-    def test_human_less_ai_like_follows_the_detector_direction(self, detector, human_less_ai_like):
-        texts, scores = bheijden_texts(
-            {"human": [0.1, 0.2, 0.3, 0.9], "no-skill": [0.5, 0.6, 0.7, 0.8]}
-        )
-        row = provenance_table(DETECTORS[detector], texts, scores, YEARS).splitlines()[-1]
-        assert row == f"| no-skill | 4 | {human_less_ai_like} | -0.400 | -0.275 (-0.673 to 0.123) |"
+    def test_model_minus_human_follows_the_detector_direction(self, detector, model_more_ai_like):
+        by_arm = by_arm_of({"human": [0.1, 0.2, 0.3, 0.9], "no-skill": [0.5, 0.6, 0.7, 0.8]})
+        row = provenance_table(DETECTORS[detector], by_arm, YEARS).splitlines()[-1]
+        assert row == f"| no-skill | 4 | {model_more_ai_like} | 0.400 | 0.275 (-0.123 to 0.673) |"
 
     def test_planted_arms_are_left_out(self):
-        texts, scores = bheijden_texts({"human": [0.1, 0.2, 0.3], **PLANTED})
-        rows = provenance_table(DETECTORS["gpttrace"], texts, scores, YEARS).splitlines()[2:]
+        by_arm = by_arm_of({"human": [0.1, 0.2, 0.3], **PLANTED})
+        rows = provenance_table(DETECTORS["gpttrace"], by_arm, YEARS).splitlines()[2:]
         assert [row.split(" | ")[0] for row in rows] == ["| skill-draft"]
 
 
 class TestContrastTable:
     def test_each_contrast_is_paired_by_topic_with_its_word_counts(self):
         texts, scores = bheijden_texts(PLANTED)
-        rows = contrast_table(DETECTORS["gpttrace"], texts, scores, PLANTED_CONTRASTS).splitlines()[
-            2:
-        ]
+        rows = contrast_table(
+            DETECTORS["gpttrace"],
+            bheijden_scores(texts, scores),
+            bheijden_words(texts),
+            PLANTED_CONTRASTS,
+        ).splitlines()[2:]
         assert rows[0] == (
             "| degraded minus neutral-rewrite | 3 | 3/3 | 0.44 to 1.00 | 1.500 | "
             "1.500 (-0.984 to 3.984) | 1.000 | 120 / 100 |"
@@ -69,15 +88,22 @@ class TestContrastTable:
     def test_more_ai_like_follows_the_detector_direction(self):
         texts, scores = bheijden_texts(PLANTED)
         rows = contrast_table(
-            DETECTORS["binoculars"], texts, scores, PLANTED_CONTRASTS
+            DETECTORS["binoculars"],
+            bheijden_scores(texts, scores),
+            bheijden_words(texts),
+            PLANTED_CONTRASTS,
         ).splitlines()[2:]
         assert [row.split(" | ")[2] for row in rows] == ["0/3", "0/3", "1/3"]
 
     def test_says_so_when_no_contrast_is_scored(self):
         texts, scores = bheijden_texts({"human": [0.1, 0.2], "no-skill": [0.5, 0.6]})
-        assert contrast_table(DETECTORS["gpttrace"], texts, scores, PLANTED_CONTRASTS).startswith(
-            "No topic"
+        table = contrast_table(
+            DETECTORS["gpttrace"],
+            bheijden_scores(texts, scores),
+            bheijden_words(texts),
+            PLANTED_CONTRASTS,
         )
+        assert table.startswith("No contrast")
 
 
 class TestOverviewTable:
@@ -86,9 +112,20 @@ class TestOverviewTable:
             {"human": [0.1, 0.2, 0.9], "corpus-claude-opus-5": [0.5, 0.6, 0.7], **PLANTED}
         )
         unplanted = {text_id: row for text_id, row in scores.items() if "corpus" in text_id}
-        table = overview_table(texts, {"gpttrace": scores, "binoculars": unplanted}).splitlines()
+        table = overview_table(
+            {
+                "gpttrace": bheijden_scores(texts, scores),
+                "binoculars": bheijden_scores(texts, unplanted),
+            }
+        ).splitlines()
         assert table[2] == "| gpttrace | 2/3 | 3/3 | 3/3 | 2/3 |"
         assert table[3] == "| binoculars | not scored | not scored | not scored | not scored |"
+
+    def test_a_contrast_on_one_topic_is_not_scored_in_the_overview_or_the_tables(self):
+        by_arm = by_arm_of({"human": [0.1], "corpus-claude-opus-5": [0.5]})
+        overview_row = overview_table({"gpttrace": by_arm}).splitlines()[2]
+        assert overview_row.startswith("| gpttrace | not scored |")
+        assert provenance_table(DETECTORS["gpttrace"], by_arm, YEARS).startswith("No model arm")
 
 
 class TestSpread:
