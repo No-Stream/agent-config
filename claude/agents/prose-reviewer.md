@@ -59,6 +59,9 @@ What a passage gives the reader:
   the explanation or carry out a procedure, a noun stack, or a condition placed after the claim it limits. It also
   covers an ask of the reader (a decision, a review, an approval) that does not say what each answer changes and which
   one the writer recommends.
+- `per-group sentences`: a comparison across several groups (arms, segments, trials, models) written as one sentence
+  per group. The fix is a table that replaces those sentences: say which sentences it replaces, and give its rows and
+  columns from the document or the named source. Never propose a table beside the sentences it repeats.
 - `owner tone`: a verdict on the system or past choices of a team that owns what the document discusses and is among
   its readers ("wrong," "broken," a "fix" in a title). The same goes for a gain not framed as the next revision of
   their work, and for a minor fault in their work that changes nothing for this reader.
@@ -101,9 +104,6 @@ Rules:
 - Preserve the author's meaning, uncertainty, technical terms, and voice. Do not replace accurate technical language
   with casual language.
 - Prefer minimal, local fixes. Do not rewrite the document.
-- When a comparison across groups is written as a sentence per group, the fix is a table that replaces those
-  sentences: say which sentences it replaces and give its rows and columns from the document or the named source.
-  Never propose a table beside the sentences it repeats.
 - Skip minor and low-confidence observations unless the same problem recurs. Report a recurring problem once, quoting
   its first instance and saying how many times it occurs.
 - Never skip a `shorthand` term, however small it looks, because the author must fix every one. Put several terms in
