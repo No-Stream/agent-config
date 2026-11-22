@@ -3,15 +3,15 @@
 Only the paths in COPIED_FILES and COPIED_DIRS are copied. After copying, every file git could publish (tracked, or
 untracked and not ignored) is scanned for the forbidden patterns and the script fails if any match, so a later edit to
 the live config cannot leak through a re-sync unnoticed.
-The paths in REPO_OWNED are edited in this repo and symlinked into the live config, so the sync never deletes or
-overwrites them, and it leaves alone any live path that is itself a symlink into this repo.
+The paths in REPO_OWNED are edited in this repo and symlinked into the live config at the paths they map to, so the sync
+never deletes or overwrites them, and it leaves alone any live path that is itself a symlink into this repo.
 Names that must not appear (clients, projects, email) live in the gitignored PRIVATE_PATTERNS_FILE, one regex per line,
 and private text substitutions in PRIVATE_REPLACEMENTS_FILE, one `old<TAB>new` per line, so this script does not
 publish them.
 
 Run: python3 sync.py. The local git hooks run python3 sync.py --check, which only scans the repo as it stands, and
 python3 sync.py --check-commits <sha>..., which scans the message and added lines of each commit being pushed.
-scripts/link-repo-owned.sh links the repo-owned paths into ~/.claude.
+scripts/link-repo-owned.sh links the repo-owned paths into ~/.claude; see README.md, Installing.
 """
 
 import argparse
@@ -22,13 +22,11 @@ import subprocess
 from pathlib import Path
 
 logger: logging.Logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 HOME = Path.home()
 REPO_ROOT = Path(__file__).resolve().parent
 
 COPIED_FILES: dict[str, str] = {
-    "AGENTS.md": "AGENTS.md",
     ".claude/settings.json": "claude/settings.json",
     ".claude/statusline-command.sh": "claude/statusline-command.sh",
     ".claude/hooks/guard-bash.sh": "claude/hooks/guard-bash.sh",
@@ -42,13 +40,16 @@ COPIED_DIRS: dict[str, str] = {
     ".claude/skills/review": "claude/skills/review",
     ".claude/skills/visualization": "claude/skills/visualization",
 }
-REPO_OWNED: tuple[str, ...] = (
-    "claude/skills/write-plainly",
-    "claude/skills/notebooks",
-    "claude/agents/prose-reviewer.md",
-    "claude/agents/prose-fidelity-checker.md",
-    "claude/agents/prose-reader-test.md",
-)
+# Repo path to live path under ~; link-repo-owned.sh links a .claude/rules/ entry, a machine layer, only for --layer.
+REPO_OWNED: dict[str, str] = {
+    "instructions/core.md": ".claude/CLAUDE.md",
+    "instructions/personal.md": ".claude/rules/personal.md",
+    "claude/skills/write-plainly": ".claude/skills/write-plainly",
+    "claude/skills/notebooks": ".claude/skills/notebooks",
+    "claude/agents/prose-reviewer.md": ".claude/agents/prose-reviewer.md",
+    "claude/agents/prose-fidelity-checker.md": ".claude/agents/prose-fidelity-checker.md",
+    "claude/agents/prose-reader-test.md": ".claude/agents/prose-reader-test.md",
+}
 CODEX_CONFIG = ".codex/config.toml"
 CODEX_RULES = ".codex/rules/default.rules"
 
@@ -260,8 +261,11 @@ def main() -> None:
     mode.add_argument(
         "--check-commits", nargs="+", metavar="SHA", help="scan each commit's message and added lines; exit 1 on any match"
     )
-    mode.add_argument("--list-repo-owned", action="store_true", help="print the repo-owned paths, one per line")
+    mode.add_argument(
+        "--list-repo-owned", action="store_true", help="print each repo-owned path and its live path under ~, tab-separated"
+    )
     args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
     if args.check:
         fail_on_leaks(scan_for_leaks(), "remove them before committing")
         logger.info("No sensitive patterns found")
@@ -269,7 +273,7 @@ def main() -> None:
         fail_on_leaks(scan_commits(args.check_commits), "rewrite these commits before pushing")
         logger.info("No sensitive patterns found in %d commits", len(args.check_commits))
     elif args.list_repo_owned:
-        print("\n".join(REPO_OWNED))
+        print("\n".join(f"{repo_path}\t{live_path}" for repo_path, live_path in REPO_OWNED.items()))
     else:
         sync()
 
