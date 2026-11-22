@@ -33,6 +33,7 @@ run_linter() {
 }
 
 run_linter "house rules (lint_prose.py)" python3 "$skill_dir/lint_prose.py" "$@"
-run_linter "sloplint" sloplint check --markdown "$@"
-run_linter "slop-guard (score is informational)" uvx --from slop-guard==0.5.0 sg -v --counts -c "$skill_dir/slop-guard.jsonl" "$@"
+# impact-noun-bare fires on careful research prose ("the impact of X on Y"); see eval/README.md.
+run_linter "sloplint" sloplint check --markdown --ignore impact-noun-bare "$@"
+run_linter "slop-guard (score is informational)" uvx --from slop-guard==0.5.0 sg -v --counts -t 100 -c "$skill_dir/slop-guard.jsonl" "$@"
 exit "$found_findings"

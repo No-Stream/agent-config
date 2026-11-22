@@ -14,7 +14,7 @@ safety hooks and settings. Paths are shown as `~`, and per-project entries and a
 | `claude/agents/` | Subagents used by the review and write-plainly skills |
 | `claude/skills/review/` | Multi-domain code review workflow (correctness, ML, stats, security, performance, ...) with a Codex second opinion |
 | `claude/skills/paper-drafting/` | Turning research into a paper or blog post: narrative, claims ledger, evidence red-team, drafting order |
-| `claude/skills/write-plainly/` | Rules for plain prose in documents other people read (READMEs, reports, posts), three prose linters run by `check-prose.sh`, and an Opus reviewer subagent |
+| `claude/skills/write-plainly/` | Rules for plain prose in documents other people read (READMEs, reports, posts), three prose linters run by `check-prose.sh`, and three subagents: an Opus reviewer, an Opus reader test that checks whether the document answers the questions its reader would ask, and a fidelity checker for edits |
 | `claude/skills/visualization/` | Plot choice, uncertainty, computed and asserted titles, light and dark themes, figure review; includes `vizstyle.py` and tests |
 | `claude/skills/notebooks/` | Authoring, running and reviewing analysis notebooks: cell structure, results rendered from code, kernel state and long runs, memory and speed on large dataframes, and a pre-run review |
 | `codex/config.toml` | Codex settings: permissions profiles, network allowlist, agents, hook registration |

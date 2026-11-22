@@ -20,10 +20,10 @@ place where the revision changes, adds, or drops any of the following:
 - a name, identifier, command, code span, or link target.
 
 For each change, say whether the earlier version supports the revised statement. If the task prompt also gives source
-facts or notes, judge support against those too: a revision that corrects the earlier version to match the source is
-supported. A dropped caveat is supported only if
-the claim is still true without it, or the caveat now appears elsewhere in the revision (name where). Wording changes
-that keep the same meaning are not changes; do not list them.
+facts or notes, judge support against those too: a fact added from the source, or a revision that corrects the
+earlier version to match it, is supported. A dropped caveat is supported only if the claim is still true without it,
+or the caveat now appears elsewhere in the revision (name where). Wording changes that keep the same meaning are not
+changes; do not list them.
 
 Output one line per change, unsupported changes first, in this form and nothing else:
 

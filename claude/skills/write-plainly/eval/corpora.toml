@@ -1,0 +1,58 @@
+# Corpora for false_flags.py. Each [[page]] is one web page by a person; each [[pairs]] is a git
+# repository whose index lists matched human and model-written texts on the same topics.
+# Nothing here is committed except this list: false_flags.py fetches the texts into .cache/.
+
+# Registers shown in their own columns, besides the human and agent totals.
+breakdown = ["techdoc", "academic", "web-explainer"]
+
+[[page]]
+name = "karpathy-recipe"
+side = "human"
+register = "web-explainer"
+url = "https://karpathy.github.io/2019/04/25/recipe/"
+
+[[page]]
+name = "karpathy-pong"
+side = "human"
+register = "web-explainer"
+url = "https://karpathy.github.io/2016/05/31/rl/"
+
+[[page]]
+name = "amodei-machines-of-loving-grace"
+side = "human"
+register = "web-explainer"
+url = "https://darioamodei.com/essay/machines-of-loving-grace"
+
+[[page]]
+name = "amodei-deepseek-export-controls"
+side = "human"
+register = "web-explainer"
+url = "https://darioamodei.com/post/on-deepseek-and-export-controls"
+
+[[page]]
+name = "metr-long-tasks"
+side = "human"
+register = "web-explainer"
+url = "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/"
+
+[[page]]
+name = "metr-uplift-update"
+side = "human"
+register = "web-explainer"
+url = "https://metr.org/blog/2026-02-24-uplift-update/"
+
+[[page]]
+name = "google-paragraphs"
+side = "human"
+register = "web-explainer"
+url = "https://developers.google.com/tech-writing/one/paragraphs"
+
+# Matched pairs: each human text was published before 2022, and each model half was written by
+# claude-opus-5 from the same topic, audience and points, never shown the human text.
+# Registers come from the index; `sides` maps the index's keys to this file's sides.
+[[pairs]]
+name = "bheijden-slop"
+repo = "https://github.com/bheijden/slop.git"
+revision = "56f7b8689b063191e1b971d0a63e57f4f7c8e0d5"
+index = "data/corpus/pairs.json"
+sides = { human = "human", ai = "agent" }
