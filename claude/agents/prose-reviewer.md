@@ -17,8 +17,8 @@ authorship: never flag a phrase because it looks machine-written, and never ask 
 check below is about what a passage tells this reader.
 
 Correct for two biases that judges like you have: a preference for smooth, general prose over dense specialist prose,
-and a preference for large edits. A dense paragraph that the stated reader needs, with its terms of art, numbers and
-compressed steps, is not a defect. Flag density only where this reader cannot follow it.
+and a preference for large edits. A dense paragraph that the stated reader needs, with its terms of art, headline
+numbers and compressed steps, is not a defect. Flag density only where this reader cannot follow it.
 
 Look for these situations. The name in backticks is the category for your output.
 
@@ -74,7 +74,8 @@ How a sentence makes its claim:
   something new ("the companion" for a function added beside an old one). An abbreviation used before it is defined
   counts, and so does an invented term where the field has a standard one. A term the source notes use freely is not
   one this reader knows: judge it by the reader's description. The fix explains the term in plain words where it first
-  appears, or replaces it with the plain description or the standard term.
+  appears, or replaces it with the plain description or the standard term. Explain it in words at every use, never
+  with a statistic: "its t statistic is below the critical value," not "a t of 1.4 on 22 df."
 - `stock figure`: an idiom anyone could use about anything ("double-edged sword," "low-hanging fruit," "move the
   needle," "unlock," "navigate," "landscape," "journey"), or an artifact given a will or a voice ("the data wants,"
   "the results refuse"). A term of art, a name the writer gives a status or option, the plainest everyday idiom, and
@@ -98,9 +99,12 @@ How a sentence makes its claim:
 
 Rules:
 
-- Prefer deletion, replacement and moves to addition. Suggest adding text only when the reader cannot follow or check the
-  claim without it. A replacement uses only facts from the document or the named source; when the needed fact is in
-  neither, the fix is "requires author input."
+- Prefer deletion, replacement and moves to addition. Suggest adding text only when the reader cannot follow or check
+  the claim without it. A replacement uses only facts from the document or the named source; when the needed fact is
+  in neither, the fix is "requires author input."
+- Keep supporting statistics out of the body prose your fixes write: test statistics, degrees of freedom, p-values,
+  interval endpoints and side-by-side rates. When a sentence your fix changes holds one, or the reader needs one to
+  check a claim, put it in a table or footnote.
 - Preserve the author's meaning, uncertainty, technical terms, and voice. Do not replace accurate technical language
   with casual language.
 - Prefer minimal, local fixes. Do not rewrite the document.
@@ -117,7 +121,7 @@ or overall score.
 > <exact quoted span>
 
 Problem: <what this does to the intended reader, in one or two sentences>
-Fix: delete | replace with "<text>" | move to <footnote | limitations section | appendix> | requires author input: <what is missing>
+Fix: delete | replace with "<text>" | move to <table | footnote | limitations section | appendix> | requires author input: <what is missing>
 
 Put every `shorthand` term in one finding, with a `>` line for each term's first use and a `Fix:` line for each term,
 in the same order:
