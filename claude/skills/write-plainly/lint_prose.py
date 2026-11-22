@@ -12,7 +12,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from lint_prose_document import (
-    MAX_SUMMARY_SENTENCES,
+    DOCUMENT_MESSAGES,
     heading_density_findings,
     number_density_findings,
     section_findings,
@@ -79,6 +79,7 @@ FREE_TRIADS_PER_SECTION = 2
 FREE_INTENSIFIERS_PER_SECTION = 2
 
 MESSAGES = {
+    **DOCUMENT_MESSAGES,
     "em-dash": "Em dash; use a comma, parentheses, a colon, a semicolon or a new sentence.",
     "dash-substitute": "Dash used as a pause; use punctuation that shows how the clauses connect.",
     "coined-label": (
@@ -86,12 +87,6 @@ MESSAGES = {
         " by what it is, with any ID after that description, unless the reader already knows it."
     ),
     "bold-run-in": "Bold run-in heading; use a heading or plain prose.",
-    "thin-h2-section": (
-        "Section has little body; merge it into a neighbor or make it a minor heading."
-    ),
-    "short-paragraph-run": (
-        "Run of very short paragraphs; combine related sentences and state how they connect."
-    ),
     "title-case-heading": "Heading looks like Title Case; use sentence case.",
     "stacked-hedge": "Two hedges on one claim; keep the one that states the real uncertainty.",
     "nominalization-of": (
@@ -139,10 +134,6 @@ MESSAGES = {
         f"Check: more than {FREE_TRIADS_PER_SECTION} lists of three in this section (advisory);"
         " keep the ones that matter."
     ),
-    "tldr-shape": (
-        f"Summary runs past {MAX_SUMMARY_SENTENCES} sentences or carries more than the headline"
-        " numbers; keep what and why, the main findings and the ask."
-    ),
     "undefined-acronym": (
         "Check: acronym used before it is defined (advisory). Spell it out at first use with"
         " the short form in parentheses."
@@ -153,17 +144,6 @@ MESSAGES = {
     "complex-sentence": (
         f"Sentence of {COMPLEX_SENTENCE_WORDS} or more words; split it so each sentence makes"
         " one point."
-    ),
-    "number-density": (
-        "Too many numbers for body prose; move them to a table or figure and say what they show."
-    ),
-    "supporting-statistic": (
-        "Check: a statistic that supports a result (advisory), such as a test statistic, degrees"
-        " of freedom, a p-value, an interval or two rates set against each other. Move it to a"
-        " table, footnote or appendix unless the reader needs it to decide."
-    ),
-    "heading-density": (
-        "More top-level sections than the length supports; merge sections or nest them."
     ),
     "borrowed-jargon": (
         "Check: a scientific term borrowed for weight (advisory). Unless the literal sense is"

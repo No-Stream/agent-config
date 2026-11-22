@@ -37,6 +37,30 @@ WORDS_PER_EXTRA_SECTION = 400
 MAX_SUMMARY_SENTENCES = 8
 MAX_SUMMARY_NUMBERS = 4
 
+DOCUMENT_MESSAGES = {
+    "thin-h2-section": (
+        "Section has little body; merge it into a neighbor or make it a minor heading."
+    ),
+    "short-paragraph-run": (
+        "Run of very short paragraphs; combine related sentences and state how they connect."
+    ),
+    "heading-density": (
+        "More top-level sections than the length supports; merge sections or nest them."
+    ),
+    "number-density": (
+        "Too many numbers for body prose; move them to a table or figure and say what they show."
+    ),
+    "supporting-statistic": (
+        "Check: a statistic that supports a result (advisory), such as a test statistic, degrees"
+        " of freedom, a p-value, an interval or two rates set against each other. Move it to a"
+        " table, footnote or appendix unless the reader needs it to decide."
+    ),
+    "tldr-shape": (
+        f"Summary runs past {MAX_SUMMARY_SENTENCES} sentences or carries more than the headline"
+        " numbers; keep what and why, the main findings and the ask."
+    ),
+}
+
 LINK_OR_URL = re.compile(r"\]\(|https?://")
 
 
