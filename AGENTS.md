@@ -10,7 +10,7 @@ The paths in `REPO_OWNED` in `sync.py` are edited in this repo instead, and each
 
 An entry whose live path is in `~/.claude/rules/` is a machine layer. Claude Code loads every file there in every session, so the link script links a layer only when `--layer` names it. `--layer personal` is only for my personal machine; on any other machine, run the link script without `--layer`. Rules that hold on one machine only belong in that machine's layer, never in `core.md`, and the layers of my other machines stay on those machines and never enter this repo.
 
-Codex reads a single global instructions file, so `scripts/build_codex_agents.py` generates `~/.codex/AGENTS.md` from the core and one layer. On my personal machine the link script runs it when given `--layer personal`; on any other machine, rebuild codex's file from that machine's own layer with `python3 scripts/build_codex_agents.py <layer>`, where `<layer>` is the layer's file name in `~/.claude/rules/` without `.md`. Never edit the generated file; edit the sources and rerun the link script or the builder.
+Codex reads a single global instructions file, so `scripts/build_codex_agents.py` generates `~/.codex/AGENTS.md` from the core and one layer. On my personal machine the link script runs it when given `--layer personal`, and installs a post-merge hook in the clone that reruns it after every merge or pull; on any other machine, rebuild codex's file from that machine's own layer with `python3 scripts/build_codex_agents.py <layer>`, where `<layer>` is the layer's file name in `~/.claude/rules/` without `.md`. Never edit the generated file; edit the sources and rerun the link script or the builder.
 
 ## Tests
 
