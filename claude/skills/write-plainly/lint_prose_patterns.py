@@ -377,6 +377,11 @@ SERIES_ITEM = r"(?!(?:and|or)\b)[\w'’-]+(?:\s+[\w'’-]+){0,3}"
 SERIES = re.compile(
     rf"\b(?P<before_conjunction>{SERIES_ITEM}(?:,\s+{SERIES_ITEM})+),?\s+(?:and|or)\s+[\w'’-]+"
 )
+# A clause of four or more words before the first comma is the sentence's own, not an opening.
+OPENING_PHRASE = re.compile(
+    r"(?i)\s*(?:in|on|at|after|before|during|since|for|by|with|when|while|if|although|because"
+    r"|however|meanwhile|today|now|then|also|finally|instead)\b(?:\s+[^\s,.]+){0,3},\s+"
+)
 
 CAPITALIZED_RUN = re.compile(
     r"(?<![\w'’-])[A-Z]{2,}(?:['’][A-Z]+)?(?:\s+[A-Z]{2,}(?:['’][A-Z]+)?)*(?![\w'’-])"

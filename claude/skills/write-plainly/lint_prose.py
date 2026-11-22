@@ -51,6 +51,7 @@ from lint_prose_patterns import (
     INTENSIFIER,
     LABEL_PATTERN,
     LIST_ENTRY_WORDS,
+    OPENING_PHRASE,
     ORDINARY_WORD,
     PHRASE_RULES,
     PRONOUN_I_AFTER_LABEL,
@@ -441,11 +442,13 @@ def _sentence_shape_findings(prose: list[Block]) -> list[Finding]:
 
 
 def _three_item_series(text: str, start: int, end: int) -> re.Match[str] | None:
-    """Return the first comma series in the span with exactly two items before its conjunction."""
+    """Return the first comma series in the sentence with exactly two items before its
+    conjunction, reading it after any opening phrase such as "In winter,"."""
+    opening = OPENING_PHRASE.match(text, start, end)
     return next(
         (
             match
-            for match in SERIES.finditer(text, start, end)
+            for match in SERIES.finditer(text, opening.end() if opening else start, end)
             if match.group("before_conjunction").count(",") == 1
         ),
         None,

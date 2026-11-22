@@ -505,12 +505,35 @@ class TestTriadDensity:
         )
         assert _lines("triad-density", text) == [8]
 
-    def test_an_opening_clause_before_a_list_of_three_hides_it(self) -> None:
+    def test_skips_an_opening_clause_before_a_list_of_three(self) -> None:
         text = (
             "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
             "In winter, the branch lends sledges, skates and scarves.\n"
         )
+        assert _lines("triad-density", text) == [5]
+
+    def test_an_opening_clause_before_a_pair_is_not_a_list_of_three(self) -> None:
+        text = (
+            "## Hours\n\n"
+            "In winter, the branch opens late and closes early.\n"
+            "However, the café stays open and serves soup.\n"
+            "In 2024, the branch bought chairs and lamps.\n"
+        )
         assert _lines("triad-density", text) == []
+
+    def test_a_long_clause_before_the_first_comma_is_not_an_opening_phrase(self) -> None:
+        text = (
+            "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
+            "For each loan we record the date, the reader and the branch.\n"
+        )
+        assert _lines("triad-density", text) == [5]
+
+    def test_counts_captions_and_footnotes(self) -> None:
+        free = "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n\n"
+        caption = free + "Figure 2: loans, visits and renewals by month.\n"
+        footnote = free + "[^1]: Loans, visits and renewals rose in May.\n"
+        assert _lines("triad-density", caption) == [6]
+        assert _lines("triad-density", footnote) == [6]
 
     def test_counts_each_section_and_skips_list_items(self) -> None:
         text = (
