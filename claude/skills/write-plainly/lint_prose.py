@@ -84,7 +84,7 @@ MESSAGES = {
     "dash-substitute": "Dash used as a pause; use punctuation that shows how the clauses connect.",
     "coined-label": (
         "Check: label or ID that may have been coined during the work (advisory). Name the thing"
-        " by what it is, with any ID after that description, unless the reader already knows it."
+        " by what it is, with any ID after that description, unless a smart reader outside the work would know it."
         ' A reworded label ("step four", "the round-three fix") is still a label.'
     ),
     "bold-run-in": "Bold run-in heading; use a heading or plain prose.",
