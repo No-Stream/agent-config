@@ -209,7 +209,7 @@ def _is_title_case_heading(line: str) -> bool:
         return False
     candidate_words = [word for word in words[1:] if word.lower() not in TITLE_SMALL_WORDS]
     uppercase_words = [
-        word for word in candidate_words if word.islower() is False and not word.isupper()
+        word for word in candidate_words if not word.islower() and not word.isupper()
     ]
     return len(uppercase_words) >= 3
 
