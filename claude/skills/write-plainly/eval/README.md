@@ -1,6 +1,6 @@
 # Lint false-flag check
 
-`false_flags.py` runs every rule in the three write-plainly linters (`lint_prose.py`, sloplint and slop-guard) over careful human prose and over model-written drafts on the same topics, then prints how often each rule fires on each side. A rule that fires more often on the human side flags careful writing more than it flags model writing, so if the rule exists to catch model habits, its message should say "check" rather than "fix", or the rule should go. The check exists because published AI-tell rule sets often fire more on good human technical writing than on model output.
+`false_flags.py` runs every rule in the three write-plainly linters (`lint_prose.py`, sloplint and slop-guard) over careful human prose and over model-written drafts on the same topics, then prints how often each rule fires on each side. A rule that fires more often on the human side flags careful writing more than it flags model writing, so if the rule exists to catch model habits, its message should say "check" rather than "fix", or the rule should go. The check exists because published AI-tell rule sets often fire more on good human technical writing than on model output. The last section gives the skill owner's blind grades on the public tasks of the pairwise evaluation in `pairwise/`.
 
 ## Running it
 
@@ -47,7 +47,7 @@ The table comes from runs on 2026-11-20 with `lint_prose.py` and `lint_prose_pat
 Each rule falls into one of two groups, and only tell rules can be demoted:
 
 - House-style rules encode this skill's own preferences: no em dashes, no dashes as pauses, few numbers in body prose, paragraph shape and sentence length. The markdown rules from the skill's Format section are house style too: no bold run-in labels or bold lead-ins, bold only for a decision or a label, sentence-case headings and no thin top-level sections. They stay whatever their human rate, and their rates are reported for information. A rule from another linter that contradicts one of them is removed whatever its rates.
-- Tell rules exist to catch model habits. A tell rule that fires more often per 1,000 words on the human side than on the agent side, on at least three human texts, gets an advisory "Check:" message or is removed. The three-text floor was added during the triage, because two texts against none is within noise for corpora this small, and it is provisional until the skill's owner confirms it. Without it, `stacked-hedge` would get a "Check:" message, `check-prose.sh` would also skip sloplint's `same-determiner-chain` and `stands-serves-as`, and slop-guard's `pithy_fragment` would be turned off.
+- Tell rules exist to catch model habits. A tell rule that fires more often per 1,000 words on the human side than on the agent side, on at least three human texts, gets an advisory "Check:" message or is removed. The three-text minimum exists because two texts against none is within noise for corpora this small, and it is provisional until the skill's owner confirms it. Without it, `stacked-hedge` would get a "Check:" message, `check-prose.sh` would also skip sloplint's `same-determiner-chain` and `stands-serves-as`, and slop-guard's `pithy_fragment` would be turned off.
 
 Two tell rules are about markdown structure: slop-guard's `bullet_density`, and the bold-header and bullet-run checks in its `structural` rule. They cannot fire on the matched corpus, which is plain text, so they are meant to be judged on the passages that the pairwise evaluation in `pairwise/` generated, as "Markdown rules on generated passages" describes. The public passages have no heading, bold or list, so neither rule is judged yet, and both stay on.
 
@@ -81,8 +81,8 @@ Rates are hits per 1,000 words. "Human" is every human text, "agent" is the mode
 | `short-paragraph-run` | lint_prose | house | 0.26 | 0.04 | 0.42 | 10/31 | 1/24 | kept |
 | `long-sentence` | lint_prose | house | 0.99 | 0.68 | 0.76 | 15/31 | 11/24 | kept |
 | `complex-sentence` | lint_prose | house | 4.04 | 4.43 | 3.38 | 25/31 | 23/24 | kept |
-| `paragraph_cv` | slop-guard | house | 0.25 | 0.98 | 0.59 | 14/31 | 23/24 | removed, contradicts the paragraph floor |
-| `paragraph_balance` | slop-guard | house | 0.02 | 0.00 | 0.04 | 1/31 | 0/24 | removed, contradicts the paragraph floor |
+| `paragraph_cv` | slop-guard | house | 0.25 | 0.98 | 0.59 | 14/31 | 23/24 | removed, contradicts the paragraph minimum |
+| `paragraph_balance` | slop-guard | house | 0.02 | 0.00 | 0.04 | 1/31 | 0/24 | removed, contradicts the paragraph minimum |
 | `bold-run-in` | lint_prose | house | 1.68 | 0.00 | 0.00 | 6/31 | 0/24 | kept |
 | `structural`, bold headers and bullet runs | slop-guard | tell | 0.23 | 0.00 | 0.00 | 4/31 | 0/24 | not judged, no bold or list in the passages |
 | `bold_bullet_list` | slop-guard | house | 0.21 | 0.00 | 0.00 | 5/31 | 0/24 | kept |
@@ -99,7 +99,7 @@ Nine more rules fired on a single text, too few to read: sloplint's `not-by-x-bu
 - slop-guard's stock-phrase rule (`SlopPhraseRule`) is removed. Most human hits are "in addition" and "in other words", written as ordinary transitions or as "in addition to". The rule also matches inside longer words ("gain additional" counts as "in addition", and "AI can also" as "I can also"). Without those matches the human rate is still several times the agent rate (0.48 against 0.09), so this bug does not explain the gap.
 - slop-guard's tone rule (`ToneMarkerRule`) is removed. Its human hits are "As mentioned above" in a research post, "As mentioned in the introduction" in an essay and "Certainly," in a memoir, plus "areas mentioned", which is the same substring bug. It is the closest call among the tell-rule changes. It sits exactly at three texts, and the agent texts are essays, which cannot show the chat phrasing the rule mostly looks for ("would you like", "let me know if").
 - slop-guard's `structural` rule keeps its bold-header and bullet-run checks, but its three-item list check is off: `triadic_record_cap` and `triadic_penalty` are 0, and `triadic_advice_min` is set higher than any document reaches. Its hits are plain lists of three, such as "film, television, and music".
-- slop-guard's paragraph rhythm rules (`ParagraphBalanceRule` and `ParagraphCVRule`) are removed as house-style conflicts. They ask for a mix of short and long paragraphs, which contradicts the skill's floor of four sentences per body paragraph, and `paragraph_cv` fired on nearly every agent text.
+- slop-guard's paragraph rhythm rules (`ParagraphBalanceRule` and `ParagraphCVRule`) are removed as house-style conflicts. They ask for a mix of short and long paragraphs, which contradicts the skill's minimum of four sentences per body paragraph, and `paragraph_cv` fired on nearly every agent text.
 - `nominalization-of` in `lint_prose.py` now starts its message with "Check:" and calls itself advisory. Its hits are real nominalizations. Some are what the rule is for ("The creation of this PEP was prompted by"), and some are fine as written ("an implementation of a standard algorithm"), so the rule stays as a prompt to look.
 - `check-prose.sh` runs sloplint with `--ignore impact-noun-bare`. Every human hit is research wording, such as "the impact of AI on developer productivity". sloplint's own rationale for the rule calls "the impact of X on Y" ordinary research wording, yet the rule fires on that form.
 - Two false positives in `lint_prose.py` are fixed. `inverted-animacy` read "a substantial number said" as an artifact speaking, so it now matches "numbers" ("the numbers tell us") and not "number". `coined-label` read the pronoun in "every plan I have" as a label named "I". These were the only hits of either rule on either side, so neither rule fires on these corpora now and neither has a row in the table.
@@ -112,7 +112,7 @@ One kept tell rule flips between the two comparisons: `contrast_pairs` fires mor
 
 ### Markdown rules on generated passages
 
-The pairwise evaluation generated one passage per task and pipeline, and two of its tasks are public. The 10 passages on those two tasks (2,455 words) contain no markdown structure, because the prompt asks for body text with no heading. `bullet_density` and slop-guard's bold-header and bullet-run checks never fire on them, so these rules stay unjudged until a source of agent-written documents with markdown structure is added. The human side for these rules is the seven web pages, since no other human text has markdown structure. The bold and heading rules in `lint_prose.py` are house style and need no judgment.
+The pairwise evaluation generated one passage per task and pipeline, and two of its tasks are public. The 10 graded passages on those two tasks (2,320 words) contain no markdown structure, because the prompt asks for body text with no heading. `bullet_density` and slop-guard's bold-header and bullet-run checks never fire on them, so these rules stay unjudged until a source of agent-written documents with markdown structure is added. The human side for these rules is the seven web pages, since no other human text has markdown structure. The bold and heading rules in `lint_prose.py` are house style and need no judgment.
 
 ### Threats to these results
 
@@ -159,3 +159,23 @@ How the rules decide:
 - The phrase and sentence rules skip double-quoted spans, which hold someone else's words. `coined-label` and `undefined-acronym` read quoted text, because a quoted button or ticket name is still an unexplained ID.
 
 No rule was dropped.
+
+## Blind grades on the public tasks
+
+The skill's owner graded the passages of the blind evaluation in `pairwise/` without knowing which pipeline wrote which, giving each passage a letter grade from A+ to F. Two of the evaluation's five tasks are public, both in `pairwise/tasks/public.toml`: a proposal paragraph on replacing a dashboard's Wald interval for conversion rates (`pub-wilson-interval`), and a design-doc explanation of SQLite's journal modes for a job queue with several worker processes (`pub-sqlite-wal`). The other three tasks, the analysis and the full readout are private. The passages come from write-plainly at commit e603d90 and five pipelines:
+
+- `current`: the owner's earlier writing skill, with a humanizer pass and a slop-guard loop.
+- `merged`: write-plainly with the owner's private work layer.
+- `merged-style-pass`: `merged` plus a style-editing pass from the earlier skill.
+- `merged-loose-paragraphs`: `merged` with the four-sentence paragraph minimum and the section-size rules relaxed.
+- `no-skill`: the bare task, with no skill files.
+
+| pipeline | `pub-wilson-interval` | `pub-sqlite-wal` |
+|---|---|---|
+| `merged` | B+ | A- |
+| `current` | B | A- |
+| `merged-loose-paragraphs` | B | A- |
+| `merged-style-pass` | C- | B |
+| `no-skill` | D | B- |
+
+On both tasks `no-skill` got the lowest grade and `merged-style-pass` the second lowest. `merged` got the top grade on the Wilson interval task, one step above `current` and `merged-loose-paragraphs`, and the three shared the top grade on the SQLite task. The owner's note on the Wilson interval task put the ideal between the `merged-loose-paragraphs` passage, which was slightly too technical, and the `merged` one, which was slightly simplified but better overall. With two tasks and one reader, these grades separate the bottom two pipelines from the top three and say little about the order within the top three.
