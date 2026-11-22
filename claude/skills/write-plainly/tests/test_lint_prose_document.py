@@ -275,6 +275,22 @@ class TestNumberDensity:
         )
         assert _lines("number-density", text) == [3]
 
+    def test_an_opening_longer_than_a_summary_is_body_prose(self) -> None:
+        text = (
+            "The library lends tools as well as books. Members borrow drills, ladders and sewing"
+            " machines. The shed behind the branch holds 140 tools. Loans run for a week. A late"
+            " tool costs $2 a day. Volunteers check each tool when it comes back. Broken tools go"
+            " to a repair night. The council pays for new tools. Last spring it bought 30 of them.\n"
+        )
+        assert _lines("number-density", text) == [1]
+
+    def test_an_opening_with_more_than_the_headline_numbers_is_body_prose(self) -> None:
+        text = (
+            "The bakery sold 340 loaves on Monday, 410 on Tuesday, 380 on Wednesday and 290 on"
+            " Thursday, and 35 cakes on Friday.\n"
+        )
+        assert _lines("number-density", text) == [1]
+
 
 CROPS = ("Tomatoes", "Beans", "Potatoes", "Onions", "Lettuce", "Carrots", "Peppers", "Squash")
 

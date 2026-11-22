@@ -103,8 +103,20 @@ def _number_count(sentence: str) -> int:
     return len(counted) + len(spelled)
 
 
+def _sentences(block: Block) -> list[str]:
+    return [block.text[start:end] for start, end in sentence_spans(block.text)]
+
+
+def _fits_summary(sentences: list[str]) -> bool:
+    numbers = sum(_number_count(sentence) for sentence in sentences)
+    return len(sentences) <= MAX_SUMMARY_SENTENCES and numbers <= MAX_SUMMARY_NUMBERS
+
+
 def number_density_findings(blocks: list[Block]) -> list[Finding]:
-    """Flag number-heavy body prose: whole documents by density, single blocks by count."""
+    """Flag number-heavy body prose: whole documents by density, single blocks by count.
+
+    With no summary section, an opening paragraph shaped like a summary counts as the summary.
+    """
     body = [
         block
         for block in blocks
@@ -112,13 +124,12 @@ def number_density_findings(blocks: list[Block]) -> list[Finding]:
     ]
     has_summary = any(block.section == "summary" for block in blocks)
     opening = next((block for block in blocks if block.kind == "paragraph"), None)
-    if not has_summary and opening in body:
+    if not has_summary and opening in body and _fits_summary(_sentences(opening)):
         body.remove(opening)
     findings: list[Finding] = []
     total_numbers = total_words = 0
     for block in body:
-        sentences = [block.text[start:end] for start, end in sentence_spans(block.text)]
-        prose = [sentence for sentence in sentences if not ARITHMETIC.search(sentence)]
+        prose = [sentence for sentence in _sentences(block) if not ARITHMETIC.search(sentence)]
         numbers = sum(_number_count(sentence) for sentence in prose)
         total_numbers += numbers
         total_words += sum(len(WORD.findall(sentence)) for sentence in prose)
@@ -142,11 +153,9 @@ def summary_findings(blocks: list[Block]) -> list[Finding]:
             sections[-1][1].append(block)
     findings: list[Finding] = []
     for heading_line, prose in sections:
-        sentences = [
-            block.text[start:end] for block in prose for start, end in sentence_spans(block.text)
-        ]
-        numbers = sum(_number_count(sentence) for sentence in sentences)
-        if len(sentences) > MAX_SUMMARY_SENTENCES or numbers > MAX_SUMMARY_NUMBERS:
+        sentences = [sentence for block in prose for sentence in _sentences(block)]
+        if not _fits_summary(sentences):
+            numbers = sum(_number_count(sentence) for sentence in sentences)
             measurement = f"summary has {len(sentences)} sentences and {numbers} numbers"
             findings.append(Finding("tldr-shape", heading_line, 1, measurement))
     return findings
