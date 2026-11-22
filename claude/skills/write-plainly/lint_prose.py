@@ -117,8 +117,9 @@ MESSAGES = {
         " modeling)."
     ),
     "cannot-rule-out": (
-        '"Cannot rule out" reads a result off an interval edge; quote the point estimate and'
-        " its interval."
+        '"Cannot rule out" reads a result off an interval edge; give the point estimate and say'
+        " whether it is distinguishable from noise, with the interval in a table or footnote"
+        " unless the reader needs it to decide."
     ),
     "cleft-sentence": (
         "Check: cleft sentence (advisory). Try the plain clause with the real subject first."
@@ -146,9 +147,9 @@ MESSAGES = {
         "Too many numbers for body prose; move them to a table or figure and say what they show."
     ),
     "supporting-statistic": (
-        "Check: a statistic that supports a result (test statistic, degrees of freedom, p-value,"
-        " interval or a pair of rates). Move it to a table, footnote or appendix unless the reader"
-        " needs it to decide."
+        "Check: a statistic that supports a result (advisory), such as a test statistic, degrees"
+        " of freedom, a p-value, an interval or two rates set against each other. Move it to a"
+        " table, footnote or appendix unless the reader needs it to decide."
     ),
     "heading-density": (
         "More top-level sections than the length supports; merge sections or nest them."
