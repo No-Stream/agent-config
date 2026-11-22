@@ -322,6 +322,7 @@ class TestSupportingStatistic:
             " The share is 0.25 * 0.4 = 0.1 of the day.\n\n"
             "Its crust score rose from 0.81 to 0.84. The oven alarm sounds at humidity 0.05 and"
             " 0.2.\n\n"
+            "The bakery spent most of its budget on flour ($14,200).\n\n"
             "![Bake times](bake.png)\n\n"
             "The two probes read 0.92 against 0.97 of the true heat.\n\n"
             "| oven | t | p |\n| new | 3.10 | 0.01 |\n\n"
