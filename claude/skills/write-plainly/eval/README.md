@@ -38,7 +38,7 @@ The numbers are counts of pattern matches. They say how often a rule fires on ea
 - One model wrote every agent text, prompted one way. Other models, other prompts or real agent drafts from your own work can fire rules at different rates.
 - The two sides differ in more than authorship. The seven web pages (about 33,000 words) have no agent counterpart, and the matched corpus is plain text with no headings, bold or lists. Rules about markdown structure can therefore fire only on the human web pages, and their agent rate of zero is not evidence. The corpus table counts the texts with markdown structure on each side. HTML conversion can also add or drop structure, such as a bold lead-in or a caption, so when a markdown rule's rate looks wrong, read the converted page in `.cache/pages/`.
 - A third of the matched corpus's human texts were published before 1930, all in non-technical registers: three literary texts and one each of biography, how-to, letters, review and travel. Prose that old differs from the technical documents this skill is for.
-- `lint_prose.py` and the modules it imports (`lint_prose_markdown.py`, `lint_prose_document.py` and the word lists in `lint_prose_patterns.py`) change over time. The output header records one sha256 of all four files, so compare runs only when the hashes match.
+- `lint_prose.py` and the modules it imports (`lint_prose_markdown.py`, `lint_prose_document.py` and the word lists in `lint_prose_patterns.py`) change over time. The output header records one sha256 of all four files, so compare runs only when the hashes match. The tables below name the hash each run used.
 
 ## Results
 
@@ -161,3 +161,42 @@ How the rules decide:
 - The phrase and sentence rules skip double-quoted spans, which hold someone else's words. `coined-label` and `undefined-acronym` read quoted text, because a quoted button or ticket name is still an unexplained ID.
 
 No rule was dropped.
+
+## Rules for model tells from public catalogs
+
+A later change added the rules below to `lint_prose.py`, for model habits that sloplint and slop-guard, as `check-prose.sh` runs them, do not catch. Their word and phrase lists, in `lint_prose_patterns.py`, come from Wikipedia's "Signs of AI writing" and "Words to watch" and the phrase list of hardikpandya/stop-slop (see `../sources.md`). Two of the rules, `intensifier` and `passive-by-agent`, enforce rules the skill already states (cut intensifiers, write in active voice), so they are house style, and `stock-emphasis` now also flags the announcing phrases the skill tells writers to cut. The table comes from a run on 2026-11-22 with the four `lint_prose*.py` files at sha256 `8facbdca08f0`, on the same corpora as the tables above.
+
+| rule | what it flags | message | group | human | agent | human texts | agent texts |
+|---|---|---|---|---|---|---|---|
+| `promotional-word` | sales wording ("supercharge", "game-changer", "cutting-edge", "transformative", "unlock the full potential", "the future looks bright") | fix | tell | 0.05 | 0.00 | 1/31 | 0/24 |
+| `ai-vocabulary` | words models overuse that careful writers rarely use ("delve", "pivotal", "interplay", "showcase", "foster", "leverages", "the competitive landscape") | check | tell | 0.02 | 0.00 | 1/31 | 0/24 |
+| `era-framing` | framing by the times ("in today's fast-paced world", "in an era of", "now more than ever") | fix | tell | 0.02 | 0.00 | 1/31 | 0/24 |
+| `vague-quantifier` | "a number of", "a wide array of", "myriad", "a host of" | check | tell | 0.12 | 0.04 | 3/31 | 1/24 |
+| `borrowed-jargon` | "orthogonal", "inflection point", "paradigm shift", "a non-zero chance" | check | tell | 0.04 | 0.04 | 2/31 | 1/24 |
+| `stock-concession` | "despite these challenges", "faces several challenges", "challenges remain" | check | tell | 0.00 | 0.00 | 0/31 | 0/24 |
+| `dead-transition` | "moving forward,", "going forward.", "all in all", "circle back" | fix | tell | 0.00 | 0.00 | 0/31 | 0/24 |
+| `insight-teaser` | "the part everyone misses", "conventional wisdom says", "contrary to popular belief", "this is where things get interesting" | fix | tell | 0.00 | 0.00 | 0/31 | 0/24 |
+| `engagement-bait` | "let that sink in", "think about it:", "what if I told you", "plot twist", "this changes everything", "make no mistake" | fix | tell | 0.00 | 0.00 | 0/31 | 0/24 |
+| `chat-phrasing` | "let me know if", "would you like me to", "I hope this helps", "happy to iterate" | check | tell | 0.00 | 0.00 | 0/31 | 0/24 |
+| `section-label` | a heading, bold run-in or colon label such as "Key takeaways", "Why it matters." or "Bottom line:" | fix | tell | 0.00 | 0.00 | 0/31 | 0/24 |
+| `stock-emphasis`, widened | the phrases in the table above, plus "it is important to note", "it should be noted", "it's worth noting", "needless to say", "at its core", "the reality is", "let me be clear" and "Importantly," | fix | house | 0.07 | 0.21 | 3/31 | 5/24 |
+| `intensifier` | the third and later intensifier in an H1 or H2 section ("very", "extremely", "incredibly", "truly") | check | house | 1.45 | 0.17 | 12/31 | 3/24 |
+| `passive-by-agent` | a passive that names its actor ("the shelves were built by volunteers") | check | house | 0.67 | 0.89 | 14/31 | 13/24 |
+
+Each list started from the catalogs, and an entry stayed only if it fired rarely on the human texts here. Words the human writers use in their ordinary sense were dropped: "ensuring" is in 10 of the 31 human texts and "significant" in 9, against none and 2 of the 24 agent texts, and "robust", "crucial", "particularly", "overall", "additionally" and adjectival "key" behave the same way. So were sentence-initial "Furthermore,", "Moreover," and "In addition," (7 human texts, no agent text), "at the end of the day", which runbooks use literally, "a wide range of", and "seamless", which names an image-editing method and a kind of pipe. Phrases sloplint already flags are left to it: "underscores", "tapestry", "testament", "vibrant", "Here's what nobody tells you", "read that again", "Here's the kicker:" and "The takeaway:".
+
+The human hits were read. `promotional-word` fires on "transformative" three times in one Amodei essay, a word the skill names as promotional. Four of the seven `vague-quantifier` hits are "a number of" in one kernel-development document, where the count was knowable. `stock-emphasis` now fires on three human texts, and its message still says fix because every hit is an announcing phrase the skill cuts in any text ("It's worth noting that", "It goes without saying that", "It should be noted in this context that", "Importantly,"), the same reasoning as for `american-spelling`; its row in the table above predates these phrases. `intensifier` fires eight times as often on the human side, and "very" makes up 74 of its 86 hits; it stays because the skill asks writers to cut intensifiers whoever writes them, and it says "check" because one or two strong adverbs per section are often earned. `passive-by-agent` fires at about the same rate on both sides; "by" followed by a means ("by replacing two tiles"), a sort key ("sorted by date") or a feeling ("surprised by") is not an actor and passes.
+
+Six of the rules never fired on these corpora, so the corpora say nothing about their false-flag rate. The agent texts are essays written from a brief, and those rarely carry chat phrasing, engagement bait or section labels, so an agent rate of zero says nothing about how often the rules catch model habits in documents. Because the lists were pruned on these same corpora, the human rates above are lower than they would be on new text.
+
+Three checks were tried and left out. A rule for a phrase repeated three or more times would contradict the skill's rule to keep one term per concept, and it fires mostly on careful prose: sloplint's off-by-default `phrase-echo` fires 1.66 times per 1,000 words on the human texts against 0.30 on the agent texts (21 of 31 human texts, 4 of 24 agent). A rule against a size in words with no number ("improved considerably") would contradict the skill's Evidence and numbers section, which keeps the numbers in tables and asks the prose for the size in plain words. A count of bold spans per word adds nothing to `bold-run-in` and slop-guard's bold checks, which flag each bold lead-in and inline keyword, and on the human pages it would flag Karpathy's recipe post (1.03 bold spans per 100 words), whose bold lead-ins `bold-run-in` already flags.
+
+How the new rules decide:
+
+- The tell rules read paragraphs, list items, captions, footnotes and headings, and skip double-quoted spans. Every phrase rule reads a paragraph with its line breaks joined, so a phrase wrapped across two lines still matches. `section-label` reads a heading's whole text, or the start of a paragraph or list item, so "the bottom line of the form" passes.
+- `ai-vocabulary` keeps a word only in its figurative or business sense where the plain sense is common: "landscape" after "competitive", "digital", "market" and a few other modifiers, "foster" except before "care", "parents", "home" or "children", "boasts" when it means "has", and "leverage" as a verb ("leverages", "to leverage"), not "highly leveraged".
+- `promotional-word` reads "unlock" only before a gain such as "potential", "value" or "insights", so "unlock the screen" and "unlocks the mutex" pass.
+- `dead-transition` reads "moving forward" and "going forward" before a comma when no word comes before them, and "going forward" at the end of a sentence unless "is", "was" or "kept" comes before it, so "the iterator is moving forward" passes. `era-framing` reads "in today's" only when "world", "market", "landscape" or a similar noun follows within two words, so "in today's release" passes.
+- In `stock-emphasis`, "it is important to note" and "worth noting" need "that", "how", "why" or a punctuation mark after them, so "it is critical to note each failed request" passes, and "at its core" counts only before a comma.
+- `intensifier` allows two per H1 or H2 section, as `triad-density` allows two lists of three, and passes "the very first" and "this very room".
+- `passive-by-agent` reads a form of "be", up to two adverbs, a past participle and "by", followed by a word that is not "far", "default", "hand", a number or a lowercase gerund, so "designed by Ming" counts and "fixed by replacing" passes.
