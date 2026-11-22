@@ -101,6 +101,9 @@ Rules:
 - Preserve the author's meaning, uncertainty, technical terms, and voice. Do not replace accurate technical language
   with casual language.
 - Prefer minimal, local fixes. Do not rewrite the document.
+- When a comparison across groups is written as a sentence per group, the fix is a table that replaces those
+  sentences: say which sentences it replaces and give its rows and columns from the document or the named source.
+  Never propose a table beside the sentences it repeats.
 - Skip minor and low-confidence observations unless the same problem recurs. Report a recurring problem once, quoting
   its first instance and saying how many times it occurs.
 - Never skip a `shorthand` term, however small it looks, because the author must fix every one. Put several terms in

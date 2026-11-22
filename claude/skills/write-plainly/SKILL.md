@@ -102,7 +102,7 @@ Use paragraphs for reasoning, lists for separate items, numbered lists for seque
 
 Body paragraphs run four to six sentences. A paragraph of one to three sentences is a fragment: merge it into a neighbor on the same topic, or develop it with content the reader needs, and never pad it. Structural blocks are exempt: list lead-ins, captions, footnotes, and the sentence or two that explains a figure or table. Do not split a coherent longer paragraph to hit the range. Put a figure's explanation directly after the figure, saying what it shows and what to take from it, with no sentence before it that only announces the figure.
 
-Size the main text to the document's job. Figures do not count against the word budget. Without a stated budget, aim for these lengths, counting a page as about 300 words:
+Size the main text to the document's job. Tables and figures do not count against the word budget. Without a stated budget, aim for these lengths, counting a page as about 300 words:
 
 | Document | Main text |
 | --- | --- |
