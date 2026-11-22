@@ -1,10 +1,8 @@
 from __future__ import annotations
 
+from conftest import rule_lines
+
 import lint_prose
-
-
-def _lines(rule: str, text: str) -> list[int]:
-    return [finding.line for finding in lint_prose.lint_text(text) if finding.rule == rule]
 
 
 class TestBorrowedJargon:
@@ -15,11 +13,11 @@ class TestBorrowedJargon:
             "There is a non-zero chance that the roof leaks again.\n"
             "Self-checkout was a paradigm shift for the staff.\n"
         )
-        assert _lines("borrowed-jargon", text) == [1, 2, 3, 4]
+        assert rule_lines("borrowed-jargon", text) == [1, 2, 3, 4]
 
     def test_leaves_measured_quantities_alone(self) -> None:
         text = "The gradient is non-zero only at the input.\nThe curve has no inflection.\n"
-        assert _lines("borrowed-jargon", text) == []
+        assert rule_lines("borrowed-jargon", text) == []
 
 
 class TestChatPhrasing:
@@ -31,11 +29,11 @@ class TestChatPhrasing:
             "Feel free to reach out with questions.\n"
             "Happy to iterate!\n"
         )
-        assert _lines("chat-phrasing", text) == [1, 2, 3, 4, 5]
+        assert rule_lines("chat-phrasing", text) == [1, 2, 3, 4, 5]
 
     def test_leaves_reported_preferences_alone(self) -> None:
         text = "Readers would like longer opening hours, and the survey asked what they hope for.\n"
-        assert _lines("chat-phrasing", text) == []
+        assert rule_lines("chat-phrasing", text) == []
 
 
 class TestWrappedLines:
@@ -58,39 +56,14 @@ class TestSectionLabel:
             "Bottom line: the branch should open at eight.\n\n"
             "## Final thoughts.\n"
         )
-        assert _lines("section-label", text) == [1, 3, 5, 7]
+        assert rule_lines("section-label", text) == [1, 3, 5, 7]
 
     def test_leaves_template_headings_and_ordinary_sentences_alone(self) -> None:
         text = (
             "## Summary\n\n## Next steps\n\n## Conclusion\n\n"
             "The bottom line of the form asks for a signature.\n"
         )
-        assert _lines("section-label", text) == []
-
-
-class TestStockEmphasisAnnouncing:
-    def test_flags_importance_assertions_and_filler_openers(self) -> None:
-        text = (
-            "It is important to note that the branch closes early on Fridays.\n"
-            "It should be noted that parking is free.\n"
-            "It's worth noting that the café opens at eight.\n"
-            "Needless to say, the raffle sold out.\n"
-            "Importantly, the lift now reaches every floor.\n"
-            "At its core, a library lends things.\n"
-            "The reality is that most readers come by bus.\n"
-            "Let me be clear: the branch stays open.\n"
-        )
-        assert _lines("stock-emphasis", text) == list(range(1, 9))
-
-    def test_leaves_comparative_adverbs_and_plain_notes_alone(self) -> None:
-        text = (
-            "More importantly, the lift now reaches every floor.\n"
-            "The staff noted that parking is free.\n"
-            "The magnetic field peaks at its core.\n"
-            "It is critical to note each failed request in the log.\n"
-            "It is important to stress-test the lock.\n"
-        )
-        assert _lines("stock-emphasis", text) == []
+        assert rule_lines("section-label", text) == []
 
 
 class TestIntensifier:
@@ -104,7 +77,7 @@ class TestIntensifier:
             "## Parking\n\n"
             "The car park is very small, and the bus is very slow.\n"
         )
-        assert _lines("intensifier", text) == [5, 6]
+        assert rule_lines("intensifier", text) == [5, 6]
 
     def test_leaves_the_very_and_quoted_speech_alone(self) -> None:
         text = (
@@ -112,7 +85,7 @@ class TestIntensifier:
             " The very first reader arrived at nine, in this very room."
             ' A reader said the café was "very, very, very good."\n'
         )
-        assert _lines("intensifier", text) == []
+        assert rule_lines("intensifier", text) == []
 
 
 class TestPassiveByAgent:
@@ -123,7 +96,7 @@ class TestPassiveByAgent:
             "Loan numbers were strongly affected by the bus strike.\n"
             "The banner was designed by Ming.\n"
         )
-        assert _lines("passive-by-agent", text) == [1, 2, 3, 4]
+        assert rule_lines("passive-by-agent", text) == [1, 2, 3, 4]
 
     def test_leaves_means_measures_and_feelings_alone(self) -> None:
         text = (
@@ -132,7 +105,7 @@ class TestPassiveByAgent:
             "Readers were surprised by the new layout, and the shelf was unaffected by the leak.\n"
             "The volunteers built the new shelves.\n"
         )
-        assert _lines("passive-by-agent", text) == []
+        assert rule_lines("passive-by-agent", text) == []
 
 
 class TestFormalWord:
@@ -143,11 +116,11 @@ class TestFormalWord:
             "Staff endeavor to ascertain which repairs come first.\n"
             "The plan necessitates a second lift, and the trustees are cognizant of it.\n"
         )
-        assert _lines("formal-word", text) == [1, 2, 2, 3, 3, 4, 4]
+        assert rule_lines("formal-word", text) == [1, 2, 2, 3, 3, 4, 4]
 
     def test_leaves_plain_words_and_the_noun_endeavor_alone(self) -> None:
         text = "The branch will use a new scanner, a long endeavor that starts in May.\n"
-        assert _lines("formal-word", text) == []
+        assert rule_lines("formal-word", text) == []
 
 
 class TestWordyPhrase:
@@ -159,11 +132,11 @@ class TestWordyPhrase:
             "Due to the fact that the lift broke, the café moved.\n"
             "In the event that it rains, the fair moves inside.\n"
         )
-        assert _lines("wordy-phrase", text) == [1, 2, 3, 4, 5]
+        assert rule_lines("wordy-phrase", text) == [1, 2, 3, 4, 5]
 
     def test_leaves_terms_of_art_alone(self) -> None:
         text = "We took the gradient with respect to the weights, in terms of loss per token.\n"
-        assert _lines("wordy-phrase", text) == []
+        assert rule_lines("wordy-phrase", text) == []
 
 
 class TestFinanceWord:
@@ -174,7 +147,7 @@ class TestFinanceWord:
             "The scanner repays its cost within a year.\n"
             "Students carry 30% of weekend loans.\n"
         )
-        assert _lines("finance-word", text) == [1, 2, 3, 4]
+        assert rule_lines("finance-word", text) == [1, 2, 3, 4]
 
     def test_leaves_idioms_and_loads_alone(self) -> None:
         text = (
@@ -182,7 +155,7 @@ class TestFinanceWord:
             "The borrower repays the loan monthly, and the van carries 30 boxes.\n"
             "We recouple the spins, and the borrower repays the costly repair.\n"
         )
-        assert _lines("finance-word", text) == []
+        assert rule_lines("finance-word", text) == []
 
 
 class TestMetaphor:
@@ -196,14 +169,14 @@ class TestMetaphor:
             "Loans bounce back after the holiday.\n"
             "The café is the low-hanging fruit, and the lift is the tip of the iceberg.\n"
         )
-        assert _lines("metaphor", text) == [1, 2, 3, 4, 5, 6, 7, 7]
+        assert rule_lines("metaphor", text) == [1, 2, 3, 4, 5, 6, 7, 7]
 
     def test_leaves_literal_bars_ledgers_and_levers_alone(self) -> None:
         text = (
             "The café has a bar and a ledger, and the jaw works as a lever.\n"
             "The staff work the floor on Tuesdays.\n"
         )
-        assert _lines("metaphor", text) == []
+        assert rule_lines("metaphor", text) == []
 
 
 class TestSignposting:
@@ -214,7 +187,7 @@ class TestSignposting:
             "The scanner reads each barcode, as shown below.\n"
             "In summary, readers wait less.\n"
         )
-        assert _lines("signposting", text) == [1, 2, 3, 4]
+        assert rule_lines("signposting", text) == [1, 2, 3, 4]
 
     def test_leaves_plain_references_alone(self) -> None:
         text = (
@@ -224,13 +197,13 @@ class TestSignposting:
             "In short weeks the café closes early.\n"
             "In this guide, we willingly keep the old format.\n"
         )
-        assert _lines("signposting", text) == []
+        assert rule_lines("signposting", text) == []
 
 
 class TestSymbolInProse:
     def test_flags_emoji_and_arrows_in_headings_and_prose(self) -> None:
         text = "## 📚 Hours\n\nThe queue fell → the desk worked.\n\nA cache miss -> a slow read.\n"
-        assert _lines("symbol-in-prose", text) == [1, 3, 5]
+        assert rule_lines("symbol-in-prose", text) == [1, 3, 5]
 
     def test_leaves_code_tables_and_footnote_returns_alone(self) -> None:
         text = (
@@ -239,18 +212,4 @@ class TestSymbolInProse:
             'See the note.↩ The guide says "✨ new".\n'
             "The synthesizer plays C♯, and the build shows ✓.\n"
         )
-        assert _lines("symbol-in-prose", text) == []
-
-
-class TestRatherThanLessAbout:
-    def test_flags_less_about_with_a_noun_subject(self) -> None:
-        text = "The change is less about speed and more about trust.\n"
-        assert _lines("rather-than", text) == [1]
-
-    def test_leaves_comparisons_of_quantity_alone(self) -> None:
-        text = "We learned less about convergence than expected. Do we know less about memory?\n"
-        assert _lines("rather-than", text) == []
-
-    def test_leaves_the_pronoun_form_to_sloplint(self) -> None:
-        text = "It's less about speed and more about trust.\n"
-        assert _lines("rather-than", text) == []
+        assert rule_lines("symbol-in-prose", text) == []

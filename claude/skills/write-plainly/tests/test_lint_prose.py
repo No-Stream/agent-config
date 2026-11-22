@@ -5,11 +5,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from conftest import rule_lines
+
 import lint_prose
-
-
-def _lines(rule: str, text: str) -> list[int]:
-    return [finding.line for finding in lint_prose.lint_text(text) if finding.rule == rule]
 
 
 class TestEmDash:
@@ -50,10 +48,10 @@ class TestCoinedLabel:
 
     def test_does_not_treat_a_pronoun_as_a_label(self) -> None:
         text = "The approach I like to take is simple.\nEvery plan I have tried failed.\n"
-        assert _lines("coined-label", text) == []
+        assert rule_lines("coined-label", text) == []
 
     def test_flags_a_roman_numeral_label(self) -> None:
-        assert _lines("coined-label", "Phase I is done, so we start the survey.\n") == [1]
+        assert rule_lines("coined-label", "Phase I is done, so we start the survey.\n") == [1]
 
     def test_ignores_references_to_the_sections_own_numbered_steps(self) -> None:
         text = (
@@ -63,7 +61,7 @@ class TestCoinedLabel:
             "3. If step 2 tears the roots, trim the torn ends.\n\n"
             "Repeat step 3 for each pot.\n"
         )
-        assert _lines("coined-label", text) == []
+        assert rule_lines("coined-label", text) == []
 
     def test_flags_other_labels_inside_a_numbered_procedure(self) -> None:
         text = (
@@ -73,7 +71,7 @@ class TestCoinedLabel:
             "3. Lift the fern into the new pot.\n\n"
             "We chose option 2, and variant 1 lost to arm 3.\n"
         )
-        assert _lines("coined-label", text) == [7, 7, 7]
+        assert rule_lines("coined-label", text) == [7, 7, 7]
 
     def test_flags_step_numbers_beyond_the_sections_own_list(self) -> None:
         text = (
@@ -84,7 +82,7 @@ class TestCoinedLabel:
             "## Next season\n\n"
             "We start step 1 in March.\n"
         )
-        assert _lines("coined-label", text) == [6, 10]
+        assert rule_lines("coined-label", text) == [6, 10]
 
     def test_ignores_references_to_the_sections_own_numbered_items(self) -> None:
         text = (
@@ -93,14 +91,14 @@ class TestCoinedLabel:
             "2. Turn on the lights.\n\n"
             "Item 2 comes first in winter.\n"
         )
-        assert _lines("coined-label", text) == []
+        assert rule_lines("coined-label", text) == []
 
     def test_flags_tracker_ids_hash_numbers_and_short_codes(self) -> None:
         text = (
             "C3 is late, and the LIB-8.3 permit has not arrived.\n"
             "#014 is late too, and G14 needs a new lock.\n"
         )
-        assert _lines("coined-label", text) == [1, 1, 2, 2]
+        assert rule_lines("coined-label", text) == [1, 1, 2, 2]
 
     def test_flags_more_label_words_once_each(self) -> None:
         text = (
@@ -109,7 +107,7 @@ class TestCoinedLabel:
             "Decision 7 moved the book sale.\n"
             "The leak is the subject of task #42.\n"
         )
-        assert _lines("coined-label", text) == [1, 2, 3, 4]
+        assert rule_lines("coined-label", text) == [1, 2, 3, 4]
 
     def test_passes_an_id_that_follows_a_plain_description(self) -> None:
         text = (
@@ -117,7 +115,7 @@ class TestCoinedLabel:
             "The second reading room (RM2) opens in May, and RM2 seats forty people.\n"
             "The fix for the broken lock (#31) shipped on Friday.\n"
         )
-        assert _lines("coined-label", text) == []
+        assert rule_lines("coined-label", text) == []
 
     def test_leaves_public_names_alone(self) -> None:
         text = (
@@ -126,7 +124,7 @@ class TestCoinedLabel:
             "Fixing the heating is our #1 job for Q3.\n"
             "The style guide is in Issue 9 of the journal.\n"
         )
-        assert _lines("coined-label", text) == []
+        assert rule_lines("coined-label", text) == []
 
     def test_flags_ids_in_backticks_quotes_and_hyphenated_labels(self) -> None:
         text = (
@@ -135,14 +133,14 @@ class TestCoinedLabel:
             "Amendment 5 passed the board.\n"
             'Press "Open REPAIR-41" to begin, or answer req-7c21be.\n'
         )
-        assert _lines("coined-label", text) == [1, 1, 2, 2, 3, 4, 4]
+        assert rule_lines("coined-label", text) == [1, 1, 2, 2, 3, 4, 4]
 
     def test_leaves_commands_in_backticks_and_hex_like_words_alone(self) -> None:
         text = (
             "Run `make all` and `git status`, then check the re-added rows.\n"
             "The weights `W1` and `W2` are two matrices.\n"
         )
-        assert _lines("coined-label", text) == []
+        assert rule_lines("coined-label", text) == []
 
 
 class TestBoldRunIn:
@@ -165,7 +163,7 @@ class TestBoldRunIn:
             "2. **Note:** the cache expires daily.\n"
             "* __Note:__ the cache expires daily.\n"
         )
-        assert _lines("bold-run-in", text) == [1, 2, 3, 4]
+        assert rule_lines("bold-run-in", text) == [1, 2, 3, 4]
 
 
 class TestTitleCaseHeading:
@@ -193,7 +191,7 @@ class TestStackedHedge:
             "A cover could\npotentially help.\n"
             "- Mulch might perhaps keep the roots warm.\n"
         )
-        assert _lines("stacked-hedge", text) == [1, 2, 4]
+        assert rule_lines("stacked-hedge", text) == [1, 2, 4]
 
     def test_leaves_single_hedges_and_masked_text_alone(self) -> None:
         text = (
@@ -203,7 +201,7 @@ class TestStackedHedge:
             "`may possibly` is a stock phrase.\n"
             "> It could potentially rain.\n"
         )
-        assert _lines("stacked-hedge", text) == []
+        assert rule_lines("stacked-hedge", text) == []
 
 
 class TestNominalizationOf:
@@ -213,7 +211,7 @@ class TestNominalizationOf:
             "After completion of the survey, the city held a vote.\n"
             "Residents asked for an investigation\nof the delays.\n"
         )
-        assert _lines("nominalization-of", text) == [1, 2, 3]
+        assert rule_lines("nominalization-of", text) == [1, 2, 3]
 
     def test_leaves_terms_of_art_plurals_and_verbs_alone(self) -> None:
         text = (
@@ -222,7 +220,7 @@ class TestNominalizationOf:
             "Two implementations of the signal timing exist.\n"
             "The city implemented the lane in two years.\n"
         )
-        assert _lines("nominalization-of", text) == []
+        assert rule_lines("nominalization-of", text) == []
 
 
 class TestInvertedAnimacy:
@@ -235,7 +233,7 @@ class TestInvertedAnimacy:
             "We found that the trained network is trying to memorize the coast.\n"
             "The numbers tell a different story about the coast.\n"
         )
-        assert _lines("inverted-animacy", text) == [1, 2, 3, 4, 6, 7]
+        assert rule_lines("inverted-animacy", text) == [1, 2, 3, 4, 6, 7]
 
     def test_leaves_measurement_verbs_people_and_objects_alone(self) -> None:
         text = (
@@ -248,7 +246,7 @@ class TestInvertedAnimacy:
             "The model is thought to overfit.\n"
             "A large number said they had never seen the coast.\n"
         )
-        assert _lines("inverted-animacy", text) == []
+        assert rule_lines("inverted-animacy", text) == []
 
     def test_leaves_plural_noun_uses_of_the_verb_alone(self) -> None:
         text = (
@@ -256,7 +254,7 @@ class TestInvertedAnimacy:
             "Two model tells and three style rules fire on this draft.\n"
             "When the data claims are stored, the table grows.\n"
         )
-        assert _lines("inverted-animacy", text) == []
+        assert rule_lines("inverted-animacy", text) == []
 
 
 class TestInvertedAnimacyCheck:
@@ -268,7 +266,7 @@ class TestInvertedAnimacyCheck:
             "A small fee buys quicker returns.\n"
             "A shelf layout that crowds the doorway slows everyone.\n"
         )
-        assert _lines("inverted-animacy-check", text) == [1, 2, 3, 4, 5]
+        assert rule_lines("inverted-animacy-check", text) == [1, 2, 3, 4, 5]
 
     def test_leaves_people_and_plain_verbs_alone(self) -> None:
         text = (
@@ -277,7 +275,7 @@ class TestInvertedAnimacyCheck:
             "We gave each group half of the visitors.\n"
             "The shelf has room for forty books.\n"
         )
-        assert _lines("inverted-animacy-check", text) == []
+        assert rule_lines("inverted-animacy-check", text) == []
 
 
 class TestBackReference:
@@ -297,7 +295,7 @@ class TestBackReference:
             "The shorter route list from earlier still applies.\n"
             "The rooms I suggested to the board earlier are free.\n"
         )
-        assert _lines("back-reference", text) == list(range(1, 14))
+        assert rule_lines("back-reference", text) == list(range(1, 14))
 
     def test_leaves_restated_and_attributed_text_alone(self) -> None:
         text = (
@@ -309,7 +307,7 @@ class TestBackReference:
             "As discussed below, the roof needs work.\n"
             'The guide says "as discussed" too often.\n'
         )
-        assert _lines("back-reference", text) == []
+        assert rule_lines("back-reference", text) == []
 
 
 class TestAnnouncingSentence:
@@ -320,7 +318,7 @@ class TestAnnouncingSentence:
             "Here is the plan:\n\n"
             "- Fix the ramp first.\n"
         )
-        assert _lines("announcing-sentence", text) == [1, 3, 5]
+        assert rule_lines("announcing-sentence", text) == [1, 3, 5]
 
     def test_leaves_sentences_that_carry_the_point_alone(self) -> None:
         text = (
@@ -328,7 +326,7 @@ class TestAnnouncingSentence:
             "We asked the council whether a second lift fits the budget, and it does.\n\n"
             "The lift has one job: it carries wheelchairs to the first floor.\n"
         )
-        assert _lines("announcing-sentence", text) == []
+        assert rule_lines("announcing-sentence", text) == []
 
 
 class TestStockEmphasis:
@@ -342,7 +340,7 @@ class TestStockEmphasis:
             "The new layout is a big win.\n"
             "An honest count of visitors is hard.\n"
         )
-        assert _lines("stock-emphasis", text) == [1, 2, 3, 4, 5, 6, 7]
+        assert rule_lines("stock-emphasis", text) == [1, 2, 3, 4, 5, 6, 7]
 
     def test_leaves_plain_uses_of_the_words_alone(self) -> None:
         text = (
@@ -351,7 +349,30 @@ class TestStockEmphasis:
             "The matter went to the council.\n"
             "Nobody can win the raffle twice.\n"
         )
-        assert _lines("stock-emphasis", text) == []
+        assert rule_lines("stock-emphasis", text) == []
+
+    def test_flags_importance_assertions_and_filler_openers(self) -> None:
+        text = (
+            "It is important to note that the branch closes early on Fridays.\n"
+            "It should be noted that parking is free.\n"
+            "It's worth noting that the café opens at eight.\n"
+            "Needless to say, the raffle sold out.\n"
+            "Importantly, the lift now reaches every floor.\n"
+            "At its core, a library lends things.\n"
+            "The reality is that most readers come by bus.\n"
+            "Let me be clear: the branch stays open.\n"
+        )
+        assert rule_lines("stock-emphasis", text) == list(range(1, 9))
+
+    def test_leaves_comparative_adverbs_and_plain_notes_alone(self) -> None:
+        text = (
+            "More importantly, the lift now reaches every floor.\n"
+            "The staff noted that parking is free.\n"
+            "The magnetic field peaks at its core.\n"
+            "It is critical to note each failed request in the log.\n"
+            "It is important to stress-test the lock.\n"
+        )
+        assert rule_lines("stock-emphasis", text) == []
 
 
 class TestHistoryInDocument:
@@ -365,7 +386,7 @@ class TestHistoryInDocument:
             "The field was previously called branch name.\n"
             "Unlike the last version, the map shows the car park.\n"
         )
-        assert _lines("history-in-document", text) == [1, 2, 3, 4, 5, 6, 7]
+        assert rule_lines("history-in-document", text) == [1, 2, 3, 4, 5, 6, 7]
 
     def test_leaves_changes_in_the_world_alone(self) -> None:
         text = (
@@ -375,7 +396,7 @@ class TestHistoryInDocument:
             "The branch was previously a post office.\n"
             "The survey took its figures from an earlier version of the census.\n"
         )
-        assert _lines("history-in-document", text) == []
+        assert rule_lines("history-in-document", text) == []
 
 
 class TestAmericanSpelling:
@@ -387,7 +408,7 @@ class TestAmericanSpelling:
             "The volunteers analysed the loans, and the modelling took a week.\n"
             "Each labelled box holds behaviour notes, a licence and a programme.\n"
         )
-        assert _lines("american-spelling", text) == [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5]
+        assert rule_lines("american-spelling", text) == [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5]
 
     def test_leaves_american_spellings_and_other_ise_words_alone(self) -> None:
         text = (
@@ -397,7 +418,7 @@ class TestAmericanSpelling:
             "We organized the center, analyzed the loans and practice programming.\n"
             'The British sign said "colour" and the `colour` field stays.\n'
         )
-        assert _lines("american-spelling", text) == []
+        assert rule_lines("american-spelling", text) == []
 
 
 class TestAllCapsEmphasis:
@@ -407,7 +428,7 @@ class TestAllCapsEmphasis:
             "Do NOT leave the door open.\n"
             "This is IMPORTANT FOR EVERYONE on the rota.\n"
         )
-        assert _lines("all-caps-emphasis", text) == [1, 2, 3]
+        assert rule_lines("all-caps-emphasis", text) == [1, 2, 3]
 
     def test_leaves_acronyms_defined_terms_code_and_quotes_alone(self) -> None:
         text = (
@@ -416,19 +437,19 @@ class TestAllCapsEmphasis:
             "The ASPP FPN model ran on NASA hardware.\n"
             'The sign said "DO NOT ENTER" and the label said `NOT FOR LOAN`.\n'
         )
-        assert _lines("all-caps-emphasis", text) == []
+        assert rule_lines("all-caps-emphasis", text) == []
 
     def test_a_word_spelled_out_in_parentheses_is_an_acronym(self) -> None:
         text = (
             "The WHO (World Health Organization) published new guidance on clean water this"
             " spring.\nThe WHO also pays for village wells.\n"
         )
-        assert _lines("all-caps-emphasis", text) == []
-        assert _lines("undefined-acronym", text) == []
+        assert rule_lines("all-caps-emphasis", text) == []
+        assert rule_lines("undefined-acronym", text) == []
 
     def test_an_aside_in_parentheses_does_not_excuse_emphasis(self) -> None:
         text = "Do NOT (under any circumstances) leave the door open.\n"
-        assert _lines("all-caps-emphasis", text) == [1]
+        assert rule_lines("all-caps-emphasis", text) == [1]
 
 
 class TestRatherThan:
@@ -438,7 +459,7 @@ class TestRatherThan:
             "The fee rose 2%, not 5%.\n"
             "Use `due_date`, not `return_date`.\n"
         )
-        assert _lines("rather-than", text) == [1, 2, 3]
+        assert rule_lines("rather-than", text) == [1, 2, 3]
 
     def test_leaves_comparisons_and_the_form_slop_guard_flags_alone(self) -> None:
         text = (
@@ -446,7 +467,19 @@ class TestRatherThan:
             "The count was higher than we expected.\n"
             "The branch is open, not closed.\n"
         )
-        assert _lines("rather-than", text) == []
+        assert rule_lines("rather-than", text) == []
+
+    def test_flags_less_about_with_a_noun_subject(self) -> None:
+        text = "The change is less about speed and more about trust.\n"
+        assert rule_lines("rather-than", text) == [1]
+
+    def test_leaves_comparisons_of_quantity_alone(self) -> None:
+        text = "We learned less about convergence than expected. Do we know less about memory?\n"
+        assert rule_lines("rather-than", text) == []
+
+    def test_leaves_the_pronoun_form_to_sloplint(self) -> None:
+        text = "It's less about speed and more about trust.\n"
+        assert rule_lines("rather-than", text) == []
 
 
 class TestCannotRuleOut:
@@ -456,7 +489,7 @@ class TestCannotRuleOut:
             "We can't rule out a 3% rise.\n"
             "We cannot exclude a seasonal effect.\n"
         )
-        assert _lines("cannot-rule-out", text) == [1, 2, 3]
+        assert rule_lines("cannot-rule-out", text) == [1, 2, 3]
 
     def test_leaves_estimates_and_other_exclusions_alone(self) -> None:
         text = (
@@ -464,7 +497,7 @@ class TestCannotRuleOut:
             "The filter can exclude archived records.\n"
             "The council ruled out a second branch.\n"
         )
-        assert _lines("cannot-rule-out", text) == []
+        assert rule_lines("cannot-rule-out", text) == []
 
 
 class TestCleftSentence:
@@ -473,7 +506,7 @@ class TestCleftSentence:
             "What keeps the queue short is the second desk.\n"
             "It is the narrow door that causes the delay.\n"
         )
-        assert _lines("cleft-sentence", text) == [1, 2]
+        assert rule_lines("cleft-sentence", text) == [1, 2]
 
     def test_leaves_questions_extraposition_and_plain_clauses_alone(self) -> None:
         text = (
@@ -482,7 +515,7 @@ class TestCleftSentence:
             "The narrow door slows the queue.\n"
             "What-if planning helps the rota.\n"
         )
-        assert _lines("cleft-sentence", text) == []
+        assert rule_lines("cleft-sentence", text) == []
 
 
 THREE_SERIES = (
@@ -495,14 +528,14 @@ THREE_SERIES = (
 class TestTriadDensity:
     def test_flags_the_third_list_of_three_in_a_section(self) -> None:
         text = "## Services\n\n" + "\n".join(THREE_SERIES) + "\n"
-        assert _lines("triad-density", text) == [5]
+        assert rule_lines("triad-density", text) == [5]
 
     def test_counts_a_series_with_a_serial_comma(self) -> None:
         text = (
             "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
             "The café sells tea, coffee, and cake.\n"
         )
-        assert _lines("triad-density", text) == [5]
+        assert rule_lines("triad-density", text) == [5]
 
     def test_a_longer_list_is_not_a_list_of_three(self) -> None:
         text = (
@@ -512,14 +545,14 @@ class TestTriadDensity:
             "Tea gets a shelf, and coffee or cocoa gets a cupboard.\n"
             "The desk lends laptops, chargers and headphones.\n"
         )
-        assert _lines("triad-density", text) == [8]
+        assert rule_lines("triad-density", text) == [8]
 
     def test_skips_an_opening_clause_before_a_list_of_three(self) -> None:
         text = (
             "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
             "In winter, the branch lends sledges, skates and scarves.\n"
         )
-        assert _lines("triad-density", text) == [5]
+        assert rule_lines("triad-density", text) == [5]
 
     def test_an_opening_clause_before_a_pair_is_not_a_list_of_three(self) -> None:
         text = (
@@ -528,21 +561,21 @@ class TestTriadDensity:
             "However, the café stays open and serves soup.\n"
             "In 2024, the branch bought chairs and lamps.\n"
         )
-        assert _lines("triad-density", text) == []
+        assert rule_lines("triad-density", text) == []
 
     def test_a_long_clause_before_the_first_comma_is_not_an_opening_phrase(self) -> None:
         text = (
             "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
             "For each loan we record the date, the reader and the branch.\n"
         )
-        assert _lines("triad-density", text) == [5]
+        assert rule_lines("triad-density", text) == [5]
 
     def test_counts_captions_and_footnotes(self) -> None:
         free = "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n\n"
         caption = free + "Figure 2: loans, visits and renewals by month.\n"
         footnote = free + "[^1]: Loans, visits and renewals rose in May.\n"
-        assert _lines("triad-density", caption) == [6]
-        assert _lines("triad-density", footnote) == [6]
+        assert rule_lines("triad-density", caption) == [6]
+        assert rule_lines("triad-density", footnote) == [6]
 
     def test_counts_each_section_and_skips_list_items(self) -> None:
         text = (
@@ -550,7 +583,7 @@ class TestTriadDensity:
             "## Visits\n\n" + "\n".join(THREE_SERIES[:2]) + "\n\n"
             "- Loans cover books, films and games.\n"
         )
-        assert _lines("triad-density", text) == []
+        assert rule_lines("triad-density", text) == []
 
 
 class TestUndefinedAcronym:
@@ -561,7 +594,7 @@ class TestUndefinedAcronym:
             "NASA's grant paid for the roof.\n\n"
             "The loan counts are FDR-controlled, and COVID-19 shut the branch.\n"
         )
-        assert _lines("undefined-acronym", text) == [1, 3, 5, 7]
+        assert rule_lines("undefined-acronym", text) == [1, 3, 5, 7]
 
     def test_leaves_defined_universal_linked_and_code_acronyms_alone(self) -> None:
         text = (
@@ -574,18 +607,18 @@ class TestUndefinedAcronym:
             "Chapter II covers the TL;DR format. Do NOT skip it.\n"
             "The scans take 60 MB.\n"
         )
-        assert _lines("undefined-acronym", text) == []
+        assert rule_lines("undefined-acronym", text) == []
 
     def test_an_aside_that_does_not_spell_the_acronym_is_not_a_definition(self) -> None:
         text = "The CMS (the old catalogue software) stores every loan.\n"
-        assert _lines("undefined-acronym", text) == [1]
+        assert rule_lines("undefined-acronym", text) == [1]
 
     def test_an_aside_that_ends_in_a_hyphen_is_read_like_any_other(self) -> None:
         text = (
             "The scheduler pins work to CPUs (single- and multi-) when the queue is long.\n"
             "The ABC (all bakers -) list goes up on Friday.\n"
         )
-        assert _lines("undefined-acronym", text) == [2]
+        assert rule_lines("undefined-acronym", text) == [2]
 
 
 RIVER_RUN_ON = (
@@ -630,7 +663,7 @@ class TestLongSentence:
             "## A heading with quite a few words in it about bread and how people bake it at home\n"
             "Short text here that follows the heading without any punctuation at all\n"
         )
-        assert _lines("long-sentence", text) == []
+        assert rule_lines("long-sentence", text) == []
 
     def test_sentence_ends_survive_etc_links_and_footnote_links(self) -> None:
         van = (
@@ -643,13 +676,13 @@ class TestLongSentence:
             f" [the guide](https://example.com/guide). {van}\n\n"
             f"We bake the bread and the rolls and the buns as the guide says.[1](#note-1) {van}\n"
         )
-        assert _lines("long-sentence", text) == []
+        assert rule_lines("long-sentence", text) == []
 
 
 class TestComplexSentence:
     def test_flags_each_forty_word_sentence_after_the_first(self) -> None:
         text = f"{STARTER_SENTENCE}\n\n{CRUST_SENTENCE}\n\n{CRUST_SENTENCE}\n"
-        assert _lines("complex-sentence", text) == [3, 5]
+        assert rule_lines("complex-sentence", text) == [3, 5]
 
     def test_one_long_sentence_is_free_and_run_ons_are_not_charged_twice(self) -> None:
         run_on = RIVER_RUN_ON.replace("early on Monday", "early on Monday or Tuesday")
@@ -661,7 +694,7 @@ class TestComplexSentence:
     def test_a_list_of_names_is_not_a_sentence(self) -> None:
         names = [f"[Baker Number{index}](/team/baker-{index}/)," for index in range(21)]
         text = f"{STARTER_SENTENCE}\n\n**Authors**\n\n" + "\n".join(names) + "\n"
-        assert _lines("complex-sentence", text) == []
+        assert rule_lines("complex-sentence", text) == []
 
 
 MASKING_TRIGGERS = (
@@ -711,7 +744,7 @@ class TestTables:
             "Loaf | Oven\n--- | ---\nspelt — light | 200 C\n\n"
             "The spelt loaf bakes fastest — about half an hour.\n"
         )
-        assert _lines("em-dash", text) == [1, 5, 11]
+        assert rule_lines("em-dash", text) == [1, 5, 11]
 
     def test_a_pipe_in_prose_makes_a_table_only_above_a_matching_delimiter_row(self) -> None:
         text = (
@@ -719,7 +752,7 @@ class TestTables:
             "Flour | sugar — one to one.\n---\n\n"
             "Flour | sugar | salt — in that order.\n--- | ---\n"
         )
-        assert _lines("em-dash", text) == [1, 3, 6]
+        assert rule_lines("em-dash", text) == [1, 3, 6]
 
 
 class TestEndToEnd:
