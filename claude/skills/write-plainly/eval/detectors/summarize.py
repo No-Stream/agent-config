@@ -254,7 +254,7 @@ def spread_line(detector: Detector, texts: Sequence[Text], scores: dict[str, dic
     )
 
 
-def chunk_noise_line(texts: Sequence[Text], scores: dict[str, dict]) -> str:
+def chunk_spread_line(texts: Sequence[Text], scores: dict[str, dict]) -> str:
     deviations = [
         statistics.stdev(scores[text.id]["chunk_scores"])
         for text in texts
@@ -308,7 +308,7 @@ def detector_section(
             contrast_table(detector, by_arm, words, PLANTED_CONTRASTS),
             "### Spread among model drafts and between the chunks of one draft",
             spread_line(detector, texts, scores),
-            chunk_noise_line(texts, scores),
+            chunk_spread_line(texts, scores),
         ]
     )
 

@@ -4,7 +4,7 @@ from summarize import (
     PLANTED_CONTRASTS,
     bheijden_scores,
     bheijden_words,
-    chunk_noise_line,
+    chunk_spread_line,
     contrast_table,
     overview_table,
     paired,
@@ -138,14 +138,14 @@ class TestSpread:
             "Model-drafted texts, planted controls left out (n = 2): standard deviation 1.414,"
         )
 
-    def test_chunk_noise_is_the_median_deviation_over_model_drafts_with_several_chunks(self):
+    def test_chunk_spread_is_the_median_deviation_over_model_drafts_with_several_chunks(self):
         texts, scores = bheijden_texts(
             {"no-skill": [1.0, 2.0, 3.0, 4.0], "degraded": [9.0], "human": [5.0]}
         )
         chunks = ([1.0, 3.0], [0.0, 4.0, 8.0], [5.0, 5.0], [7.0], [0.0, 100.0], [0.0, 50.0])
         for text_id, chunk_scores in zip(scores, chunks, strict=True):
             scores[text_id]["chunk_scores"] = chunk_scores
-        assert chunk_noise_line(texts, scores) == (
+        assert chunk_spread_line(texts, scores) == (
             "Median standard deviation between the chunks of one text, over the 3 model drafts "
             "outside the planted controls with two or more chunks: 1.414."
         )
