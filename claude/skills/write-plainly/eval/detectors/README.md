@@ -73,10 +73,10 @@ The manifest's sources are the bheijden/slop corpus (fetched into `../.cache/` b
 
 `sagemaker_job.py` reads its account settings from `.private/eval/detectors/sagemaker.toml`, a gitignored file with these keys: `profile`, `region`, `role_arn`, `s3_prefix`, `image_uri` (an AWS Hugging Face PyTorch training image with transformers 4.56 or newer), `instance_type` (one GPU with 40 GB or more holds both models at bfloat16), `volume_gb` and `max_runtime_s`. The texts go only to that account's S3 and SageMaker.
 
-The tests cover the manifest, the chunking, which texts get rescored, the summary tables and their direction for each detector, and the Binoculars and Fast-DetectGPT formulas. They need CPU torch and transformers:
+The tests cover the manifest, the chunking, which texts get rescored, the summary tables and their direction for each detector, how a finished SageMaker job's scores are merged, and the Binoculars and Fast-DetectGPT formulas. They need CPU torch, transformers and boto3:
 
 ```sh
-uv run --no-project --python 3.12 --with pytest --with scipy --with torch \
+uv run --no-project --python 3.12 --with pytest --with scipy --with boto3 --with torch \
   --with transformers==5.23.0 --index https://download.pytorch.org/whl/cpu python -m pytest tests
 ```
 
