@@ -26,6 +26,7 @@ from lint_prose_markdown import (
     Block,
     Finding,
     excerpt,
+    heading_text,
     heading_words,
     is_heading,
     mask_quotations,
@@ -45,6 +46,7 @@ from lint_prose_patterns import (
     DESCRIBED_ID,
     HASH_NUMBER,
     HEX_ID,
+    INTENSIFIER,
     LABEL_PATTERN,
     LIST_ENTRY_WORDS,
     ORDINARY_WORD,
@@ -52,9 +54,12 @@ from lint_prose_patterns import (
     PRONOUN_I_AFTER_LABEL,
     PUBLIC_IDS,
     ROMAN_NUMERALS,
+    SECTION_LABEL_HEADING,
+    SECTION_LABEL_RUN_IN,
     SERIES,
     SHORT_CODE,
     STANDARD_ID_PREFIXES,
+    TELL_RULES,
     TITLE_SMALL_WORDS,
     TRACKER_ID,
     UNIVERSAL_ACRONYMS,
@@ -66,6 +71,7 @@ COMPLEX_SENTENCE_WORDS = 40
 FREE_COMPLEX_SENTENCES = 1
 ANNOUNCING_QUESTION_MAX_WORDS = 12
 FREE_TRIADS_PER_SECTION = 2
+FREE_INTENSIFIERS_PER_SECTION = 2
 
 MESSAGES = {
     "em-dash": "Em dash; use a comma, parentheses, a colon, a semicolon or a new sentence.",
@@ -154,12 +160,49 @@ MESSAGES = {
     "heading-density": (
         "More top-level sections than the length supports; merge sections or nest them."
     ),
+    "ai-vocabulary": (
+        "Check: a word language models overuse (advisory). Keep it only if it is literal and the"
+        " plainest word; otherwise say the specific thing."
+    ),
+    "promotional-word": "Promotional wording; state the specific gain or cut it.",
+    "borrowed-jargon": (
+        "Check: a scientific term borrowed for weight (advisory). Unless the literal sense is"
+        ' meant, say "unrelated", "a change" or "a chance".'
+    ),
+    "stock-concession": (
+        "Check: a concession that names no specific challenge (advisory). Name the challenge"
+        " and what it changes, or cut the sentence."
+    ),
+    "era-framing": "Opening that frames the topic by the times; start with the information.",
+    "dead-transition": (
+        "Filler transition; cut it, or use a connective that says how the sentences relate."
+    ),
+    "insight-teaser": "Teaser that sells a point as insider knowledge; state the point.",
+    "engagement-bait": "Line that performs for the reader; cut it and let the facts carry it.",
+    "chat-phrasing": (
+        "Check: chat phrasing addressed to the requester (advisory). Cut it from a document;"
+        " it is fine in a message the user sends."
+    ),
+    "vague-quantifier": (
+        "Check: a quantifier that stands in for a count (advisory). Give the number or name the"
+        " items if you know them."
+    ),
+    "section-label": "Stock section label; name the section by its content, or state the point.",
+    "intensifier": (
+        f"Check: more than {FREE_INTENSIFIERS_PER_SECTION} intensifiers in this section"
+        " (advisory); keep one only where the sentence says less without it."
+    ),
+    "passive-by-agent": (
+        "Check: passive voice with a named actor (advisory). Make the actor the subject unless"
+        " the sentence is about what was acted on."
+    ),
 }
 
 LINK_TEXT = re.compile(r"\[[^\]\n]*\](?=\()")
 CODE_SPAN = re.compile(r"`([^`\n]+)`")
 CODE_ID_SHAPES = (TRACKER_ID, HEX_ID, HASH_NUMBER)  # a short code in backticks is a variable name
 LABEL_SHAPES = (LABEL_PATTERN, *CODE_ID_SHAPES, SHORT_CODE)
+LINE_BREAK = re.compile(r"[ \t]*\n[ \t]*")
 INTERNAL_PUNCTUATION = re.compile(r"[,;:](?=\s)|[(—–]|\s--?\s")
 
 
@@ -274,13 +317,42 @@ def _coined_label_findings(visible_lines: list[str], blocks: list[Block]) -> lis
     return findings
 
 
-def _phrase_findings(prose: list[Block]) -> list[Finding]:
-    return [
-        block.finding(rule, match.start("hit"))
-        for block in prose
-        for rule, pattern in PHRASE_RULES.items()
-        for match in pattern.finditer(mask_quotations(block.text))
-    ]
+def _joined_lines(text: str) -> tuple[str, list[int]]:
+    """Return the text with each line break and its indentation as one space, and the offset in
+    the original text of each character, so a phrase wrapped across lines still matches."""
+    offsets: list[int] = []
+    position = 0
+    for match in LINE_BREAK.finditer(text):
+        offsets.extend(range(position, match.start() + 1))
+        position = match.end()
+    offsets.extend(range(position, len(text)))
+    return LINE_BREAK.sub(" ", text), offsets
+
+
+def _phrase_findings(blocks: list[Block], rules: dict[str, re.Pattern[str]]) -> list[Finding]:
+    findings: list[Finding] = []
+    for block in blocks:
+        text, offsets = _joined_lines(mask_quotations(block.text))
+        findings.extend(
+            block.finding(rule, offsets[match.start("hit")])
+            for rule, pattern in rules.items()
+            for match in pattern.finditer(text)
+        )
+    return findings
+
+
+def _section_label_findings(blocks: list[Block]) -> list[Finding]:
+    """Flag a heading, bold run-in or colon label that is a stock label such as "Key takeaways"."""
+    findings: list[Finding] = []
+    for block in blocks:
+        if block.kind == "heading":
+            if SECTION_LABEL_HEADING.match(heading_text(block.text)):
+                findings.append(block.finding("section-label", block.start_offset))
+        elif block.kind in PROSE_KINDS:
+            label = SECTION_LABEL_RUN_IN.match(block.text)
+            if label:
+                findings.append(block.finding("section-label", label.start("hit")))
+    return findings
 
 
 def _sentence_rule(sentence: str) -> str | None:
@@ -368,6 +440,23 @@ def _triad_findings(blocks: list[Block]) -> list[Finding]:
     ]
 
 
+def _intensifier_findings(blocks: list[Block]) -> list[Finding]:
+    """Flag each intensifier past the free ones in its H1 or H2 section."""
+    findings: list[Finding] = []
+    for _, body in top_sections(blocks):
+        hits = [
+            (block, match.start())
+            for block in body
+            if block.kind in PROSE_KINDS
+            for match in INTENSIFIER.finditer(mask_quotations(block.text))
+        ]
+        findings.extend(
+            block.finding("intensifier", offset)
+            for block, offset in hits[FREE_INTENSIFIERS_PER_SECTION:]
+        )
+    return findings
+
+
 def _is_ordinary_word(token: str) -> bool:
     return bool(ORDINARY_WORD.fullmatch(token.lower().replace("’", "'")))
 
@@ -429,11 +518,15 @@ def lint_text(text: str) -> list[Finding]:
     original_lines, visible_lines, line_kinds = masked_lines(text)
     blocks = parse_blocks(original_lines, visible_lines, line_kinds)
     prose = [block for block in blocks if block.kind in PROSE_KINDS]
+    headings = [block for block in blocks if block.kind == "heading"]
     findings = _line_findings(original_lines, visible_lines)
     findings.extend(_coined_label_findings(visible_lines, blocks))
     findings.extend(section_findings(blocks))
     findings.extend(short_paragraph_findings(blocks))
-    findings.extend(_phrase_findings(prose))
+    findings.extend(_phrase_findings(prose, PHRASE_RULES))
+    findings.extend(_phrase_findings([*prose, *headings], TELL_RULES))
+    findings.extend(_section_label_findings(blocks))
+    findings.extend(_intensifier_findings(blocks))
     findings.extend(_sentence_findings(prose))
     findings.extend(_sentence_shape_findings(prose))
     findings.extend(_triad_findings(blocks))
