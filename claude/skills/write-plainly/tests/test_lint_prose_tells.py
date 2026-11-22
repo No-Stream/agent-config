@@ -117,7 +117,7 @@ class TestDeadTransition:
             "Moving forward, the branch opens at nine.\n"
             "We will track loans going forward.\n"
             "When all is said and done, readers want books.\n"
-            "All in all, the move went well.\n"
+            "Last but not least, the café reopened.\n"
             "We will circle back on parking.\n"
         )
         assert _lines("dead-transition", text) == [1, 2, 3, 4, 5]
@@ -303,3 +303,138 @@ class TestPassiveByAgent:
             "The volunteers built the new shelves.\n"
         )
         assert _lines("passive-by-agent", text) == []
+
+
+class TestFormalWord:
+    def test_flags_formal_words_with_everyday_synonyms(self) -> None:
+        text = (
+            "The branch will utilize a new scanner.\n"
+            "Work will commence in May, prior to the audit.\n"
+            "Staff endeavor to ascertain which repairs come first.\n"
+            "The plan necessitates a second lift, and the trustees are cognizant of it.\n"
+        )
+        assert _lines("formal-word", text) == [1, 2, 2, 3, 3, 4, 4]
+
+    def test_leaves_plain_words_and_the_noun_endeavor_alone(self) -> None:
+        text = "The branch will use a new scanner, a long endeavor that starts in May.\n"
+        assert _lines("formal-word", text) == []
+
+
+class TestWordyPhrase:
+    def test_flags_phrases_with_a_short_form(self) -> None:
+        text = (
+            "We added a desk in order to shorten the queue.\n"
+            "When it comes to parking, the council has a plan.\n"
+            "With regard to hours, the branch opens at nine.\n"
+            "Due to the fact that the lift broke, the café moved.\n"
+            "In the event that it rains, the fair moves inside.\n"
+        )
+        assert _lines("wordy-phrase", text) == [1, 2, 3, 4, 5]
+
+    def test_leaves_terms_of_art_alone(self) -> None:
+        text = "We took the gradient with respect to the weights, in terms of loss per token.\n"
+        assert _lines("wordy-phrase", text) == []
+
+
+class TestFinanceWord:
+    def test_flags_finance_words_for_plain_ideas(self) -> None:
+        text = (
+            "The branch has foregone late fees this year.\n"
+            "The café recoups its outlay by spring.\n"
+            "The scanner repays its cost within a year.\n"
+            "Students carry 30% of weekend loans.\n"
+        )
+        assert _lines("finance-word", text) == [1, 2, 3, 4]
+
+    def test_leaves_idioms_and_loads_alone(self) -> None:
+        text = (
+            "The result was a foregone conclusion.\n"
+            "The borrower repays the loan monthly, and the van carries 30 boxes.\n"
+            "We recouple the spins, and the borrower repays the costly repair.\n"
+        )
+        assert _lines("finance-word", text) == []
+
+
+class TestWhetherRange:
+    def test_flags_a_range_that_pretends_to_cover_every_case(self) -> None:
+        text = (
+            "Whether it's a novel or a cookbook, the branch has it.\n"
+            "Whether you're a student or a retiree, the hours suit you.\n"
+        )
+        assert _lines("whether-range", text) == [1, 2]
+
+    def test_leaves_real_questions_alone(self) -> None:
+        text = (
+            "We asked whether it is open late or early, and nobody knew.\n"
+            "Whether it's raining or not, the fair goes ahead.\n"
+        )
+        assert _lines("whether-range", text) == []
+
+
+class TestMetaphor:
+    def test_flags_images_and_stock_idioms(self) -> None:
+        text = (
+            "The new desk raises the bar for returns.\n"
+            "The survey is a yardstick for the branch.\n"
+            "The budget is a ledger of tradeoffs.\n"
+            "The late opening bridges the gap to night-shift workers.\n"
+            "We read the loans through the lens of the bus timetable.\n"
+            "Loans bounce back after the holiday.\n"
+            "The café is the low-hanging fruit, and the lift is the tip of the iceberg.\n"
+        )
+        assert _lines("metaphor", text) == [1, 2, 3, 4, 5, 6, 7, 7]
+
+    def test_leaves_literal_bars_ledgers_and_levers_alone(self) -> None:
+        text = (
+            "The café has a bar and a ledger, and the jaw works as a lever.\n"
+            "The staff work the floor on Tuesdays.\n"
+        )
+        assert _lines("metaphor", text) == []
+
+
+class TestSignposting:
+    def test_flags_signposts_and_recap_openers(self) -> None:
+        text = (
+            "In this section, we will explain the returns desk.\n"
+            "Let's dive in.\n"
+            "The scanner reads each barcode, as shown below.\n"
+            "In summary, readers wait less.\n"
+        )
+        assert _lines("signposting", text) == [1, 2, 3, 4]
+
+    def test_leaves_plain_references_alone(self) -> None:
+        text = (
+            "The table below lists the hours.\n"
+            "The guide has a section on parking, and in short weeks the café closes early.\n"
+            "In this guide, we willingly keep the old format.\n"
+        )
+        assert _lines("signposting", text) == []
+
+
+class TestSymbolInProse:
+    def test_flags_emoji_and_arrows_in_headings_and_prose(self) -> None:
+        text = "## 📚 Hours\n\nThe queue fell → the desk worked.\n\nA cache miss -> a slow read.\n"
+        assert _lines("symbol-in-prose", text) == [1, 3, 5]
+
+    def test_leaves_code_tables_and_footnote_returns_alone(self) -> None:
+        text = (
+            "Run `a -> b` here, and $f: X → Y$ is a map.\n\n"
+            "| From | To |\n| --- | --- |\n| A | → B |\n\n"
+            'See the note.↩ The guide says "✨ new".\n'
+            "The synthesizer plays C♯, and the build shows ✓.\n"
+        )
+        assert _lines("symbol-in-prose", text) == []
+
+
+class TestRatherThanLessAbout:
+    def test_flags_less_about_with_a_noun_subject(self) -> None:
+        text = "The change is less about speed and more about trust.\n"
+        assert _lines("rather-than", text) == [1]
+
+    def test_leaves_comparisons_of_quantity_alone(self) -> None:
+        text = "We learned less about convergence than expected. Do we know less about memory?\n"
+        assert _lines("rather-than", text) == []
+
+    def test_leaves_the_pronoun_form_to_sloplint(self) -> None:
+        text = "It's less about speed and more about trust.\n"
+        assert _lines("rather-than", text) == []
