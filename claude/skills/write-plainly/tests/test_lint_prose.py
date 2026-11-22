@@ -548,6 +548,13 @@ class TestUndefinedAcronym:
         text = "The CMS (the old catalogue software) stores every loan.\n"
         assert _lines("undefined-acronym", text) == [1]
 
+    def test_an_aside_that_ends_in_a_hyphen_is_read_like_any_other(self) -> None:
+        text = (
+            "The scheduler pins work to CPUs (single- and multi-) when the queue is long.\n"
+            "The ABC (all bakers -) list goes up on Friday.\n"
+        )
+        assert _lines("undefined-acronym", text) == [2]
+
 
 RIVER_RUN_ON = (
     "The volunteers who walk the river path every weekend collect plastic bottles and old fishing"
