@@ -75,8 +75,7 @@ def section_findings(blocks: list[Block]) -> list[Finding]:
         kinds = [block.kind for block in body if block.kind not in ("heading", "break")]
         pairs = zip(["", *kinds], kinds)
         merged = [kind for previous, kind in pairs if not (kind == previous == "list-item")]
-        thin = len(merged) < 2 or merged == ["list-item"]
-        if thin and not _is_reference_list(body):
+        if len(merged) < 2 and not _is_reference_list(body):
             findings.append(heading.finding("thin-h2-section", 0))
     return findings
 
@@ -134,9 +133,13 @@ def _sentences(block: Block) -> list[str]:
     return [block.text[start:end] for start, end in sentence_spans(block.text)]
 
 
-def _fits_summary(sentences: list[str]) -> bool:
-    numbers = sum(_number_count(sentence) for sentence in sentences)
-    return len(sentences) <= MAX_SUMMARY_SENTENCES and numbers <= MAX_SUMMARY_NUMBERS
+def _summary_shape(sentences: list[str]) -> tuple[int, int]:
+    """Return the number of sentences and the count of numbers they quote."""
+    return len(sentences), sum(_number_count(sentence) for sentence in sentences)
+
+
+def _fits_summary(sentences: int, numbers: int) -> bool:
+    return sentences <= MAX_SUMMARY_SENTENCES and numbers <= MAX_SUMMARY_NUMBERS
 
 
 def number_density_findings(blocks: list[Block]) -> list[Finding]:
@@ -151,7 +154,7 @@ def number_density_findings(blocks: list[Block]) -> list[Finding]:
     ]
     has_summary = any(block.section == "summary" for block in blocks)
     opening = next((block for block in blocks if block.kind == "paragraph"), None)
-    if not has_summary and opening in body and _fits_summary(_sentences(opening)):
+    if not has_summary and opening in body and _fits_summary(*_summary_shape(_sentences(opening))):
         body.remove(opening)
     findings: list[Finding] = []
     total_numbers = total_words = 0
@@ -204,9 +207,10 @@ def summary_findings(blocks: list[Block]) -> list[Finding]:
             sections[-1][1].append(block)
     findings: list[Finding] = []
     for heading_line, prose in sections:
-        sentences = [sentence for block in prose for sentence in _sentences(block)]
-        if not _fits_summary(sentences):
-            numbers = sum(_number_count(sentence) for sentence in sentences)
-            measurement = f"summary has {len(sentences)} sentences and {numbers} numbers"
+        sentences, numbers = _summary_shape(
+            [sentence for block in prose for sentence in _sentences(block)]
+        )
+        if not _fits_summary(sentences, numbers):
+            measurement = f"summary has {sentences} sentences and {numbers} numbers"
             findings.append(Finding("tldr-shape", heading_line, 1, measurement))
     return findings
