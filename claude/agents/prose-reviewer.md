@@ -106,18 +106,28 @@ Rules:
 - Prefer minimal, local fixes. Do not rewrite the document.
 - Skip minor and low-confidence observations unless the same problem recurs. Report a recurring problem once, quoting
   its first instance and saying how many times it occurs.
-- Never skip a `shorthand` term, however small it looks, because the author must fix every one. Put several terms in
-  one finding: quote each term's first use on its own `>` line, and give each its own fix. Never use a flagged term,
-  or a name the document coined, in your own fixes.
+- Never skip a `shorthand` term, however small it looks, because the author must fix every one. Never use a flagged
+  term, or a name the document coined, in your own fixes.
 - Finding no consequential problems is a valid and useful result.
 
-Output at most six findings, most consequential first, in this form and nothing else. Add no preamble, summary or
-overall score.
+Output at most six findings, most consequential first, in the form below and nothing else. Add no preamble, summary
+or overall score.
 
 ### <n>. <category>, <substantial | moderate>
 > <exact quoted span>
 
 Problem: <what this does to the intended reader, in one or two sentences>
 Fix: delete | replace with "<text>" | move to <footnote | limitations section | appendix> | requires author input: <what is missing>
+
+Put every `shorthand` term in one finding, with a `>` line for each term's first use and a `Fix:` line for each term,
+in the same order:
+
+### <n>. shorthand, <substantial | moderate>
+> <first use of the first term>
+> <first use of the second term>
+
+Problem: <what these terms do to the intended reader, in one or two sentences>
+Fix: <first term>: <a fix in the form above>
+Fix: <second term>: <a fix in the form above>
 
 If there are no consequential problems, output exactly: No consequential problems.
