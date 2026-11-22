@@ -61,7 +61,9 @@ USER_AGENT = "Mozilla/5.0 (compatible; prose-lint-eval/1.0)"
 MIN_PAGE_WORDS = 500
 PUBLIC_DOMAIN_BEFORE_YEAR = 1929
 RIGHTS_HEADER = "text\tside\tdate\tsource\trights"
-MARKDOWN_STRUCTURE = re.compile(r"^(#{1,6} |\s*[-*+] |\s*\d+\. )|\*\*", re.MULTILINE)
+MARKDOWN_STRUCTURE = re.compile(
+    rf"^(#{{1,6}} |\s*{lint_prose_markdown.LIST_MARKER} )|\*\*", re.MULTILINE
+)
 
 
 @dataclass(frozen=True)
