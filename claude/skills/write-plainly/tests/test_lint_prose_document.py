@@ -305,6 +305,7 @@ class TestSupportingStatistic:
             "Each loaf lost 2.1 ± 0.4 grams of water.",
             "The new probe read within 0.92 of the true heat, against 0.97 for the old one.",
             "The new tin browned 0.62 of the crust, vs. 0.71 for the old tin.",
+            "The share of burnt loaves had a 95% Wilson interval of 0.12 to 0.19.",
         )
         text = OVEN_OPENING + "\n\n".join(sentences) + "\n"
         paragraph_lines = [3 + 2 * index for index in range(len(sentences))]
@@ -323,6 +324,7 @@ class TestSupportingStatistic:
             "Its crust score rose from 0.81 to 0.84. The oven alarm sounds at humidity 0.05 and"
             " 0.2.\n\n"
             "The bakery spent most of its budget on flour ($14,200).\n\n"
+            "CI takes 10 to 15 minutes on every pull request.\n\n"
             "![Bake times](bake.png)\n\n"
             "The two probes read 0.92 against 0.97 of the true heat.\n\n"
             "| oven | t | p |\n| new | 3.10 | 0.01 |\n\n"

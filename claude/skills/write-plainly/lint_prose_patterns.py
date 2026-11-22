@@ -229,13 +229,17 @@ LARGE_SPELLED_NUMBER = re.compile(rf"(?i)\b{LARGE_NUMBER_WORD}\b")
 YEAR_ORDINAL_OR_VERSION = re.compile(r"(?:1[6-9]|20)\d\ds?|\d+(?:st|nd|rd|th)|\d+(?:\.\d+){2,}")
 ENDPOINT = r"[-+−]?[$€£]?\d[\d.,]*%?"
 INTERVAL_PAIR = rf"\s*{ENDPOINT}\s*,(?!\d{{3}}(?!\d))\s*{ENDPOINT}\s*"
+INTERVAL_LABEL = (
+    r"(?:\d+(?:\.\d+)?%\s*(?:[\w-]+\s+)?|(?i:confidence|credible)\s+)(?:CI|(?i:intervals?))\b"
+    r"[^.;]{0,25}?"
+)
 SUPPORTING_STATISTIC = re.compile(
     r"(?<![\w.-])(?:[tzF]|t-stat(?:istic)?|z-score|chi-squared?|χ²)"
     r"\s*(?:\(\s*\d[\d.,\s]*\))?\s*(?:=|of|was|is)\s*[-+−]?\d"
     r"|\b\d+(?:\.\d+)?\s*(?:df|degrees of freedom)\b|\bdf\s*=\s*\d"
     r"|(?<![\w.-])p\s*[<>=≤≥]\s*0?\.\d|\bp-?values? (?:of|was|is|=|<)\s*0?\.\d"
     rf"|[\[(]{INTERVAL_PAIR}[\])]"
-    rf"|(?i:\b(?:CI|intervals?)\b)[^.;]{{0,25}}?{ENDPOINT}\s*(?:to|–|-)\s*[-+−]?\d"
+    rf"|{INTERVAL_LABEL}{ENDPOINT}\s*(?:to|–|-)\s*[-+−]?\d"
     r"|\d\s*(?:±|\+/-)\s*\d"
 )
 DECIMAL_RATE = r"(?<![\d.])[-+−]?0?\.\d+(?!\.\d)"
