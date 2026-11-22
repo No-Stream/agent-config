@@ -1,6 +1,6 @@
 # Lint false-flag check
 
-`false_flags.py` runs every rule in the three write-plainly linters (`lint_prose.py`, sloplint and slop-guard) over careful human prose and over model-written drafts on the same topics, then prints how often each rule fires on each side. A rule that fires more often on the human side flags careful writing more than it flags model writing, so if the rule exists to catch model habits, its message should say "check" rather than "fix", or the rule should go. The check exists because published AI-tell rule sets often fire more on good human technical writing than on model output. The last section gives the skill owner's blind grades on the public tasks of the pairwise evaluation in `pairwise/`.
+`false_flags.py` runs every rule in the three write-plainly linters (`lint_prose.py`, sloplint and slop-guard) over careful human prose and over model-written drafts on the same topics, then prints how often each rule fires on each side. A rule that fires more often on the human side flags careful writing more than it flags model writing, so if the rule exists to catch model habits, its message should say "check" rather than "fix", or the rule should go. The check exists because published AI-tell rule sets often fire more on good human technical writing than on model output.
 
 ## Running it
 
@@ -161,23 +161,3 @@ How the rules decide:
 - The phrase and sentence rules skip double-quoted spans, which hold someone else's words. `coined-label` and `undefined-acronym` read quoted text, because a quoted button or ticket name is still an unexplained ID.
 
 No rule was dropped.
-
-## Blind grades on the public tasks
-
-The skill's owner graded the passages of the blind evaluation in `pairwise/` without knowing which pipeline wrote which, giving each passage a letter grade from A+ to F. Two of the evaluation's five tasks are public, both in `pairwise/tasks/public.toml`: a proposal paragraph on replacing a dashboard's Wald interval for conversion rates (`pub-wilson-interval`), and a design-doc explanation of SQLite's journal modes for a job queue with several worker processes (`pub-sqlite-wal`). The other three tasks, the analysis and the full readout are private. Five pipelines wrote the passages, and the three merged ones read write-plainly at commit e603d90:
-
-- `current`: the owner's earlier writing skill, with its style-editing pass, a humanizer pass and a slop-guard loop.
-- `merged`: write-plainly with the owner's private work layer.
-- `merged-style-pass`: the same draft as `merged`, then the earlier skill's style-editing pass before `merged`'s review steps.
-- `merged-loose-paragraphs`: `merged` with no rules on paragraph length or section size.
-- `no-skill`: the bare task, with no skill files.
-
-| pipeline | `pub-wilson-interval` | `pub-sqlite-wal` |
-|---|---|---|
-| `merged` | B+ | A- |
-| `current` | B | A- |
-| `merged-loose-paragraphs` | B | A- |
-| `merged-style-pass` | C- | B |
-| `no-skill` | D | B- |
-
-On both tasks `no-skill` got the lowest grade and `merged-style-pass` the second lowest. `merged` got the top grade on the Wilson interval task, one step above `current` and `merged-loose-paragraphs`, and the three shared the top grade on the SQLite task. The owner's note on the Wilson interval task put the ideal between the `merged-loose-paragraphs` passage, which was slightly too technical, and the `merged` one, which was slightly simplified but better overall. With two tasks and one reader, these grades separate the bottom two pipelines from the top three and say little about the order within the top three.

@@ -100,3 +100,23 @@ Passages of about 200 words cannot show document-level structure (headings, sect
 A grade judges one passage on its own, so the person may give two passages of a task the same grade where a ranking would have forced an order. Those pairs count as ties, and a task graded all alike says nothing about order. Grades on different tasks need not mean the same thing, so the comparisons use only the order within each task. The four comparisons with the base pipeline come from the same grades, so they are not independent of each other.
 
 The judges are told to apply one pipeline's own guidance, so the readout measures each judge against the person and never against the other judge. `judges.py` stops if a judge did not open the guidance file: it checks the Opus judge's Read calls, and the shell commands the codex judge ran, which `codex exec --json` reports.
+
+## Blind grades on the public tasks
+
+The skill's owner graded the passages of this evaluation without knowing which pipeline wrote which, giving each passage a letter grade from A+ to F. The graded run had five tasks, and two of them are public, both in `tasks/public.toml`: a proposal paragraph on replacing a dashboard's Wald interval for conversion rates (`pub-wilson-interval`), and a design-doc explanation of SQLite's journal modes for a job queue with several worker processes (`pub-sqlite-wal`). The other three tasks, the analysis and the full readout are private. Five pipelines wrote the passages, and the three merged ones read write-plainly at commit e603d90:
+
+- `current`: the owner's earlier writing skill, with its style-editing pass, a humanizer pass and a slop-guard loop.
+- `merged`: write-plainly with the owner's private work layer.
+- `merged-style-pass`: the same draft as `merged`, then the earlier skill's style-editing pass before `merged`'s review steps.
+- `merged-loose-paragraphs`: `merged` with no rules on paragraph length or section size.
+- `no-skill`: the bare task, with no skill files.
+
+| pipeline | `pub-wilson-interval` | `pub-sqlite-wal` |
+|---|---|---|
+| `merged` | B+ | A- |
+| `current` | B | A- |
+| `merged-loose-paragraphs` | B | A- |
+| `merged-style-pass` | C- | B |
+| `no-skill` | D | B- |
+
+On both tasks `no-skill` got the lowest grade and `merged-style-pass` the second lowest. `merged` got the top grade on the Wilson interval task, one step above `current` and `merged-loose-paragraphs`, and the three shared the top grade on the SQLite task. The owner's note on the Wilson interval task put the ideal between the `merged-loose-paragraphs` passage, which was slightly too technical, and the `merged` one, which was slightly simplified but better overall. With two tasks and one reader, these grades separate the bottom two pipelines from the top three and say little about the order within the top three.
