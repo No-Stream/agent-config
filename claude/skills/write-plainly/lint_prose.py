@@ -164,32 +164,13 @@ MESSAGES = {
     "heading-density": (
         "More top-level sections than the length supports; merge sections or nest them."
     ),
-    "ai-vocabulary": (
-        "Check: a word language models overuse (advisory). Keep it only if it is literal and the"
-        " plainest word; otherwise say the specific thing."
-    ),
-    "promotional-word": "Promotional wording; state the specific gain or cut it.",
     "borrowed-jargon": (
         "Check: a scientific term borrowed for weight (advisory). Unless the literal sense is"
         ' meant, say "unrelated", "a change" or "a chance".'
     ),
-    "stock-concession": (
-        "Check: a concession that names no specific challenge (advisory). Name the challenge"
-        " and what it changes, or cut the sentence."
-    ),
-    "era-framing": "Opening that frames the topic by the times; start with the information.",
-    "dead-transition": (
-        "Filler transition; cut it, or use a connective that says how the sentences relate."
-    ),
-    "insight-teaser": "Teaser that sells a point as insider knowledge; state the point.",
-    "engagement-bait": "Line that performs for the reader; cut it and let the facts carry it.",
     "chat-phrasing": (
         "Check: chat phrasing addressed to the requester (advisory). Cut it from a document;"
         " it is fine in a message the user sends."
-    ),
-    "vague-quantifier": (
-        "Check: a quantifier that stands in for a count (advisory). Give the number or name the"
-        " items if you know them."
     ),
     "section-label": "Stock section label; name the section by its content, or state the point.",
     "intensifier": (
@@ -211,10 +192,6 @@ MESSAGES = {
     "finance-word": (
         'Check: a finance word for a plain idea (advisory). Write "lost" for "foregone", "earns'
         ' back" for "recoups", "accounts for 30%" for "carries 30%".'
-    ),
-    "whether-range": (
-        'Check: "whether it\'s X or Y" range filler (advisory). If the sentence does not depend on'
-        " the two cases, say who or what it is about."
     ),
     "metaphor": (
         "Check: an image or stock idiom in place of the literal claim (advisory). Name the"
