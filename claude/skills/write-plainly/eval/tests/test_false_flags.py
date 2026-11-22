@@ -108,6 +108,21 @@ class TestLoadTexts:
             for corpus, side, register, name, _, words in FIXTURES
         ]
 
+    @pytest.mark.parametrize(
+        ("content", "has_markdown"),
+        [
+            ("Steps:\n1) Fill the tank.\n2) Open the valve.\n", True),
+            ("Steps:\n1. Fill the tank.\n", True),
+            ("+ The filter keeps sand out.\n", True),
+            ("## Pumps\nThe pump runs at night.\n", True),
+            ("The pump runs at night, 2) quietly.\n", False),
+        ],
+    )
+    def test_reads_markdown_structure_with_every_list_marker_the_linter_knows(
+        self, content: str, has_markdown: bool
+    ) -> None:
+        assert bool(false_flags.MARKDOWN_STRUCTURE.search(content)) is has_markdown
+
 
 class TestCollectHits:
     def test_attributes_every_hit_to_its_text(
