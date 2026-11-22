@@ -29,28 +29,30 @@ To use any of this, copy or symlink the pieces you want into `~/.claude/` and `~
 write-plainly linters need [uv](https://docs.astral.sh/uv/) for slop-guard, and Ruby 3.3 or later with
 `gem install sloplint` so that `sloplint` is on `PATH`.
 
-The paths listed in `REPO_OWNED` in `sync.py` are edited in this repo, and each machine uses them through symlinks:
-the two instruction files, the write-plainly and notebooks skills, and the three `prose-*.md` agents. `REPO_OWNED` maps
-each repo path to its live path: `instructions/core.md` to `~/.claude/CLAUDE.md`, `instructions/personal.md` to
-`~/.claude/rules/personal.md`, and each skill and agent to the same path under `~/.claude`. To set that up in a clone,
-run `scripts/link-repo-owned.sh --layer personal` on my personal machine, or `scripts/link-repo-owned.sh` on a machine
-whose layer is kept outside this repo.
+The paths in `REPO_OWNED` in `sync.py` are edited in this repo, and each machine uses them through symlinks at the
+live paths the dict maps them to. To set that up in a clone, run `scripts/link-repo-owned.sh --layer personal` on my
+personal machine, or `scripts/link-repo-owned.sh` on a machine whose layer is kept outside this repo. On a machine set
+up with the old layout, where `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` both linked to one `~/AGENTS.md`, run
+`scripts/link-repo-owned.sh --replace --layer personal` and then move `~/AGENTS.md` into the backup directory the
+script printed, because Claude Code and Codex would otherwise load it as project instructions in directories under `~`.
 
 Claude Code loads every file in `~/.claude/rules/` in every session, so a layer must be linked only on its own machine.
 The script therefore links an entry whose live path is in `~/.claude/rules/` only when `--layer` names it. With
-`--layer`, it then runs `scripts/build_codex_agents.py`, which writes `~/.codex/AGENTS.md` as a header naming its two
-sources followed by `~/.claude/CLAUDE.md` and the layer, because Codex reads a single global instructions file and has
-no include syntax. The builder replaces a symlink at that path, never overwrites a file it did not write, and rewrites
-its output only when a source changed, so rerun the link script after pulling changes to `instructions/`. On a machine
-whose layer is not in this repo, run the builder with that layer instead:
-`python3 scripts/build_codex_agents.py ~/.claude/rules/<layer>.md`.
+`--layer NAME`, it then runs `scripts/build_codex_agents.py NAME`, which writes `~/.codex/AGENTS.md` as a header naming
+its two sources followed by `~/.claude/CLAUDE.md` and `~/.claude/rules/NAME.md`, because Codex reads a single global
+instructions file and has no include syntax. The builder replaces a symlink at that path, never overwrites a file it did
+not write, and rewrites its output only when a source changed. The script also installs a post-merge hook in the clone
+that reruns the builder, so after a merge or pull into `main` Codex reads the same instructions as Claude Code. On a
+machine whose layer is not in this repo, run the builder with that layer's name whenever the core or the layer changes:
+`python3 scripts/build_codex_agents.py <layer>`.
 
 When a live copy already exists, the script stops and prints the diff if it differs from the clone. If it matches, the
 script moves it under `~/.local/state/agent-config-backups/<timestamp>/`, outside `~/.claude`, so Claude Code never
 loads the backup. Once you have read the diff, rerun the script with `--replace` to move a differing live copy to that
-backup directory as well and link the clone's copy in its place. Running the script again leaves correct links alone.
-The checkout the live paths link to stays on `main`, so the script refuses to run from any other branch, and feature
-work on the repo-owned files happens in a separate worktree.
+backup directory as well and link the clone's copy in its place. A different post-merge hook already in the clone also
+stops the script with the diff, and `--replace` leaves it alone: merge the two or move yours aside. Running the script
+again leaves correct links and its own hook alone. The checkout the live paths link to stays on `main`, so the script
+refuses to run from any other branch, and feature work on the repo-owned files happens in a separate worktree.
 
 I keep the rest of this repo in sync with my live config using `python3 sync.py`. The script copies an explicit
 allowlist of files from `~/.claude` and `~/.codex`, replaces home-directory paths with `~`, drops per-project entries
