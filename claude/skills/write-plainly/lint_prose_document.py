@@ -19,6 +19,7 @@ from lint_prose_markdown import (
 )
 from lint_prose_patterns import (
     ARITHMETIC,
+    LABELED_BRACKET_INTERVAL,
     LARGE_SPELLED_NUMBER,
     NOT_A_NUMBER,
     NUMBER,
@@ -163,7 +164,8 @@ def supporting_statistic_findings(blocks: list[Block]) -> list[Finding]:
 
 def _quotes_supporting_statistic(sentence: str) -> bool:
     masked = NOT_A_NUMBER.sub(blank_match, sentence)
-    if SUPPORTING_STATISTIC.search(masked):
+    # The citation mask blanks "[12, 18]", so a labeled bracket is read in the unmasked sentence.
+    if SUPPORTING_STATISTIC.search(masked) or LABELED_BRACKET_INTERVAL.search(sentence):
         return True
     return bool(RATE_CONTRAST.search(masked)) and not ARITHMETIC.search(sentence)
 

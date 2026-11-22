@@ -243,6 +243,7 @@ SUPPORTING_STATISTIC = re.compile(
     rf"|{INTERVAL_LABEL}{ENDPOINT}\s*(?:to|–|-)\s*[-+−]?\d"
     r"|\d\s*(?:±|\+/-)\s*\d"
 )
+LABELED_BRACKET_INTERVAL = re.compile(rf"{INTERVAL_LABEL}\[{INTERVAL_PAIR}\]")
 DECIMAL_RATE = r"(?<![\d.])[-+−]?0?\.\d+(?!\.\d)"
 RATE_CONTRAST = re.compile(
     rf"{DECIMAL_RATE}[^.;]*?\b(?:against|versus|vs\.?|while|compared (?:with|to))(?!\w)"
