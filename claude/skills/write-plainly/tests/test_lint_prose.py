@@ -625,24 +625,62 @@ class TestComplexSentence:
         assert _lines("complex-sentence", text) == []
 
 
+MASKING_TRIGGERS = (
+    "The model wants the implementation of a cache that may possibly cost 3, 4 or 5"
+    f" dollars. {RIVER_RUN_ON} {STARTER_SENTENCE} {CRUST_SENTENCE} As discussed, honestly,"
+    " the CMS was previously called B7 and is VERY slow rather than fast. What keeps it"
+    " slow is the disk. Two things matter: speed and cost. We can't rule out a fault."
+    f" The window display wins most visitors. {' '.join(THREE_SERIES)}"
+)
+
+
 class TestMasking:
     def test_rules_skip_code_quotes_tables_and_links(self) -> None:
-        triggers = (
-            "The model wants the implementation of a cache that may possibly cost 3, 4 or 5"
-            f" dollars. {RIVER_RUN_ON} {STARTER_SENTENCE} {CRUST_SENTENCE} As discussed, honestly,"
-            " the CMS was previously called B7 and is VERY slow rather than fast. What keeps it"
-            " slow is the disk. Two things matter: speed and cost. We can't rule out a fault."
-            f" The window display wins most visitors. {' '.join(THREE_SERIES)}"
-        )
         text = (
             "# Masking\n\n"
-            f"```\n{triggers}\n```\n\n"
-            f"> {triggers}\n\n"
-            f"| {triggers} |\n\n"
-            f"`{triggers}`\n\n"
+            f"```\n{MASKING_TRIGGERS}\n```\n\n"
+            f"> {MASKING_TRIGGERS}\n\n"
+            f"| {MASKING_TRIGGERS} |\n\n"
+            f"`{MASKING_TRIGGERS}`\n\n"
             "[A plain link](https://example.com/the-model-wants/may-possibly/1/2/3)\n"
         )
         assert lint_prose.lint_text(text) == []
+
+
+class TestTables:
+    def test_rules_skip_tables_without_outer_pipes(self) -> None:
+        text = (
+            "# Bake times\n\n"
+            f"Loaf | {MASKING_TRIGGERS}\n"
+            ":--- | ---:\n"
+            f"rye | {MASKING_TRIGGERS}\n"
+            f"{MASKING_TRIGGERS}\n\n"
+            "| Loaf | Oven |\n"
+            "--- | ---\n"
+            f"spelt | {MASKING_TRIGGERS}\n\n"
+            "- Loaf | Oven\n"
+            "  --- | ---\n"
+            f"  barley | {MASKING_TRIGGERS}\n"
+        )
+        assert lint_prose.lint_text(text) == []
+
+    def test_a_table_runs_from_its_header_to_a_blank_line_or_another_block(self) -> None:
+        text = (
+            "The bakery sets two ovens — one per loaf.\n"
+            "Loaf | Oven\n--- | ---\nrye — dense | 220 C\n"
+            "- The rye loaf bakes longest — about an hour.\n\n"
+            "Loaf | Oven\n--- | ---\nspelt — light | 200 C\n\n"
+            "The spelt loaf bakes fastest — about half an hour.\n"
+        )
+        assert _lines("em-dash", text) == [1, 5, 11]
+
+    def test_a_pipe_in_prose_makes_a_table_only_above_a_matching_delimiter_row(self) -> None:
+        text = (
+            "We sift the flour | sugar mix — twice.\n\n"
+            "Flour | sugar — one to one.\n---\n\n"
+            "Flour | sugar | salt — in that order.\n--- | ---\n"
+        )
+        assert _lines("em-dash", text) == [1, 3, 6]
 
 
 class TestEndToEnd:

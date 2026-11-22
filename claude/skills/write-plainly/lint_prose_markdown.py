@@ -22,6 +22,9 @@ LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 FOOTNOTE_DEFINITION = re.compile(r"^\s*(?:\[\^[^\]]+\]:|[⁰¹²³⁴⁵⁶⁷⁸⁹]+\s)")
 IMAGE_LINE = re.compile(r"^\s*!\[")
 THEMATIC_BREAK = re.compile(r"^\s{0,3}(?:[-*_]\s*){3,}$")
+TABLE_DELIMITER_ROW = re.compile(r"^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$")
+UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
+OUTER_PIPES = re.compile(r"^\||(?<!\\)\|$")
 ABBREVIATION_PERIODS = re.compile(r"(?i:\b(?:e\.g|i\.e|vs|dr|fig|et al)\.)|\betc\.(?!\s+[A-Z])")
 SENTENCE_END = re.compile(r"[.!?]+[\"'’”)\]]*(?=\s|\Z)")
 WORD = re.compile(r"[A-Za-z0-9]+(?:['’.,-][A-Za-z0-9]+)*")
@@ -109,6 +112,50 @@ def mask_quotations(text: str) -> str:
     return QUOTATION.sub(blank_match, text)
 
 
+def _starts_other_block(line: str) -> bool:
+    """Whether a line opens a block that ends a table: a heading, quote, fence or break."""
+    return bool(
+        HEADING.match(line) or FENCE.match(line) or THEMATIC_BREAK.match(line)
+    ) or line.lstrip().startswith(">")
+
+
+def _cell_count(row: str) -> int:
+    return len(UNESCAPED_PIPE.findall(OUTER_PIPES.sub("", row.strip()))) + 1
+
+
+def _is_table_header(line: str, next_line: str) -> bool:
+    """Whether a line heads a table: the next line is a delimiter row with as many cells.
+
+    A delimiter row of dashes alone is a heading underline or a break, and one that reads as a
+    list item is a list item, so neither makes a table.
+    """
+    delimiter = next_line.strip()
+    return (
+        bool(line.strip())
+        and not _starts_other_block(line)
+        and bool(TABLE_DELIMITER_ROW.match(delimiter))
+        and ("|" in delimiter or ":" in delimiter)
+        and not LIST_ITEM.match(next_line)
+        and _cell_count(line) == _cell_count(delimiter)
+    )
+
+
+def _table_lines(lines: list[str]) -> list[bool]:
+    """Flag each line of a GFM table, whose outer pipes are optional.
+
+    A table is a header row, a delimiter row and the rows after them up to a blank line or the
+    start of another block; a header row can carry a list marker, since a table can sit in a list.
+    """
+    flags = [False] * len(lines)
+    in_table = False
+    for index, line in enumerate(lines):
+        next_line = lines[index + 1] if index + 1 < len(lines) else ""
+        body_row = bool(line.strip()) and not (_starts_other_block(line) or LIST_ITEM.match(line))
+        in_table = (in_table and body_row) or _is_table_header(line, next_line)
+        flags[index] = in_table
+    return flags
+
+
 def masked_lines(text: str) -> tuple[list[str], list[str], list[str]]:
     """Return the source lines, the lines with markup blanked, and each blanked line's kind.
 
@@ -119,6 +166,7 @@ def masked_lines(text: str) -> tuple[list[str], list[str], list[str]]:
         original_lines.append("")
     visible_lines = list(original_lines)
     kinds = [""] * len(original_lines)
+    table_lines = _table_lines(original_lines)
     in_frontmatter = bool(original_lines and original_lines[0].strip() == "---")
     fence_marker = ""
     for index, line in enumerate(original_lines):
@@ -136,7 +184,7 @@ def masked_lines(text: str) -> tuple[list[str], list[str], list[str]]:
             fence_marker = fence_match.group(1)[0]
         elif stripped.startswith(">"):
             kinds[index] = "quote"
-        elif stripped.startswith("|"):
+        elif stripped.startswith("|") or table_lines[index]:
             kinds[index] = "table"
         else:
             visible_lines[index] = _mask_inline(line)
