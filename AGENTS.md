@@ -21,7 +21,10 @@ uv run --no-project --with pytest python -m pytest tests
 (cd claude/skills/write-plainly && uv run --no-project --with pytest python -m pytest tests)
 (cd claude/skills/visualization && uv run --no-project --with pytest --with matplotlib --with numpy --with pandas --with pillow python -m pytest tests)
 python3 sync.py --check
+ruff check . && ruff format --check .
 ```
+
+Ruff reads `ruff.toml` at the root (and `claude/skills/write-plainly/ruff.toml` under that skill), so it gives the same answer from any directory; the copied directories are excluded there, because they are linted where they are edited.
 
 After a change under `claude/skills/write-plainly/eval/`, also run that evaluation's three suites, whose commands are in `eval/README.md`, `eval/pairwise/README.md` and `eval/detectors/README.md`.
 

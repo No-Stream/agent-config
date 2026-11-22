@@ -1,0 +1,11 @@
+# sync.py, scripts/ and tests/ run on the system Python, which may be 3.9.
+target-version = "py39"
+line-length = 100
+# Copies of live config (COPIED_FILES and COPIED_DIRS in sync.py); lint and format them where they are edited.
+extend-exclude = [
+    "claude/agents",
+    "claude/skills/paper-drafting",
+    "claude/skills/review",
+    "claude/skills/visualization",
+    "codex/hooks",
+]

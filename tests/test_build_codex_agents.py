@@ -35,7 +35,9 @@ def build(home: Path) -> subprocess.CompletedProcess[str]:
 
 
 class TestBuildCodexAgents:
-    def test_replaces_the_old_symlink_with_the_core_then_the_layer_under_a_header(self, home: Path) -> None:
+    def test_replaces_the_old_symlink_with_the_core_then_the_layer_under_a_header(
+        self, home: Path
+    ) -> None:
         out = home / ".codex/AGENTS.md"
         out.symlink_to(home / ".claude/CLAUDE.md")
 

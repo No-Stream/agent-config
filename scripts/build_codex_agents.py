@@ -38,7 +38,9 @@ def write_if_changed(out: Path, text: str) -> bool:
     if out.exists() and not out.is_symlink():
         current = out.read_text(encoding="utf-8")
         if not current.startswith(HEADER_PREFIX):
-            raise SystemExit(f"{out} is a regular file this script did not write; move it aside, then rerun")
+            raise SystemExit(
+                f"{out} is a regular file this script did not write; move it aside, then rerun"
+            )
         if current == text:
             return False
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -67,7 +69,9 @@ def build(home: Path, layer: str) -> bool:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("layer", help="the machine layer's name, such as personal for ~/.claude/rules/personal.md")
+    parser.add_argument(
+        "layer", help="the machine layer's name, such as personal for ~/.claude/rules/personal.md"
+    )
     args = parser.parse_args()
     home = Path.home()
     if build(home, args.layer):

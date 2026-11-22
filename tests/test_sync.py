@@ -12,7 +12,10 @@ SOURCE_REPO = Path(__file__).resolve().parents[1]
 REPO_OWNED = dict(
     line.split("\t")
     for line in subprocess.run(
-        [sys.executable, str(SOURCE_REPO / "sync.py"), "--list-repo-owned"], check=True, capture_output=True, text=True
+        [sys.executable, str(SOURCE_REPO / "sync.py"), "--list-repo-owned"],
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.splitlines()
 )
 REPO_OWNED_FILES = (
@@ -30,7 +33,11 @@ def write(path: Path, text: str) -> None:
 
 
 def snapshot(root: Path) -> dict[str, bytes]:
-    return {str(path.relative_to(root)): path.read_bytes() for path in sorted(root.rglob("*")) if path.is_file()}
+    return {
+        str(path.relative_to(root)): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
 
 
 @pytest.fixture
@@ -100,7 +107,9 @@ def fresh_home(tmp_path: Path) -> Path:
 def commit(repo: Path, message: str, path: str) -> str:
     subprocess.run(["git", "-C", str(repo), "add", "--", path], check=True)
     identity = ["-c", "user.name=Test", "-c", "user.email=test@example.com"]
-    subprocess.run(["git", "-C", str(repo), *identity, "commit", "-q", "-m", message, "--", path], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), *identity, "commit", "-q", "-m", message, "--", path], check=True
+    )
     return subprocess.run(
         ["git", "-C", str(repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
     ).stdout.strip()
@@ -128,7 +137,9 @@ def run_link_script(repo: Path, home: Path, *args: str) -> subprocess.CompletedP
 
 class TestSync:
     def test_leaves_repo_owned_files_byte_identical(self, repo: Path, home: Path) -> None:
-        (home / ".claude/agents/prose-fidelity-checker.md").symlink_to(repo / "claude/agents/prose-fidelity-checker.md")
+        (home / ".claude/agents/prose-fidelity-checker.md").symlink_to(
+            repo / "claude/agents/prose-fidelity-checker.md"
+        )
         before = {relative: (repo / relative).read_bytes() for relative in REPO_OWNED_FILES}
 
         result = run_sync(repo, home)
@@ -142,7 +153,9 @@ class TestSync:
         result = run_sync(repo, home)
 
         assert result.returncode == 0, result.stderr
-        assert (repo / "claude/statusline-command.sh").read_text() == "echo ~/notes for the project\n"
+        assert (
+            repo / "claude/statusline-command.sh"
+        ).read_text() == "echo ~/notes for the project\n"
         assert (repo / "AGENTS.md").read_text() == "this repo's own instructions\n"
         assert (repo / "claude/agents/codex-reviewer.md").read_text() == "live codex reviewer\n"
         assert (repo / "claude/skills/visualization/SKILL.md").read_text() == "live visualization\n"
@@ -150,7 +163,9 @@ class TestSync:
         assert "projects" not in (repo / "codex/config.toml").read_text()
         assert not (repo / "claude/skills/review/stale.md").exists()
 
-    def test_leaves_paths_behind_a_live_symlink_into_the_repo_alone(self, repo: Path, home: Path) -> None:
+    def test_leaves_paths_behind_a_live_symlink_into_the_repo_alone(
+        self, repo: Path, home: Path
+    ) -> None:
         linked_files = ("claude/skills/visualization/SKILL.md", "claude/hooks/guard-bash.sh")
         # Redaction rewrites Secret Project, so copying a linked file onto itself would change it.
         for relative in linked_files:
@@ -168,7 +183,9 @@ class TestSync:
 
 
 class TestCheck:
-    def test_fails_on_a_planted_leak_and_passes_once_it_is_removed(self, repo: Path, fresh_home: Path) -> None:
+    def test_fails_on_a_planted_leak_and_passes_once_it_is_removed(
+        self, repo: Path, fresh_home: Path
+    ) -> None:
         write(repo / "claude/notes.md", "nothing to see\n")
         (repo / "cache").mkdir()
         (repo / "cache/corpus.gz").write_bytes(b"\x1f\x8b binary cache that mentions ExampleCorp\n")
@@ -184,7 +201,9 @@ class TestCheck:
 
 
 class TestCheckCommits:
-    def test_fails_on_a_leak_that_a_later_commit_removed(self, repo: Path, fresh_home: Path) -> None:
+    def test_fails_on_a_leak_that_a_later_commit_removed(
+        self, repo: Path, fresh_home: Path
+    ) -> None:
         write(repo / "notes.md", "nothing to see\n")
         clean = commit(repo, "Add notes", "notes.md")
         write(repo / "notes.md", "nothing to see\nbuilt for ExampleCorp\n")
@@ -245,12 +264,16 @@ class TestLinkRepoOwned:
         subprocess.run(["git", "-C", str(repo), "switch", "-q", "main"], check=True)
 
         subprocess.run(
-            ["git", "-C", str(repo), "merge", "-q", "new-rule"], env={**os.environ, "HOME": str(fresh_home)}, check=True
+            ["git", "-C", str(repo), "merge", "-q", "new-rule"],
+            env={**os.environ, "HOME": str(fresh_home)},
+            check=True,
         )
 
         assert (fresh_home / ".codex/AGENTS.md").read_text().endswith("\n\na new personal rule\n")
 
-    def test_stops_with_the_diff_when_a_different_post_merge_hook_exists(self, repo: Path, fresh_home: Path) -> None:
+    def test_stops_with_the_diff_when_a_different_post_merge_hook_exists(
+        self, repo: Path, fresh_home: Path
+    ) -> None:
         hook = repo / ".git/hooks/post-merge"
         write(hook, "#!/bin/sh\necho my own hook\n")
 
@@ -267,7 +290,10 @@ class TestLinkRepoOwned:
 
         assert result.returncode == 0, result.stderr
         shared = {relative: live for relative, live in REPO_OWNED.items() if live != PERSONAL_LAYER}
-        assert all((fresh_home / live).resolve() == (repo / relative).resolve() for relative, live in shared.items())
+        assert all(
+            (fresh_home / live).resolve() == (repo / relative).resolve()
+            for relative, live in shared.items()
+        )
         assert not (fresh_home / ".claude/rules").exists()
         assert not (fresh_home / ".codex").exists()
         assert not (repo / ".git/hooks/post-merge").exists()
@@ -287,13 +313,19 @@ class TestLinkRepoOwned:
         assert (home / ".claude/CLAUDE.md").resolve() == (repo / "instructions/core.md").resolve()
         assert (home / PERSONAL_LAYER).resolve() == (repo / "instructions/personal.md").resolve()
         assert not (home / ".codex/AGENTS.md").is_symlink()
-        assert (home / ".codex/AGENTS.md").read_text().endswith("repo copy of instructions/personal.md\n")
+        assert (
+            (home / ".codex/AGENTS.md")
+            .read_text()
+            .endswith("repo copy of instructions/personal.md\n")
+        )
         assert (home / "AGENTS.md").read_text() == "the old shared instructions\n"
         [backup] = home.glob(f"{BACKUP_ROOT}/*/.claude/CLAUDE.md")
         assert backup.is_symlink()
         assert backup.read_text() == "the old shared instructions\n"
 
-    def test_refuses_to_link_into_a_checkout_that_is_not_on_main(self, repo: Path, fresh_home: Path) -> None:
+    def test_refuses_to_link_into_a_checkout_that_is_not_on_main(
+        self, repo: Path, fresh_home: Path
+    ) -> None:
         subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "feature"], check=True)
 
         result = run_link_script(repo, fresh_home)
@@ -302,7 +334,9 @@ class TestLinkRepoOwned:
         assert "feature" in result.stderr
         assert not any(fresh_home.iterdir())
 
-    def test_backs_up_an_identical_live_copy_before_linking(self, repo: Path, tmp_path: Path) -> None:
+    def test_backs_up_an_identical_live_copy_before_linking(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
         home = tmp_path / "home-with-copy"
         shutil.copytree(repo / "claude/skills/write-plainly", home / ".claude/skills/write-plainly")
 
@@ -314,7 +348,9 @@ class TestLinkRepoOwned:
         [backup] = home.glob(f"{BACKUP_ROOT}/*/.claude/skills/write-plainly")
         assert snapshot(backup) == snapshot(repo / "claude/skills/write-plainly")
 
-    def test_stops_with_the_diff_when_the_live_copy_differs(self, repo: Path, tmp_path: Path) -> None:
+    def test_stops_with_the_diff_when_the_live_copy_differs(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
         home = tmp_path / "home-with-edit"
         write(home / ".claude/agents/prose-reviewer.md", "an unsynced live edit\n")
 
@@ -326,7 +362,9 @@ class TestLinkRepoOwned:
         assert (home / ".claude/agents/prose-reviewer.md").read_text() == "an unsynced live edit\n"
         assert not (home / BACKUP_ROOT).exists()
 
-    def test_replace_backs_up_a_differing_live_copy_and_links(self, repo: Path, tmp_path: Path) -> None:
+    def test_replace_backs_up_a_differing_live_copy_and_links(
+        self, repo: Path, tmp_path: Path
+    ) -> None:
         home = tmp_path / "home-with-edit"
         write(home / ".claude/agents/prose-reviewer.md", "an unsynced live edit\n")
         write(home / ".claude/skills/write-plainly/SKILL.md", "an older live skill\n")

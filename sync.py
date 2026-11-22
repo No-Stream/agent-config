@@ -54,7 +54,12 @@ CODEX_CONFIG = ".codex/config.toml"
 CODEX_RULES = ".codex/rules/default.rules"
 
 # Per-project trust entries, a machine-specific hook hash, and UI migration state.
-CODEX_DROPPED_TABLE_PREFIXES = ("[projects.", "[hooks.state.", "[notice", "[tui.model_availability_nux]")
+CODEX_DROPPED_TABLE_PREFIXES = (
+    "[projects.",
+    "[hooks.state.",
+    "[notice",
+    "[tui.model_availability_nux]",
+)
 
 PRIVATE_PATTERNS_FILE = REPO_ROOT / ".private" / "forbidden_patterns.txt"
 PRIVATE_REPLACEMENTS_FILE = REPO_ROOT / ".private" / "replacements.tsv"
@@ -75,10 +80,16 @@ IGNORED_NAMES = {"__pycache__", ".pytest_cache", ".git", ".private"}
 
 
 def load_private_replacements() -> list[tuple[str, str]]:
-    rows = [line.split("\t") for line in PRIVATE_REPLACEMENTS_FILE.read_text().splitlines() if line.strip()]
+    rows = [
+        line.split("\t")
+        for line in PRIVATE_REPLACEMENTS_FILE.read_text().splitlines()
+        if line.strip()
+    ]
     malformed_rows = [row for row in rows if len(row) != 2]
     if malformed_rows:
-        raise ValueError(f"{PRIVATE_REPLACEMENTS_FILE} rows must be old<TAB>new, got {malformed_rows}")
+        raise ValueError(
+            f"{PRIVATE_REPLACEMENTS_FILE} rows must be old<TAB>new, got {malformed_rows}"
+        )
     return [(old, new) for old, new in rows]
 
 
@@ -139,15 +150,21 @@ def copy_redacted(source: Path, destination: Path) -> None:
 
 
 def load_forbidden_patterns() -> list[str]:
-    private_patterns = [line for line in PRIVATE_PATTERNS_FILE.read_text().splitlines() if line.strip()]
+    private_patterns = [
+        line for line in PRIVATE_PATTERNS_FILE.read_text().splitlines() if line.strip()
+    ]
     if not private_patterns:
-        raise ValueError(f"{PRIVATE_PATTERNS_FILE} is empty; it must list the private names to check for")
+        raise ValueError(
+            f"{PRIVATE_PATTERNS_FILE} is empty; it must list the private names to check for"
+        )
     return GENERIC_FORBIDDEN_PATTERNS + private_patterns
 
 
 def git(*args: str) -> str:
     command = ["git", "-C", str(REPO_ROOT), *args]
-    return subprocess.run(command, check=True, capture_output=True, encoding="utf-8", errors="replace").stdout
+    return subprocess.run(
+        command, check=True, capture_output=True, encoding="utf-8", errors="replace"
+    ).stdout
 
 
 def matching_patterns(line: str, patterns: list[str]) -> list[str]:
@@ -156,7 +173,9 @@ def matching_patterns(line: str, patterns: list[str]) -> list[str]:
 
 def publishable_files() -> list[Path]:
     listed = git("ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0")
-    return [REPO_ROOT / name for name in sorted(set(listed)) if name and (REPO_ROOT / name).is_file()]
+    return [
+        REPO_ROOT / name for name in sorted(set(listed)) if name and (REPO_ROOT / name).is_file()
+    ]
 
 
 def scan_for_leaks() -> list[str]:
@@ -174,10 +193,21 @@ def scan_commits(commits: list[str]) -> list[str]:
     forbidden_patterns = load_forbidden_patterns()
     leaks = []
     for commit in commits:
-        for line_number, line in enumerate(git("log", "-1", "--format=%B", commit).splitlines(), start=1):
+        for line_number, line in enumerate(
+            git("log", "-1", "--format=%B", commit).splitlines(), start=1
+        ):
             for pattern in matching_patterns(line, forbidden_patterns):
                 leaks.append(f"{commit} message line {line_number}: matches {pattern!r}")
-        diff = git("show", "--format=", "--unified=0", "--no-color", "--no-ext-diff", "--no-prefix", "--diff-merges=first-parent", commit)
+        diff = git(
+            "show",
+            "--format=",
+            "--unified=0",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-prefix",
+            "--diff-merges=first-parent",
+            commit,
+        )
         path, in_hunk = "", False
         for line in diff.splitlines():
             if line.startswith("diff --git "):
@@ -213,18 +243,26 @@ def links_into_repo(source: Path, destination: Path) -> bool:
 
 def planned_copies() -> list[tuple[Path, Path]]:
     """Every (live source, repo destination) pair the sync copies with redaction, repo-owned paths excluded."""
-    copies = [(HOME / source, REPO_ROOT / destination) for source, destination in COPIED_FILES.items()]
+    copies = [
+        (HOME / source, REPO_ROOT / destination) for source, destination in COPIED_FILES.items()
+    ]
     for source_dir, destination_dir in COPIED_DIRS.items():
         for source in sorted((HOME / source_dir).rglob("*")):
             if not source.is_dir() and not IGNORED_NAMES.intersection(source.parts):
-                copies.append((source, REPO_ROOT / destination_dir / source.relative_to(HOME / source_dir)))
-    return [(source, destination) for source, destination in copies if not is_repo_owned(destination)]
+                copies.append(
+                    (source, REPO_ROOT / destination_dir / source.relative_to(HOME / source_dir))
+                )
+    return [
+        (source, destination) for source, destination in copies if not is_repo_owned(destination)
+    ]
 
 
 def remove_stale_files(kept: set[Path]) -> None:
     """Delete files under the synced directories that are neither kept nor repo-owned, then the directories left empty."""
     destinations = [*COPIED_FILES.values(), *COPIED_DIRS.values()]
-    for synced_dir in {Path(destination).parts[0] for destination in destinations if "/" in destination}:
+    for synced_dir in {
+        Path(destination).parts[0] for destination in destinations if "/" in destination
+    }:
         for path in sorted((REPO_ROOT / synced_dir).rglob("*"), reverse=True):
             if path in kept or is_repo_owned(path):
                 continue
@@ -236,7 +274,9 @@ def remove_stale_files(kept: set[Path]) -> None:
 
 def sync() -> None:
     copies = planned_copies()
-    linked_paths = {destination for source, destination in copies if links_into_repo(source, destination)}
+    linked_paths = {
+        destination for source, destination in copies if links_into_repo(source, destination)
+    }
     written_paths = []
     for source, destination in copies:
         if destination not in linked_paths:
@@ -244,9 +284,17 @@ def sync() -> None:
             written_paths.append(destination)
 
     codex_config_source = HOME / CODEX_CONFIG
-    write_text(REPO_ROOT / "codex/config.toml", redact(sanitize_codex_config(codex_config_source.read_text())), codex_config_source)
+    write_text(
+        REPO_ROOT / "codex/config.toml",
+        redact(sanitize_codex_config(codex_config_source.read_text())),
+        codex_config_source,
+    )
     codex_rules_source = HOME / CODEX_RULES
-    write_text(REPO_ROOT / "codex/rules/default.rules", redact(keep_forbidden_codex_rules(codex_rules_source.read_text())), codex_rules_source)
+    write_text(
+        REPO_ROOT / "codex/rules/default.rules",
+        redact(keep_forbidden_codex_rules(codex_rules_source.read_text())),
+        codex_rules_source,
+    )
     written_paths += [REPO_ROOT / "codex/config.toml", REPO_ROOT / "codex/rules/default.rules"]
 
     remove_stale_files(set(written_paths) | linked_paths)
@@ -255,14 +303,25 @@ def sync() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Copy the shareable live config into this repo and scan it for leaks.")
+    parser = argparse.ArgumentParser(
+        description="Copy the shareable live config into this repo and scan it for leaks."
+    )
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--check", action="store_true", help="only scan the repo for sensitive patterns; exit 1 on any match")
     mode.add_argument(
-        "--check-commits", nargs="+", metavar="SHA", help="scan each commit's message and added lines; exit 1 on any match"
+        "--check",
+        action="store_true",
+        help="only scan the repo for sensitive patterns; exit 1 on any match",
     )
     mode.add_argument(
-        "--list-repo-owned", action="store_true", help="print each repo-owned path and its live path under ~, tab-separated"
+        "--check-commits",
+        nargs="+",
+        metavar="SHA",
+        help="scan each commit's message and added lines; exit 1 on any match",
+    )
+    mode.add_argument(
+        "--list-repo-owned",
+        action="store_true",
+        help="print each repo-owned path and its live path under ~, tab-separated",
     )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
