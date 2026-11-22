@@ -89,7 +89,10 @@ MESSAGES = {
     ),
     "bold-run-in": "Bold run-in heading; use a heading or plain prose.",
     "title-case-heading": "Heading looks like Title Case; use sentence case.",
-    "stacked-hedge": "Two hedges on one claim; keep the one that states the real uncertainty.",
+    "stacked-hedge": (
+        "Two hedges on one claim; keep the one that states the real uncertainty. Swapping in a"
+        ' hedge the pattern misses ("could plausibly") is not a fix.'
+    ),
     "nominalization-of": (
         "Check: possible action buried in a noun (advisory). If someone did it, use the verb,"
         ' as in "we implemented X".'
