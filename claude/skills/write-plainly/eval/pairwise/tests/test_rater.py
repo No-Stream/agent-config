@@ -58,6 +58,26 @@ class TestRender:
             "<p>| not | a table | | just pipes |</p>"
         )
 
+    def test_a_table_without_outer_pipes_is_a_table(self) -> None:
+        assert render_passage("Name | Value\n--- | ---\nA | 1") == (
+            '<div class="table"><table><thead><tr><th>Name</th><th>Value</th></tr></thead>'
+            "<tbody><tr><td>A</td><td>1</td></tr></tbody></table></div>"
+        )
+
+    def test_an_escaped_pipe_stays_inside_its_cell(self) -> None:
+        assert render_passage("| Op | Use |\n| --- | --- |\n| `a \\| b` | pipe |") == (
+            '<div class="table"><table><thead><tr><th>Op</th><th>Use</th></tr></thead>'
+            "<tbody><tr><td><code>a | b</code></td><td>pipe</td></tr></tbody></table></div>"
+        )
+
+    @pytest.mark.parametrize(
+        "text",
+        ["Costs rose | fell\n---", "a | b | c\n--- | ---", "| a | b |\n| --- |"],
+        ids=["heading-underline", "more-header-cells", "fewer-separator-cells"],
+    )
+    def test_a_separator_of_dashes_alone_or_another_cell_count_is_no_table(self, text: str) -> None:
+        assert render_passage(text) == f"<p>{html.escape(' '.join(text.splitlines()))}</p>"
+
     def test_fenced_code_keeps_its_lines_and_blank_lines(self) -> None:
         rendered = render_passage("Before.\n\n```\n(-inf, 0] u [1, inf)\n\n<x>\n```\n\nAfter.")
         assert rendered == (

@@ -46,6 +46,8 @@ FENCE = "```"
 INLINE_CODE = re.compile(r"`([^`\n]+)`")
 LIST_MARKER = re.compile(r"(?:[-*]|\d+\.)\s+")
 TABLE_SEPARATOR = re.compile(r"\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?")
+OUTER_PIPES = re.compile(r"^\||(?<!\\)\|$")
+UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
 
 
 class LineRefused(ValueError):
@@ -84,7 +86,25 @@ def inline(text: str) -> str:
 
 
 def table_cells(row: str) -> list[str]:
-    return [cell.strip() for cell in row.strip().strip("|").split("|")]
+    """A row's cells: its outer pipes are optional, and `\\|` is a pipe inside a cell."""
+    cells = UNESCAPED_PIPE.split(OUTER_PIPES.sub("", row.strip()))
+    return [cell.strip().replace("\\|", "|") for cell in cells]
+
+
+def is_table(lines: list[str]) -> bool:
+    """Whether a block opens with a header row over a separator row of as many cells.
+
+    This is how the linter's markdown model reads a table: a separator of dashes alone is a heading
+    underline, so a paragraph over one stays a paragraph.
+    """
+    if len(lines) < 2:
+        return False
+    separator = lines[1].strip()
+    return (
+        bool(TABLE_SEPARATOR.fullmatch(separator))
+        and ("|" in separator or ":" in separator)
+        and len(table_cells(lines[0])) == len(table_cells(separator))
+    )
 
 
 def render_table(rows: list[str]) -> str:
@@ -102,8 +122,7 @@ def render_table(rows: list[str]) -> str:
 
 def render_block(lines: list[str]) -> str:
     """Lines between blank lines: a table, or a paragraph and list items in the order typed."""
-    is_table = len(lines) > 1 and lines[0].lstrip().startswith("|")
-    if is_table and TABLE_SEPARATOR.fullmatch(lines[1].strip()):
+    if is_table(lines):
         return render_table(lines)
     items: list[tuple[str, str]] = []  # (tag, text), tag "p", "ul" or "ol"
     for line in lines:
