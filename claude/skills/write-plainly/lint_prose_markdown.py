@@ -181,23 +181,23 @@ def is_heading(line: str) -> bool:
     return heading_level(line) > 0
 
 
-def _heading_text(line: str) -> str:
+def heading_text(line: str) -> str:
     heading = re.sub(r"`+[^`]*`+", " ", HEADING.sub("", line))
     return re.sub(r"[*_~]", "", heading).strip(" #:")
 
 
 def heading_words(line: str) -> list[str]:
-    return re.findall(r"[A-Za-z][A-Za-z0-9']*", _heading_text(line))
+    return re.findall(r"[A-Za-z][A-Za-z0-9']*", heading_text(line))
 
 
 def is_summary_heading(line: str) -> bool:
-    return is_heading(line) and bool(SUMMARY_HEADING.match(_heading_text(line)))
+    return is_heading(line) and bool(SUMMARY_HEADING.match(heading_text(line)))
 
 
 def _section_role(heading_line: str) -> Section:
     if is_summary_heading(heading_line):
         return "summary"
-    if BACK_MATTER_HEADING.match(_heading_text(heading_line)):
+    if BACK_MATTER_HEADING.match(heading_text(heading_line)):
         return "back-matter"
     return "body"
 
