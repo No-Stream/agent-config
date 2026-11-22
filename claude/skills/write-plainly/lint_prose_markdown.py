@@ -30,9 +30,24 @@ OUTER_PIPES = re.compile(r"^\||(?<!\\)\|$")
 ABBREVIATION_PERIODS = re.compile(r"(?i:\b(?:e\.g|i\.e|vs|dr|fig|et al)\.)|\betc\.(?!\s+[A-Z])")
 SENTENCE_END = re.compile(r"[.!?]+[\"'’”)\]]*(?=\s|\Z)")
 WORD = re.compile(r"[A-Za-z0-9]+(?:['’.,-][A-Za-z0-9]+)*")
-PROSE_KINDS = ("paragraph", "list-item", "caption", "footnote")
 
 Section = Literal["summary", "back-matter", "body"]
+# A masked block is a line that inline masking left blank, such as a lone link or comment.
+BlockKind = Literal[
+    "paragraph",
+    "list-item",
+    "caption",
+    "footnote",
+    "heading",
+    "break",
+    "image",
+    "code",
+    "quote",
+    "table",
+    "masked",
+]
+LineKind = Literal["", "frontmatter", "code", "quote", "table", "masked"]
+PROSE_KINDS: tuple[BlockKind, ...] = ("paragraph", "list-item", "caption", "footnote")
 
 
 @dataclass(frozen=True)
@@ -47,13 +62,10 @@ class Finding:
 
 @dataclass(frozen=True)
 class Block:
-    """One markdown block, in document order, with markup blanked from its text.
+    """One markdown block, in document order, with markup blanked from its text; the kinds in
+    PROSE_KINDS are prose."""
 
-    The prose kinds are paragraph, list-item, caption and footnote. The others are heading,
-    break, image, code, quote, table and masked (a line that inline masking left blank).
-    """
-
-    kind: str
+    kind: BlockKind
     first_line: int
     text: str
     section: Section
@@ -77,7 +89,7 @@ class Block:
 
 @dataclass
 class _BlockDraft:
-    kind: str
+    kind: BlockKind
     first_line: int
     after_image: bool
     section: Section
@@ -158,16 +170,14 @@ def _table_lines(lines: list[str]) -> list[bool]:
     return flags
 
 
-def masked_lines(text: str) -> tuple[list[str], list[str], list[str]]:
-    """Return the source lines, the lines with markup blanked, and each blanked line's kind.
-
-    The kind is frontmatter, code, quote, table or masked for a blanked line, and empty otherwise.
-    """
+def masked_lines(text: str) -> tuple[list[str], list[str], list[LineKind]]:
+    """Return the source lines, the lines with markup blanked, and each line's kind, which is
+    empty for a line left visible."""
     original_lines = text.splitlines()
     if text.endswith(("\n", "\r")):
         original_lines.append("")
     visible_lines = list(original_lines)
-    kinds = [""] * len(original_lines)
+    kinds: list[LineKind] = [""] * len(original_lines)
     table_lines = _table_lines(original_lines)
     in_frontmatter = bool(original_lines and original_lines[0].strip() == "---")
     fence_marker = ""
@@ -210,7 +220,7 @@ def sentence_spans(text: str) -> list[tuple[int, int]]:
     """Return (start, end) offsets of each sentence that contains a word."""
     protected = ABBREVIATION_PERIODS.sub(lambda match: match.group().replace(".", "\0"), text)
     ends = [match.end() for match in SENTENCE_END.finditer(protected)]
-    spans = []
+    spans: list[tuple[int, int]] = []
     for start, end in zip([0, *ends], [*ends, len(text)]):
         segment = text[start:end]
         if WORD.search(segment):
@@ -263,7 +273,7 @@ def ordered_items_by_line(visible_lines: list[str]) -> list[int]:
 
 
 def parse_blocks(
-    original_lines: list[str], visible_lines: list[str], line_kinds: list[str]
+    original_lines: list[str], visible_lines: list[str], line_kinds: list[LineKind]
 ) -> list[Block]:
     """Split the document into blocks; an indented block after a list item stays in the list."""
     drafts: list[_BlockDraft] = []
