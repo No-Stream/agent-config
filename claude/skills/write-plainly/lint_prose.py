@@ -18,6 +18,7 @@ from lint_prose_document import (
     section_findings,
     short_paragraph_findings,
     summary_findings,
+    supporting_statistic_findings,
 )
 from lint_prose_markdown import (
     PROSE_KINDS,
@@ -143,6 +144,11 @@ MESSAGES = {
     ),
     "number-density": (
         "Too many numbers for body prose; move them to a table or figure and say what they show."
+    ),
+    "supporting-statistic": (
+        "Check: a statistic that supports a result (test statistic, degrees of freedom, p-value,"
+        " interval or a pair of rates). Move it to a table, footnote or appendix unless the reader"
+        " needs it to decide."
     ),
     "heading-density": (
         "More top-level sections than the length supports; merge sections or nest them."
@@ -433,6 +439,7 @@ def lint_text(text: str) -> list[Finding]:
     findings.extend(_all_caps_findings(prose))
     findings.extend(_undefined_acronym_findings(prose))
     findings.extend(number_density_findings(blocks))
+    findings.extend(supporting_statistic_findings(blocks))
     findings.extend(heading_density_findings(blocks, prose))
     findings.extend(summary_findings(blocks))
     return sorted(findings, key=lambda finding: (finding.line, finding.column, finding.rule))

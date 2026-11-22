@@ -292,6 +292,43 @@ class TestNumberDensity:
         assert _lines("number-density", text) == [1]
 
 
+OVEN_OPENING = "We tested whether the new oven bakes bread faster than the old one.\n\n"
+
+
+class TestSupportingStatistic:
+    def test_flags_each_kind_of_supporting_statistic_in_body_prose(self) -> None:
+        sentences = (
+            "The new oven baked faster, with a t of 3.10 on 14 df.",
+            "Loaves rose higher in it (p = 0.02).",
+            "Sales rose 4.0% [2.5%, 5.5%] after the move.",
+            "The 95% interval runs from 1.0 to 3.2 minutes.",
+            "Each loaf lost 2.1 ± 0.4 grams of water.",
+            "The new probe read within 0.92 of the true heat, against 0.97 for the old one.",
+        )
+        text = OVEN_OPENING + "\n\n".join(sentences) + "\n"
+        assert _lines("supporting-statistic", text) == [3, 5, 7, 9, 11, 13]
+
+    def test_flags_a_summary_and_an_opening_paragraph_too(self) -> None:
+        summary = "## TL;DR\n\nThe new oven bakes bread faster (p < 0.01).\n"
+        opening = "The new oven bakes bread faster, with a t of 3.10.\n"
+        assert _lines("supporting-statistic", summary) == [3]
+        assert _lines("supporting-statistic", opening) == [1]
+
+    def test_leaves_headline_numbers_arithmetic_and_exempt_blocks_alone(self) -> None:
+        text = (
+            OVEN_OPENING + "The new oven bakes a loaf in 25 minutes, 20% faster than the old one."
+            " The share is 0.25 * 0.4 = 0.1 of the day.\n\n"
+            "![Bake times](bake.png)\n\n"
+            "The two probes read 0.92 and 0.97 of the true heat.\n\n"
+            "| oven | t | p |\n| new | 3.10 | 0.01 |\n\n"
+            "The new oven is faster.[^1]\n\n"
+            "[^1]: A t of 3.10 on 14 df, p = 0.01.\n\n"
+            "## Appendix\n\n"
+            "The 95% interval runs from 1.0 to 3.2 minutes.\n"
+        )
+        assert _lines("supporting-statistic", text) == []
+
+
 CROPS = ("Tomatoes", "Beans", "Potatoes", "Onions", "Lettuce", "Carrots", "Peppers", "Squash")
 
 

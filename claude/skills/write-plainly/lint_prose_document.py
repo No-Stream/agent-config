@@ -19,10 +19,12 @@ from lint_prose_markdown import (
 )
 from lint_prose_patterns import (
     ARITHMETIC,
+    DECIMAL_RATE,
     LARGE_SPELLED_NUMBER,
     NOT_A_NUMBER,
     NUMBER,
     SPELLED_NUMBER,
+    SUPPORTING_STATISTIC,
     YEAR_ORDINAL_OR_VERSION,
 )
 
@@ -141,6 +143,30 @@ def number_density_findings(blocks: list[Block]) -> list[Finding]:
         summary = f"body prose carries {density:.1f} numbers per 100 words"
         findings.append(Finding("number-density", body[0].first_line, 1, summary))
     return findings
+
+
+def supporting_statistic_findings(blocks: list[Block]) -> list[Finding]:
+    """Flag a sentence outside the back matter that quotes a statistic supporting a result.
+
+    The statistics are a test statistic, degrees of freedom, a p-value, an interval, a plus-minus
+    spread and two rates written as decimals. Tables, captions and footnotes are exempt.
+    """
+    findings: list[Finding] = []
+    for block in blocks:
+        if block.kind not in ("paragraph", "list-item") or block.section == "back-matter":
+            continue
+        for start, end in sentence_spans(block.text):
+            if _quotes_supporting_statistic(block.text[start:end]):
+                findings.append(block.finding("supporting-statistic", start))
+    return findings
+
+
+def _quotes_supporting_statistic(sentence: str) -> bool:
+    masked = NOT_A_NUMBER.sub(blank_match, sentence)
+    if SUPPORTING_STATISTIC.search(masked):
+        return True
+    rates = [match for match in NUMBER.finditer(masked) if DECIMAL_RATE.fullmatch(match.group())]
+    return len(rates) > 1 and not ARITHMETIC.search(sentence)
 
 
 def summary_findings(blocks: list[Block]) -> list[Finding]:
