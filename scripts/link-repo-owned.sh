@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: link-repo-owned.sh [--replace] [--layer NAME]. Links each repo-owned live path (sync.py --list-repo-owned) into this repo and, with --layer, builds ~/.codex/AGENTS.md from the core and that layer; see README.md, Installing.
+# Usage: link-repo-owned.sh [--replace] [--layer NAME]. Links each repo-owned live path (sync.py --list-repo-owned) into this repo and, with --layer, builds ~/.codex/AGENTS.md from the core and that layer and installs a post-merge hook that rebuilds it; see README.md, Installing.
 set -euo pipefail
 
 replace=false
@@ -69,4 +69,19 @@ done <<< "$repo_owned"
 
 if [[ -n "$layer" ]]; then
   python3 "$repo_root/scripts/build_codex_agents.py" "$layer"
+  hook="$(git -C "$repo_root" rev-parse --path-format=absolute --git-path hooks)/post-merge"
+  hook_text="#!/bin/sh
+# Installed by scripts/link-repo-owned.sh --layer $layer: rebuilds ~/.codex/AGENTS.md after a merge or pull.
+exec python3 \"$repo_root/scripts/build_codex_agents.py\" \"$layer\""
+  if [[ -e "$hook" || -L "$hook" ]]; then
+    if ! diff "$hook" - <<< "$hook_text"; then
+      echo "error: $hook differs from the post-merge hook this script installs (diff above); merge the two or move yours aside, then rerun" >&2
+      exit 1
+    fi
+    echo "already installed: $hook"
+  else
+    printf '%s\n' "$hook_text" > "$hook"
+    chmod +x "$hook"
+    echo "installed: $hook"
+  fi
 fi

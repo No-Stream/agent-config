@@ -234,6 +234,32 @@ class TestLinkRepoOwned:
         assert (fresh_home / ".codex/AGENTS.md").stat().st_ino == built_inode
         assert not (fresh_home / BACKUP_ROOT).exists()
 
+    def test_the_post_merge_hook_rebuilds_codex_instructions_after_a_merge_into_main(
+        self, repo: Path, fresh_home: Path
+    ) -> None:
+        commit(repo, "Add the repo", ".")
+        assert run_link_script(repo, fresh_home, "--layer", "personal").returncode == 0
+        subprocess.run(["git", "-C", str(repo), "switch", "-q", "-c", "new-rule"], check=True)
+        write(repo / "instructions/personal.md", "a new personal rule\n")
+        commit(repo, "Add a personal rule", "instructions/personal.md")
+        subprocess.run(["git", "-C", str(repo), "switch", "-q", "main"], check=True)
+
+        subprocess.run(
+            ["git", "-C", str(repo), "merge", "-q", "new-rule"], env={**os.environ, "HOME": str(fresh_home)}, check=True
+        )
+
+        assert (fresh_home / ".codex/AGENTS.md").read_text().endswith("\n\na new personal rule\n")
+
+    def test_stops_with_the_diff_when_a_different_post_merge_hook_exists(self, repo: Path, fresh_home: Path) -> None:
+        hook = repo / ".git/hooks/post-merge"
+        write(hook, "#!/bin/sh\necho my own hook\n")
+
+        result = run_link_script(repo, fresh_home, "--layer", "personal")
+
+        assert result.returncode != 0
+        assert "echo my own hook" in result.stdout
+        assert hook.read_text() == "#!/bin/sh\necho my own hook\n"
+
     def test_without_a_layer_links_the_shared_paths_and_leaves_layers_and_codex_alone(
         self, repo: Path, fresh_home: Path
     ) -> None:
@@ -244,6 +270,7 @@ class TestLinkRepoOwned:
         assert all((fresh_home / live).resolve() == (repo / relative).resolve() for relative, live in shared.items())
         assert not (fresh_home / ".claude/rules").exists()
         assert not (fresh_home / ".codex").exists()
+        assert not (repo / ".git/hooks/post-merge").exists()
 
     def test_replace_moves_a_machine_from_one_shared_instructions_file_to_the_core_and_its_layer(
         self, repo: Path, tmp_path: Path
