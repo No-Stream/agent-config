@@ -696,6 +696,54 @@ class TestComplexSentence:
         assert rule_lines("complex-sentence", text) == []
 
 
+class TestStaccatoRun:
+    def test_flags_three_short_sentences_that_open_on_the_same_word(self) -> None:
+        text = (
+            "The library opened a tool shed last spring.\n\n"
+            "Members borrow drills on weekdays. Members return them on Saturday. Members pay"
+            " nothing for a loan.\n"
+        )
+        assert rule_lines("staccato-run", text) == [3]
+
+    def test_flags_three_short_sentences_that_each_open_on_a_determiner(self) -> None:
+        text = (
+            "A new member gets a short tour. The desk issues a card. Each card holds ten loans.\n"
+        )
+        assert rule_lines("staccato-run", text) == [1]
+
+    def test_flags_a_longer_run_once(self) -> None:
+        text = "We open at nine. We close at five. We shut on Sundays. We shut on holidays.\n"
+        assert rule_lines("staccato-run", text) == [1]
+
+    def test_a_long_sentence_or_another_opener_breaks_the_run(self) -> None:
+        long_middle = (
+            "Members borrow drills on weekdays. Members return them on Saturday, after the morning"
+            " rush has passed and the staff have counted the week's tools. Members pay nothing.\n"
+        )
+        other_opener = "Members borrow drills. Staff check each drill. Members pay nothing.\n"
+        assert rule_lines("staccato-run", long_middle) == []
+        assert rule_lines("staccato-run", other_opener) == []
+
+    def test_counts_the_words_of_quoted_titles(self) -> None:
+        text = (
+            'The next guide, "Sharpening and Honing a Plane Iron by Hand at Home," covers the'
+            ' bevel. The third guide, "Choosing, Shaping and Fitting a New Ash Handle," covers'
+            ' repairs. The last guide, "Storing Hand Tools Through a Long and Damp Winter," covers'
+            " rust.\n"
+        )
+        assert rule_lines("staccato-run", text) == []
+
+    def test_reads_only_the_sentences_of_one_paragraph(self) -> None:
+        text = (
+            "- The desk opens at nine.\n- The shed opens at ten.\n- The café opens at noon.\n\n"
+            "![Loans](loans.png)\n\n"
+            "The bars are loans. The line is returns. The dots are repairs.\n\n"
+            "The desk opens at nine.\n\nThe shed opens at ten.\n\nThe café opens at noon.\n\n"
+            '"The desk opens. The shed opens. The café opens." That is the sign on the door.\n'
+        )
+        assert rule_lines("staccato-run", text) == []
+
+
 MASKING_TRIGGERS = (
     "The model wants the implementation of a cache that may possibly cost 3, 4 or 5"
     f" dollars. {RIVER_RUN_ON} {STARTER_SENTENCE} {CRUST_SENTENCE} As discussed, honestly,"
@@ -807,10 +855,10 @@ The examples folder contains requests for common workflows.
             ("coined-label", 13),
             ("em-dash", 13),
             ("short-paragraph-run", 13),
-            ("thin-h2-section", 6),
-            ("thin-h2-section", 31),
-            ("thin-h2-section", 36),
-            ("thin-h2-section", 41),
+            ("thin-section", 6),
+            ("thin-section", 31),
+            ("thin-section", 36),
+            ("thin-section", 41),
         }
 
 
@@ -852,3 +900,44 @@ class TestCli:
         assert [(finding["path"], finding["rule"]) for finding in json_findings] == [
             (str(flagged_path), "em-dash")
         ]
+
+    def test_budget_against_and_pr_options(self, tmp_path: Path) -> None:
+        summary = (
+            "This change adds holds. Members reserve a tool online. The desk keeps it for a day."
+            " Members get an email. Staff can cancel a hold. Holds expire at closing. Staff can"
+            " extend a hold once.\n"
+        )
+        old_path, new_path = tmp_path / "old.md", tmp_path / "new.md"
+        old_path.write_text("The branch lends drills to members.\n", encoding="utf-8")
+        new_path.write_text(summary, encoding="utf-8")
+        named_paths = [
+            tmp_path / name
+            for name in ("release-pr-body.md", "PR_DESCRIPTION.md", "proposal-description.md")
+        ]
+        for path in named_paths:
+            path.write_text(summary, encoding="utf-8")
+
+        def rules(*arguments: str) -> set[str]:
+            result = _run_cli("--json", *arguments)
+            assert result.returncode in (0, 1), result.stderr
+            return {finding["rule"] for finding in json.loads(result.stdout)}
+
+        options_rules = {"over-budget", "revision-growth", "pr-shape"}
+        assert options_rules & rules(str(new_path)) == set()
+        assert "over-budget" in rules("--budget", "20", str(new_path))
+        assert "revision-growth" in rules("--against", str(old_path), str(new_path))
+        assert "pr-shape" in rules("--pr", str(new_path))
+        assert ["pr-shape" in rules(str(path)) for path in named_paths] == [True, True, False]
+
+    def test_rejects_a_bad_budget_and_against_with_several_inputs(self, tmp_path: Path) -> None:
+        path = tmp_path / "doc.md"
+        path.write_text("A clear sentence.\n", encoding="utf-8")
+        assert _run_cli("--budget", "0", str(path)).returncode == 2
+        assert _run_cli("--against", str(path), str(path), str(path)).returncode == 2
+
+
+def _run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
+    script_path = Path(lint_prose.__file__).resolve()
+    return subprocess.run(
+        [sys.executable, str(script_path), *arguments], capture_output=True, text=True, check=False
+    )

@@ -399,3 +399,29 @@ RATE_CONTRAST = re.compile(
     rf"[^.;]*?{DECIMAL_RATE}"
 )
 ARITHMETIC = re.compile(r"\d[\s)]*[=×*][\s(]*[-+−$€£]?\d|=\s*[-+−$€£]?\d")
+
+# Shape rules from the owner's document feedback: worded measurements, staccato runs, PR names.
+MEASURE_NUMBER_WORD = r"(?:two|three|four|five|six|seven|eight|nine)"
+MEASURE_UNIT = (
+    r"(?:cents?|dollars?|euros?|points?|basis points?|degrees?|seconds?|minutes?|hours?|days?"
+    r"|weeks?|months?|years?|meters?|miles?|grams?|kilograms?|pounds?)"
+)
+FRACTION_WORD = r"(?:half|halves|third|thirds|quarter|quarters|fifth|fifths|tenth|tenths)"
+# A fraction word is a share only before "of", a comparative, a preposition or punctuation.
+AFTER_A_SHARE = (
+    r"(?=\s+(?:of|as|than|more|less|fewer|sooner|later|faster|slower|higher|lower|longer|shorter"
+    r"|at|in|on|for|from|by)\b|\s*[,.;:!?)]|\s*$)"
+)
+MEASURED_NUMBER_WORD = re.compile(
+    rf"(?i)\b(?:{MEASURE_NUMBER_WORD}\s+{MEASURE_UNIT}\b"
+    r"|(?<!\bat )one\s+(?:cent|dollar|euro|point)\b(?!\s+of\b)"
+    rf"|(?:a|one|two|three|four)[- ]{FRACTION_WORD}\b{AFTER_A_SHARE}"
+    r"|half (?:a|an)\b(?!\s+dozen)|half (?:of|as|the)\b"
+    r"|(?:than|about|nearly|roughly|almost|over|under) half\b"
+    r"|(?:one|two|three) and a half\b"
+    rf"|(?:under|over|nearly|roughly|almost)\s+{MEASURE_NUMBER_WORD}\b(?!\s+(?:of|in|or|and|to)\b)"
+    rf"|by\s+{MEASURE_NUMBER_WORD}(?=\s*[,.;:!?)]|\s*$))"
+)
+STACCATO_DETERMINERS = {"a", "an", "the", "each", "every", "one", "another", "some", "most", "no"}
+STACCATO_DETERMINERS |= {"our", "their", "its", "this", "that", "these", "those"}
+PULL_REQUEST_FILE_NAME = re.compile(r"(?i)(?:^|[_-])(?:pr|cr)[-_]?(?:description|body)\b")

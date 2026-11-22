@@ -98,9 +98,7 @@ class _BlockDraft:
     def finish(self, original_lines: list[str]) -> Block:
         """Build the block; its lines are consecutive source lines from its first line."""
         text = "\n".join(self.lines)
-        caption = CAPTION_START.match(text.lstrip()) or (
-            self.after_image and sentence_count(text) <= 2
-        )
+        caption = self.after_image or CAPTION_START.match(text.lstrip())
         kind = "caption" if self.kind == "paragraph" and caption else self.kind
         first = self.first_line - 1
         source_lines = tuple(original_lines[first : first + len(self.lines)])

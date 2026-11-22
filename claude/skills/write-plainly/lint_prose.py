@@ -13,8 +13,13 @@ from pathlib import Path
 
 from lint_prose_document import (
     DOCUMENT_MESSAGES,
+    budget_findings,
     heading_density_findings,
+    long_caption_findings,
     number_density_findings,
+    pr_appendix_as_back_matter,
+    pr_shape_findings,
+    revision_findings,
     section_findings,
     short_paragraph_findings,
     summary_findings,
@@ -57,11 +62,13 @@ from lint_prose_patterns import (
     PHRASE_RULES,
     PRONOUN_I_AFTER_LABEL,
     PUBLIC_IDS,
+    PULL_REQUEST_FILE_NAME,
     ROMAN_NUMERALS,
     SECTION_LABEL_HEADING,
     SECTION_LABEL_RUN_IN,
     SERIES,
     SHORT_CODE,
+    STACCATO_DETERMINERS,
     STANDARD_ID_PREFIXES,
     SYMBOL_IN_PROSE,
     TELL_RULES,
@@ -75,6 +82,8 @@ LONG_SENTENCE_MAX_PUNCTUATION = 1
 COMPLEX_SENTENCE_WORDS = 40
 FREE_COMPLEX_SENTENCES = 1
 ANNOUNCING_QUESTION_MAX_WORDS = 12
+STACCATO_MAX_WORDS = 12
+STACCATO_RUN = 3
 FREE_TRIADS_PER_SECTION = 2
 FREE_INTENSIFIERS_PER_SECTION = 2
 
@@ -152,6 +161,10 @@ MESSAGES = {
     "complex-sentence": (
         f"Sentence of {COMPLEX_SENTENCE_WORDS} or more words; split it so each sentence makes"
         " one point."
+    ),
+    "staccato-run": (
+        "Check: a run of short sentences of the same shape (advisory). Join them into one sentence"
+        " or a list; changing their first words is not a fix."
     ),
     "borrowed-jargon": (
         "Check: a scientific term borrowed for weight (advisory). Unless the literal sense is"
@@ -412,6 +425,30 @@ def _sentence_shape_findings(prose: list[Block]) -> list[Finding]:
     return findings
 
 
+def _opens_like(first_words: list[str]) -> bool:
+    """Whether sentences open on one word, or each on a determiner such as "the" or "each"."""
+    return len(set(first_words)) == 1 or all(word in STACCATO_DETERMINERS for word in first_words)
+
+
+def _staccato_findings(prose: list[Block]) -> list[Finding]:
+    """Flag the first of three or more short sentences in a paragraph that open the same way."""
+    findings: list[Finding] = []
+    for block in prose:
+        if block.kind != "paragraph":
+            continue
+        spans = sentence_spans(mask_quotations(block.text))
+        sentences = [(start, WORD.findall(block.text[start:end])) for start, end in spans]
+        run_end = 0
+        for index in range(len(sentences) - STACCATO_RUN + 1):
+            window = sentences[index : index + STACCATO_RUN]
+            short = all(len(words) <= STACCATO_MAX_WORDS for _, words in window)
+            if short and _opens_like([words[0].lower() for _, words in window]):
+                if index >= run_end:
+                    findings.append(block.finding("staccato-run", window[0][0]))
+                run_end = index + STACCATO_RUN
+    return findings
+
+
 def _three_item_series(text: str, start: int, end: int) -> re.Match[str] | None:
     """Return the first comma series in the sentence with exactly two items before its
     conjunction, reading it after any opening phrase such as "In winter,"."""
@@ -520,10 +557,23 @@ def _undefined_acronym_findings(prose: list[Block]) -> list[Finding]:
     return findings
 
 
-def lint_text(text: str) -> list[Finding]:
-    """Return conservative style findings, retaining original line locations."""
+def _blocks(text: str, pr: bool) -> tuple[list[str], list[str], list[Block]]:
+    """Return the source lines, the lines with markup blanked, and the blocks of a document; in a
+    pull request description, the part below the first horizontal rule is the appendix."""
     original_lines, visible_lines, line_kinds = masked_lines(text)
     blocks = parse_blocks(original_lines, visible_lines, line_kinds)
+    return original_lines, visible_lines, pr_appendix_as_back_matter(blocks) if pr else blocks
+
+
+def lint_text(
+    text: str, *, budget: int | None = None, against: str | None = None, pr: bool = False
+) -> list[Finding]:
+    """Return conservative style findings, retaining original line locations.
+
+    `budget` is the agreed main-text word count, `against` the text of the version this one
+    revises, and `pr` marks a pull request description; each turns on the rule that needs it.
+    """
+    original_lines, visible_lines, blocks = _blocks(text, pr)
     prose = [block for block in blocks if block.kind in PROSE_KINDS]
     headings = [block for block in blocks if block.kind == "heading"]
     findings = _line_findings(original_lines, visible_lines)
@@ -536,6 +586,7 @@ def lint_text(text: str) -> list[Finding]:
     findings.extend(_intensifier_findings(blocks))
     findings.extend(_sentence_findings(prose))
     findings.extend(_sentence_shape_findings(prose))
+    findings.extend(_staccato_findings(prose))
     findings.extend(_triad_findings(blocks))
     findings.extend(_all_caps_findings(prose))
     findings.extend(_undefined_acronym_findings(prose))
@@ -543,6 +594,13 @@ def lint_text(text: str) -> list[Finding]:
     findings.extend(supporting_statistic_findings(blocks))
     findings.extend(heading_density_findings(blocks, prose))
     findings.extend(summary_findings(blocks))
+    findings.extend(long_caption_findings(blocks))
+    if budget is not None:
+        findings.extend(budget_findings(blocks, budget))
+    if against is not None:
+        findings.extend(revision_findings(blocks, _blocks(against, pr)[2]))
+    if pr:
+        findings.extend(pr_shape_findings(blocks))
     return sorted(findings, key=lambda finding: (finding.line, finding.column, finding.rule))
 
 
@@ -552,15 +610,41 @@ def _read_input(path: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
+def _positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"must be a positive whole number, got {value}")
+    return number
+
+
+def is_pr_description_name(path: str) -> bool:
+    """Whether a file name marks a pull request or code review description, as pr-body.md does."""
+    return bool(PULL_REQUEST_FILE_NAME.search(Path(path).name))
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", help="write findings as JSON")
+    parser.add_argument(
+        "--budget", type=_positive_int, metavar="N", help="report main text over 110%% of N words"
+    )
+    parser.add_argument(
+        "--against", metavar="OLD", help="report growth against OLD, the version this revises"
+    )
+    parser.add_argument(
+        "--pr", action="store_true", help="check the shape of a pull request description"
+    )
     parser.add_argument("inputs", nargs="+", metavar="INPUT", help="file path or - for stdin")
     options = parser.parse_args(arguments)
+    if options.against is not None and len(options.inputs) != 1:
+        parser.error("--against compares one input with OLD; give exactly one INPUT")
+    against = None if options.against is None else _read_input(options.against)
     all_findings: list[dict[str, object]] = []
     text_findings: list[str] = []
     for input_path in options.inputs:
-        for finding in lint_text(_read_input(input_path)):
+        pr = options.pr or is_pr_description_name(input_path)
+        findings = lint_text(_read_input(input_path), budget=options.budget, against=against, pr=pr)
+        for finding in findings:
             message = MESSAGES[finding.rule]
             all_findings.append({**asdict(finding), "message": message, "path": input_path})
             text_findings.append(
