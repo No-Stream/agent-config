@@ -120,6 +120,56 @@ INTENSIFIER = re.compile(
     r"(?i)\b(?:(?<!\bthe )(?<!\bthis )(?<!\bthat )very|extremely|exceptionally|incredibly"
     r"|remarkably|tremendously|immensely|hugely|insanely|truly|absolutely|utterly|totally)\b"
 )
+LESS_ABOUT = (
+    r"(?<!\bit['’]s )(?<!\bit is )(?<!\bthis is )(?<!\bthat['’]s )(?<!\bthat is )"
+    r"\bless about\b[^.;?!]{1,60}?\b(?:more|than) about\b"
+)
+FORMAL_WORDS = (
+    r"utili[sz](?:e|es|ed|ing)|commenc(?:e|es|ed|ing)|ascertain(?:s|ed|ing)?|endeavou?r(?:s|ed)? to"
+    r"|facilitat(?:e|es|ed|ing)|ameliorat(?:e|es|ed|ing)|cogni[sz]ant|necessitat(?:e|es|ed|ing)"
+    r"|remunerat(?:e|es|ed|ing|ion)|heretofore|hitherto|thusly|at this juncture|prior to"
+)
+WORDY_PHRASES = (
+    r"in order to|when it comes to|with (?:regard|regards|reference) to|in regard to|in relation to"
+    r"|(?:due|owing) to the fact that|in spite of the fact that|despite the fact that"
+    r"|in the event that|for the purpose of|at this point in time|at the present time"
+    r"|a sufficient number of|in an effort to"
+)
+FINANCE_WORDS = (
+    r"foregone\b(?! conclusion)|recoup(?:s|ed|ing)?\b"
+    r"|repa(?:y|ys|id|ying) (?:its|their|the|our) (?:cost|costs|outlay|investment|price)\b"
+    r"|carr(?:y|ies|ied|ying) (?:about |roughly |nearly |over |almost |only |just )?[-+]?\d[\d.,]*\s?%"
+)
+METAPHOR_IMAGES = (
+    r"(?:raise[sd]?|raising|lower(?:s|ed|ing)?|clear(?:s|ed|ing)?|set(?:s|ting)?|meet(?:s|ing)?|met)"
+    r" the bar|an? (?:high|low|higher|lower) bar"
+    r"|(?:puts?|sets?|putting|setting) an? (?:hard |soft )?(?:floor|ceiling)|an? (?:hard|soft)"
+    r" (?:floor|ceiling)|yardsticks?|(?:a|the) ladder of|climb(?:s|ed|ing)? the (?:\w+ )?ladder"
+    r"|bridg(?:e|es|ed|ing) the gap|an? bridge (?:to|between)|through the lens of"
+    r"|(?:a|the) lens (?:on|into|for)|(?:a|the) ledger of|an? window (?:into|onto)"
+    r"|paint(?:s|ed|ing)? an? (?:\w+ )?picture|the backbone of|(?:no|an) echo of|a menu of"
+    r"|bounc(?:e|es|ed|ing) back|flywheels?|(?:competitive|economic|defensible) moats?"
+    r"|(?:tail|head)winds?|pain points?|heavy lifting|in the weeds|boil(?:s|ing)? the ocean"
+    r"|doubl(?:e|es|ed|ing) down|lean(?:s|ed|ing)? into|tak(?:e|es|ing) a step back"
+    r"|on the same page|rising tide|uphill (?:battle|climb)|(?:key|main|biggest|policy) levers?"
+    r"|pull(?:s|ed|ing)? (?:the |a |every |a few )?(?:\w+ )?levers?"
+)
+CLICHES = (
+    r"north star|mov(?:e|es|ed|ing) the needle|low-hanging fruit|double-edged sword"
+    r"|tip of the iceberg|lion['’]s share|silver bullet|perfect storm|moving target|slippery slope"
+    r"|elephant in the room|wake-?up call|sea change"
+)
+DOCUMENT_WORDS = r"section|document|post|article|guide|report|essay|chapter|paper|note|README"
+SIGNPOSTS = (
+    rf"in this (?:{DOCUMENT_WORDS}),? (?:we|I)(?:['’]ll| will| shall| are going to| am going to)"
+    rf"|in the (?:next|following) (?:{DOCUMENT_WORDS}),? (?:we|I)\b"
+    r"|let(?:['’]s| us) (?:dive|dig|jump) in(?:to)?"
+    r"|as (?:we|you)(?:['’]ll| will) see (?:below|later|shortly|in the next)"
+    r"|as (?:described|shown|explained|discussed|detailed|outlined) below"
+    rf"|this (?:{DOCUMENT_WORDS}) (?:will )?(?:cover|describe|explain|outline|discuss|walk)(?:s|es)?\b"
+    r"|(?<![a-z,] )(?:in short|in sum|in summary|to sum up|to summari[sz]e|to wrap up|in closing"
+    r"|in conclusion|all in all|taken together)(?=,)"
+)
 PHRASE_RULES = {
     "stacked-hedge": re.compile(
         r"(?i)\b(?P<hit>(?:may|might|could|can)\s+(?:possibly|potentially|perhaps|conceivably))\b"
@@ -183,7 +233,7 @@ PHRASE_RULES = {
         rf"(?i)\b(?P<hit>(?:{CANNOT}|unable to)\s+(?:be\s+)?rul(?:e|ed)\s+out"
         rf"|(?:we|I)\s+{CANNOT}\s+exclude|{CANNOT}\s+be\s+excluded)\b"
     ),
-    "rather-than": re.compile(r"(?i)(?P<hit>\brather than\b|(?<!\w), not\b)"),
+    "rather-than": re.compile(rf"(?i)(?P<hit>\brather than\b|(?<!\w), not\b|{LESS_ABOUT})"),
     "american-spelling": re.compile(rf"(?i)\b(?P<hit>{BRITISH_SPELLING})\b"),
     "passive-by-agent": re.compile(
         r"(?i)\b(?P<hit>(?:is|are|was|were|be|been|being)\s+"
@@ -191,6 +241,11 @@ PHRASE_RULES = {
         rf"(?!(?:{NOT_AN_ACTOR_VERBS})\b)(?!un\w+ed\b)(?:\w+ed|{IRREGULAR_PARTICIPLES})\s+by)"
         rf"\s+(?!(?:{NOT_AN_AGENT})\b)(?!(?:\w+ly\s+)?(?-i:[a-z][\w-]*ing)\b)(?=[A-Za-z])"
     ),
+    "formal-word": re.compile(rf"(?i)\b(?P<hit>{FORMAL_WORDS})\b"),
+    "wordy-phrase": re.compile(rf"(?i)\b(?P<hit>{WORDY_PHRASES})\b"),
+    "finance-word": re.compile(rf"(?i)\b(?P<hit>{FINANCE_WORDS})"),
+    "metaphor": re.compile(rf"(?i)\b(?P<hit>{METAPHOR_IMAGES}|{CLICHES})\b"),
+    "signposting": re.compile(rf"(?i)\b(?P<hit>{SIGNPOSTS})\b"),
 }
 # Model-tell lists, written from Wikipedia's "Signs of AI writing" and stop-slop (sources.md).
 AI_VOCABULARY = (
@@ -260,7 +315,7 @@ TELL_RULES = {
         r"(?i)\b(?P<hit>(?<![a-z] )(?:moving|going) forward(?=,)"
         r"|(?<!\bis )(?<!\bare )(?<!\bwas )(?<!\bwere )(?<!\bbe )(?<!\bkeep )(?<!\bkept )"
         r"going forward(?=\s*(?:[.;!?)]|$))"
-        r"|all in all|circl(?:e|es|ed|ing) back|when all is said and done|last but not least)\b"
+        r"|circl(?:e|es|ed|ing) back|when all is said and done|last but not least)\b"
     ),
     "insight-teaser": re.compile(
         r"(?i)(?<!here['’]s )(?<!here is )\b(?P<hit>the (?:part|thing|bit) (?:everyone|everybody"
@@ -285,11 +340,23 @@ TELL_RULES = {
         r"|(?:I['’]d be|I would be|I['’]m|I am) happy to|happy to (?:help|iterate|expand|clarify)"
         r"|great question|is there anything else|you['’]re absolutely right)\b"
     ),
+    "whether-range": re.compile(
+        r"(?i)(?<![a-z,] )\b(?P<hit>whether (?:it['’]s|it is|you['’]re|you are|they['’]re|they are"
+        r"|we['’]re|we are) [^.,;]{1,40}? or (?!not\b)[^.,;]{1,40}?,)"
+    ),
     "vague-quantifier": re.compile(
         r"(?i)\b(?P<hit>a number of|a (?:wide|broad|diverse|vast) (?:array|spectrum) of"
         r"|myriad|a plethora of|a (?:whole )?host of|a multitude of)\b"
     ),
 }
+# Pictographic emoji blocks, BMP emoji shown as pictures, and arrows; the footnote return "↩" passes.
+EMOJI = (
+    r"\U0001F300-\U0001F64F\U0001F680-\U0001F6FF\U0001F900-\U0001F9FF\U0001FA70-\U0001FAFF"
+    r"\u2614\u2615\u26A1\u26D4\u2705\u274C\u2728\u2753-\u2755\u2757\u2B50"
+)
+ARROWS = r"\u2190-\u21A8\u21AB-\u21FF\u27A1\u27F0-\u27FF\u2900-\u297F\u2B05-\u2B07"
+SYMBOL_IN_PROSE = re.compile(rf"[{EMOJI}{ARROWS}]|(?<=\w) -?-> (?=\w)")
+INLINE_MATH = re.compile(r"\$[^$\n]+\$")
 QUOTATION = re.compile(r'"[^"]{1,300}"|“[^”]{1,300}”')
 
 ANNOUNCING_COLON = re.compile(

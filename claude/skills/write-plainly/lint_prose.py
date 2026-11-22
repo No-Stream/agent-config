@@ -25,6 +25,7 @@ from lint_prose_markdown import (
     WORD,
     Block,
     Finding,
+    blank_match,
     excerpt,
     heading_text,
     heading_words,
@@ -46,6 +47,7 @@ from lint_prose_patterns import (
     DESCRIBED_ID,
     HASH_NUMBER,
     HEX_ID,
+    INLINE_MATH,
     INTENSIFIER,
     LABEL_PATTERN,
     LIST_ENTRY_WORDS,
@@ -59,6 +61,7 @@ from lint_prose_patterns import (
     SERIES,
     SHORT_CODE,
     STANDARD_ID_PREFIXES,
+    SYMBOL_IN_PROSE,
     TELL_RULES,
     TITLE_SMALL_WORDS,
     TRACKER_ID,
@@ -115,8 +118,8 @@ MESSAGES = {
         "Ordinary word in capitals; use italics or plain wording, or backticks if it is code."
     ),
     "rather-than": (
-        'Check: contrast with "rather than" or ", not" (advisory). If no reader expects the'
-        " alternative, state only what is true."
+        'Check: contrast with "rather than", ", not" or "less about ... more about" (advisory).'
+        " If no reader expects the alternative, state only what is true."
     ),
     "american-spelling": (
         "British spelling; use the American form (color, center, license, organize, analyze,"
@@ -196,6 +199,34 @@ MESSAGES = {
         "Check: passive voice with a named actor (advisory). Make the actor the subject unless"
         " the sentence is about what was acted on."
     ),
+    "formal-word": (
+        'Check: a formal word with an everyday one (advisory); write "use", "start", "find out",'
+        ' "try", "help", "need" or "before" unless the formal word is the term of art.'
+    ),
+    "wordy-phrase": (
+        'Check: wordy phrase (advisory); use the short form ("to", "about", "because", "if",'
+        ' "now") unless the words mean something else here, as in "written in order to disk".'
+    ),
+    "finance-word": (
+        'Check: a finance word for a plain idea (advisory). Write "lost" for "foregone", "earns'
+        ' back" for "recoups", "accounts for 30%" for "carries 30%".'
+    ),
+    "whether-range": (
+        'Check: "whether it\'s X or Y" range filler (advisory). If the sentence does not depend on'
+        " the two cases, say who or what it is about."
+    ),
+    "metaphor": (
+        "Check: an image or stock idiom in place of the literal claim (advisory). Name the"
+        " threshold, method, cause or quantity itself."
+    ),
+    "signposting": (
+        "Check: a signpost that announces what the text covers or that a recap follows"
+        " (advisory). State the content itself and cut the recap."
+    ),
+    "symbol-in-prose": (
+        'Check: emoji or arrow in prose (advisory). Write the word ("to", "becomes", "leads to")'
+        " or drop the symbol; a menu path such as File → Save can stay."
+    ),
 }
 
 LINK_TEXT = re.compile(r"\[[^\]\n]*\](?=\()")
@@ -227,6 +258,8 @@ def _line_hits(visible: str) -> Iterator[tuple[str, int]]:
     """Yield the rule and column of each hit in one line with its markup blanked."""
     for match in re.finditer("—", visible):
         yield "em-dash", match.start() + 1
+    for match in SYMBOL_IN_PROSE.finditer(INLINE_MATH.sub(blank_match, mask_quotations(visible))):
+        yield "symbol-in-prose", match.start() + 1
     for match in re.finditer(r"–", visible):
         left = visible[match.start() - 1] if match.start() else ""
         right = visible[match.end()] if match.end() < len(visible) else ""
