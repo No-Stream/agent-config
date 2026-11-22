@@ -298,11 +298,13 @@ OVEN_OPENING = "We tested whether the new oven bakes bread faster than the old o
 class TestSupportingStatistic:
     def test_flags_each_kind_of_supporting_statistic_in_body_prose(self) -> None:
         sentences = (
-            "The new oven baked faster, with a t of 3.10 on 14 df.",
+            "The new oven baked faster, with a t of 3.10.",
+            "The Welch test ran on 9.73 df.",
             "Loaves rose higher in it (p = 0.02).",
+            "The crust darkened, with a p-value of 0.04.",
             "Sales rose 4.0% [2.5%, 5.5%] after the move.",
             "The 95% interval runs from 1.0 to 3.2 minutes.",
-            "Each loaf lost 2.1 ± 0.4 grams of water.",
+            "- Each loaf lost 2.1 ± 0.4 grams of water.",
             "The new probe read within 0.92 of the true heat, against 0.97 for the old one.",
             "The new tin browned 0.62 of the crust, vs. 0.71 for the old tin.",
             "The share of burnt loaves had a 95% Wilson interval of 0.12 to 0.19.",
@@ -321,7 +323,8 @@ class TestSupportingStatistic:
     def test_leaves_headline_numbers_arithmetic_and_exempt_blocks_alone(self) -> None:
         text = (
             OVEN_OPENING + "The new oven bakes a loaf in 25 minutes, 20% faster than the old one."
-            " The share is 0.25 * 0.4 = 0.1 of the day.\n\n"
+            " Its probe reads within 0.92 of the true heat while the oven warms up. The share is"
+            " 0.25 * 0.4 = 0.1 of the day.\n\n"
             "Its crust score rose from 0.81 to 0.84. The oven alarm sounds at humidity 0.05 and"
             " 0.2.\n\n"
             "The bakery spent most of its budget on flour ($14,200). Bread sales rose in both"
