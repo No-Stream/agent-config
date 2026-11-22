@@ -15,6 +15,7 @@ auto-saved command approvals are removed.
 | `claude/skills/paper-drafting/` | Turning research into a paper or blog post: narrative, claims ledger, evidence red-team, drafting order |
 | `claude/skills/write-plainly/` | Rules for plain prose in documents other people read (READMEs, reports, posts), three prose linters run by `check-prose.sh`, and an Opus reviewer subagent |
 | `claude/skills/visualization/` | Plot choice, uncertainty, computed and asserted titles, light and dark themes, figure review; includes `vizstyle.py` and tests |
+| `claude/skills/notebooks/` | Authoring, running and reviewing analysis notebooks: cell structure, results rendered from code, kernel state and long runs, memory and speed on large dataframes, and a pre-run review |
 | `codex/config.toml` | Codex settings: permissions profiles, network allowlist, agents, hook registration |
 | `codex/rules/default.rules` | Codex prefix rules that forbid the same destructive commands as the Claude deny list |
 | `codex/hooks/` | Codex PreToolUse guard that reuses the Claude guard and checks compound shell commands, with test cases |
