@@ -148,18 +148,18 @@ Run these checks once, in order.
 2. Triage the findings once, and never rerun the linters to chase the score. Fix every em dash and high-confidence sloplint note unless it names something literally. Read each finding whose message starts with "Check:" and fix it only when the flagged text is a real instance of the rule. Fix a number-density or section-shape finding by moving numbers into a table or restructuring, never by spelling numbers out or splitting text to dodge the count. Fix a slop-guard rhythm finding only by regrouping content, never by adding or splitting a sentence to change the spread. Treat a single word-level hit ("robust," "crucial") as a prompt to check that the word is literal and earned. Skip findings in quoted material, code, and tables.
 3. Search the draft for passive voice and make each instance active unless the actor is unknown or irrelevant; no linter covers this. Compare against the source for numbers, negation, modality, scope, and attribution.
 4. For a standalone document others will read, run the review by a fresh reader below.
-5. After delivering to a rendered format (Google Docs, a PR page, a rendered site), check what the reader sees: re-read the rendered result for empty paragraphs, lost headings or lists, broken tables, and stray markup.
+5. After delivering to a rendered format (Google Docs, a PR page, a rendered site), re-read what the reader sees for empty paragraphs, lost headings or lists, broken tables, and stray markup.
 
 ### Review by a fresh reader
 
-Dispatch two read-only subagents in parallel, and pass neither of them the linter output, so that each reads the document cold:
+Dispatch two read-only subagents in parallel, and pass neither the linter output, so each reads the document cold:
 
-- `prose-reviewer` (Opus) gets the document path, the intended reader, and the source material if there is any. It returns at most six findings, each a quoted span with its problem and a fix, and zero findings is a valid result.
+- `prose-reviewer` (Opus) gets the document path, the intended reader, and any source material. It returns at most six findings, each a quoted span with its problem and a fix, or none.
 - `prose-reader-test` (Opus) gets only the document path and the intended reader, and reads the document without this skill. It returns the questions a cold reader in that audience would ask, each answered from the document or marked "not answered."
 
-Apply the reviewer findings you agree with. Close each gap from information you have, placing the answer where "Route caveats and detail" sends it, and flag the rest for the author. If the edits touched more than a few sentences, dispatch `prose-fidelity-checker` (Sonnet) with the earlier version, the source notes if there are any, and the revision. It marks every change in meaning as supported or unsupported by the source. Revert or fix the unsupported ones.
+Apply the reviewer findings you agree with. Always fix a term either reviewer marks as unexplained or coined: explain it in plain words where it first appears, or replace it with a plain description. Close every remaining gap from information you have, placing the answer where "Route caveats and detail" sends it, and flag the rest for the author. If the edits touched more than a few sentences, dispatch `prose-fidelity-checker` (Sonnet) with the earlier version, any source notes, and the revision, and revert or fix each change in meaning it marks unsupported by the source.
 
-Run this review once. Do not loop critique and rewrite until a reviewer approves: repeated passes accumulate drift and strip useful detail.
+Run this review once, since repeated rounds of critique and rewrite accumulate drift and strip useful detail.
 
 ## Calibration examples
 

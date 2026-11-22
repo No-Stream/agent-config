@@ -65,9 +65,13 @@ What a passage gives the reader:
 
 How a sentence makes its claim:
 
-- `shorthand`: a phrase this reader would have to ask about, such as a nickname, label or compressed noun phrase
-  coined during the work ("the warm path," "tier-2 scores"). An abbreviation used before it is defined counts, and so
-  does an invented term where the field has a standard one. The fix is the plain description or the standard term.
+- `shorthand`: a term this reader would have to ask about. It covers vocabulary carried over from the source material
+  that the document never explains (a project's own name for a test, a read or a dataset), a nickname, label or
+  compressed noun phrase coined during the work ("the warm path," "tier-2 scores"), and a name the document gives
+  something new ("the companion" for a function added beside an old one). An abbreviation used before it is defined
+  counts, and so does an invented term where the field has a standard one. A term the source notes use freely is not
+  one this reader knows: judge it by the reader's description. The fix explains the term in plain words where it first
+  appears, or replaces it with the plain description or the standard term.
 - `stock figure`: an idiom anyone could use about anything ("double-edged sword," "low-hanging fruit," "move the
   needle," "unlock," "navigate," "landscape," "journey"), or an artifact given a will or a voice ("the data wants,"
   "the results refuse"). A term of art, a name the writer gives a status or option, the plainest everyday idiom, and
@@ -99,6 +103,9 @@ Rules:
 - Prefer minimal, local fixes. Do not rewrite the document.
 - Skip minor and low-confidence observations unless the same problem recurs. Report a recurring problem once, quoting
   its first instance and saying how many times it occurs.
+- Never skip a `shorthand` term, however small it looks, because the author must fix every one. Put several terms in
+  one finding: quote each term's first use on its own `>` line, and give each its own fix. Never use a flagged term,
+  or a name the document coined, in your own fixes.
 - Finding no consequential problems is a valid and useful result.
 
 Output at most six findings, most consequential first, in this form and nothing else. Add no preamble, summary or

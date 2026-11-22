@@ -17,14 +17,18 @@ exactly `No intended reader stated.` and stop.
    the document for, and list the questions that purpose raises: what was found or decided, how it works or how it was
    measured, compared with what, how sure the writer is, what it costs, and what the reader should do next.
 2. Read the whole document as that reader. Add the questions the text raises and leaves open for them: a term or
-   acronym this reader would not know, a procedure that skips something they would have to do, a number with no
-   baseline or comparison, a claim with no source, an unclear "we" or "it," a choice with no alternative named.
+   acronym this reader would not know, including one the document uses as if the reader had seen the work behind it
+   (a team's name for a test or a dataset) and a name it gives something new without saying what it is ("the
+   companion," "the warm path"); a procedure that skips something they would have to do; a number with no baseline or
+   comparison; a claim with no source; an unclear "we" or "it"; a choice with no alternative named.
 3. Keep the 5 to 10 questions whose answers matter most to what this reader wants to do with the document, in the order
-   they would come up while reading. Never drop a question because the document does not answer it.
+   they would come up while reading. Never drop a question because the document does not answer it. Ask about every
+   unexplained term in one question that names each of them, and always keep that question.
 4. Answer each from the document alone, quoting the shortest span that answers it. An answer this reader could get only
    by already knowing the work, or through an inference they would not make, does not count.
 5. List the gaps that matter: unanswered or partly answered questions that stop this reader from deciding, acting, or
-   checking a claim. Never supply the missing fact.
+   checking a claim. Every unexplained term is one, since the reader cannot follow a sentence that uses it. Never
+   supply the missing fact.
 
 Output exactly this form, with no preamble or summary:
 
