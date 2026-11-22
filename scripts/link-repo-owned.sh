@@ -68,5 +68,5 @@ while IFS=$'\t' read -r relative live_relative; do
 done <<< "$repo_owned"
 
 if [[ -n "$layer" ]]; then
-  python3 "$repo_root/scripts/build_codex_agents.py" "$HOME/.claude/rules/$layer.md"
+  python3 "$repo_root/scripts/build_codex_agents.py" "$layer"
 fi
