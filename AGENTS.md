@@ -23,6 +23,8 @@ uv run --no-project --with pytest python -m pytest tests
 python3 sync.py --check
 ```
 
+After a change under `claude/skills/write-plainly/eval/`, also run that evaluation's three suites, whose commands are in `eval/README.md`, `eval/pairwise/README.md` and `eval/detectors/README.md`.
+
 `tests/` runs `sync.py`, the link script and the codex builder end to end against a temporary home and repo, so no test touches the live config. `bash codex/hooks/test_guard_shell.sh codex/hooks/guard_shell_cases.tsv` tests the guard installed at `~/.codex/hooks/guard_shell.py`, so it runs only on a machine where that copy is installed.
 
 `sync.py` and `scripts/` use only the standard library and run under the system `python3`, so keep them compatible with Python 3.9.
