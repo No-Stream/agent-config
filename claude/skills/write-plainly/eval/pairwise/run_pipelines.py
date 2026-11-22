@@ -41,6 +41,7 @@ from pipeline_config import (
     AuthorStage,
     BareDraftStage,
     Config,
+    CopiedDraftStage,
     DraftStage,
     FidelityGate,
     LintLoop,
@@ -248,6 +249,8 @@ class Runner:
             return self.draft(run)
         if isinstance(stage, BareDraftStage):
             return self.bare_draft(run)
+        if isinstance(stage, CopiedDraftStage):
+            return self.copied_draft(run)
         passage, session_id = latest(previous, "passage"), latest(previous, "session_id")
         agent_outputs = {r["stage"]: r["text"] for r in previous if r["kind"] == AgentStage.kind}
         match stage:
@@ -263,10 +266,6 @@ class Runner:
 
     def draft(self, run: StageRun) -> dict:
         stage, task = run.stage, run.task
-        if stage.from_pipeline:
-            source_pipeline = self.config.pipeline(stage.from_pipeline)
-            source = self.ensure_stage(task.task_id, source_pipeline, 0, previous=[])
-            return {**source, "copied_from": stage.from_pipeline}
         prompt = DRAFT_PROMPT.format(
             read_list=read_list(stage.read),
             instructions=stage.instructions.strip(),
@@ -288,6 +287,11 @@ class Runner:
         )
         result = self.author_call(prompt, resume_session_id=None, tools=())
         return with_passage(run.record, result, "author")
+
+    def copied_draft(self, run: StageRun) -> dict:
+        source_pipeline = self.config.pipeline(run.stage.from_pipeline)
+        source = self.ensure_stage(run.task.task_id, source_pipeline, 0, previous=[])
+        return {**source, "copied_from": run.stage.from_pipeline}
 
     def agent_stage(self, run: StageRun, passage: str) -> dict:
         stage, task = run.stage, run.task

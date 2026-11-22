@@ -53,12 +53,13 @@ Each judge ranks every set twice. The seed draws one order of the passages and t
 
 ## Pipeline config
 
-A TOML file with a `[run]` table, named linters, a `[fidelity]` table and one `[[pipeline]]` per pipeline. Each pipeline is a list of stages, the first of them, and only it, a `draft` or a `bare_draft`:
+A TOML file with a `[run]` table, named linters, a `[fidelity]` table and one `[[pipeline]]` per pipeline. Each pipeline is a list of stages, the first of them, and only it, a `draft`, a `bare_draft` or a `copied_draft`:
 
 | Stage kind | What it runs |
 | --- | --- |
-| `draft` | Starts the author conversation: reads the files in `read`, follows `instructions`, returns the passage. With `from_pipeline` in place of `read`, it reuses that pipeline's draft and session instead, so two pipelines can share a draft. It takes exactly one of the two. |
+| `draft` | Starts the author conversation: reads the files in `read` (at least one), follows `instructions`, returns the passage. |
 | `bare_draft` | The model's own draft, for a baseline without guidance: it follows `instructions`, its prompt names no files and carries no path note, and the call gets no tools. The task text and the rules for the run are the same as a `draft`'s. |
+| `copied_draft` | Reuses the draft and author session of the pipeline named in `from_pipeline`, so two pipelines can share one draft and differ only in later stages. That pipeline's own first stage cannot be a `copied_draft`. It makes no call. |
 | `agent` | A fresh reviewer conversation. It takes either `agent_file` (a Claude Code subagent definition: its body is the system prompt, its frontmatter sets the model and tools) or a `brief`. `sees` picks what it gets: `passage`, `doc_type`, `reader`, `notes`; `read` lists files it must read first, and `model` overrides the model. Consecutive agent stages with the same `group` run in parallel. |
 | `author` | One more turn of the author conversation: `instructions`, the files in `read`, the output of the earlier agent stages named in `inputs`, and the output of the linters named in `lint`, run on the current passage. With `loop` (`lint`, `score_key`, `until`, `max_rounds`), the linter runs again after each turn until its score reaches `until` or the turns reach `max_rounds`. |
 | `fidelity_gate` | Counts the sentences changed since the earlier draft, author or gate stage named in `compare_to` (required). At `min_changed_sentences` (default 4) or more it runs the fidelity checker named in `agent_file` (required), and if that reports an unsupported change, one author turn with `instructions` fixes it. `model` overrides the checker's model. |

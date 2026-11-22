@@ -79,7 +79,7 @@ name = "base"
 name = "variant"
 override = "Override for the variant."
   [[pipeline.stage]]
-  kind = "draft"
+  kind = "copied_draft"
   name = "draft"
   from_pipeline = "base"
   [[pipeline.stage]]
@@ -473,6 +473,10 @@ class TestFidelityGate:
         assert claude_calls()[-1]["prompt"].startswith(GATE_CHECK)
 
 
+DRAFT_NO_READ = 'kind = "draft"\n  name = "draft"'
+READS_NOTHING = DRAFT_NO_READ + "\n  read = []"
+
+
 class TestConfigChecks:
     @pytest.mark.parametrize(
         ("old", "new"),
@@ -484,8 +488,7 @@ class TestConfigChecks:
                 'kind = "bare_draft"\n  name = "lint"',
             ),
             ('from_pipeline = "base"', 'from_pipeline = "variant"'),
-            ('  from_pipeline = "base"\n', ""),
-            ('from_pipeline = "base"\n', 'from_pipeline = "base"\n  read = ["guide.md"]\n'),
+            ('kind = "copied_draft"\n  name = "draft"\n  from_pipeline = "base"', READS_NOTHING),
             ('name = "reviewer"\n', 'name = "reviewer"\n  brief = "Review it."\n'),
             ('kind = "agent"\n  name = "style"', 'kind = "critic"\n  name = "style"'),
             ('sees = ["passage"]\n  group', 'sees = ["passage", "mood"]\n  group'),
@@ -500,7 +503,6 @@ class TestConfigChecks:
             "second-draft",
             "draft-copied-from-a-copy",
             "draft-reads-nothing",
-            "copied-draft-also-reads",
             "agent-file-and-brief",
             "unknown-kind",
             "sees-outside-the-list",
@@ -516,14 +518,28 @@ class TestConfigChecks:
         with pytest.raises(ValueError):
             load_config(edited_config(tmp_path, old, new), str(fake_claude))
 
-    def test_a_key_on_a_stage_kind_that_does_not_take_it_stops_the_load(
-        self, tmp_path: Path, fake_claude: Path
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            ('brief = "Style pass."\n', 'brief = "Style pass."\n  lint = ["plain"]\n'),
+            ('from_pipeline = "base"\n', 'from_pipeline = "base"\n  read = ["guide.md"]\n'),
+            ('from_pipeline = "base"\n', 'from_pipeline = "base"\n  instructions = "Draft."\n'),
+            ('  from_pipeline = "base"\n', ""),
+            ('kind = "copied_draft"\n  name = "draft"\n  from_pipeline = "base"', DRAFT_NO_READ),
+        ],
+        ids=[
+            "agent-stage-with-lint",
+            "copied-draft-also-reads",
+            "copied-draft-with-instructions",
+            "copied-draft-without-a-source",
+            "draft-without-read",
+        ],
+    )
+    def test_a_key_its_kind_does_not_take_or_a_missing_required_key_stops_the_load(
+        self, tmp_path: Path, fake_claude: Path, old: str, new: str
     ) -> None:
-        config_file = edited_config(
-            tmp_path, 'brief = "Style pass."\n', 'brief = "Style pass."\n  lint = ["plain"]\n'
-        )
         with pytest.raises(TypeError):
-            load_config(config_file, str(fake_claude))
+            load_config(edited_config(tmp_path, old, new), str(fake_claude))
 
 
 CHECKED = '- UNSUPPORTED: "a" (was: absent). Reason.\n- SUPPORTED: "b" (was: "c"). Reason.\n'
