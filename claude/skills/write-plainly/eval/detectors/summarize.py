@@ -24,18 +24,21 @@ from scoring import (
     BHEIJDEN_ARMS,
     DEGRADED,
     DETECTORS,
+    GPU_DETECTORS,
     MANIFEST_FILE,
     NEUTRAL_REWRITE,
     NO_SKILL,
+    REPO_ROOT,
     SCORES_DIR,
     SKILL_DRAFT,
     TELLS_INJECTED,
     VOICE_ARM,
     Detector,
     Text,
-    read_jsonl,
+    prepared_texts,
     read_manifest,
     scores_file,
+    split_pending,
 )
 
 HUMAN, CORPUS_MODEL = BHEIJDEN_ARMS["human"], BHEIJDEN_ARMS["ai"]
@@ -48,6 +51,7 @@ PLANTED_CONTRASTS = (
 )
 SKILL_CONTRASTS = ((SKILL_DRAFT, NO_SKILL),)
 OLD_TEXT_YEAR = 1930
+CPU_RESCORE, GPU_RESCORE = "./rescore.sh", "heavy --light -- uv run sagemaker_job.py run"
 OVERVIEW = (
     "Two separate checks, each paired by topic on the bheijden corpus. Provenance: does the "
     "detector score the published human text as less AI-like than a model's text on the same "
@@ -246,6 +250,13 @@ def chunk_noise_line(texts: Sequence[Text], scores: dict[str, dict]) -> str:
     )
 
 
+def coverage_line(detector: Detector, texts: Sequence[Text], scores: dict[str, dict]) -> str:
+    if len(scores) == len(texts):
+        return f"All {len(texts)} texts have a current score."
+    command = GPU_RESCORE if detector.name in GPU_DETECTORS else CPU_RESCORE
+    return f"{len(scores)} of {len(texts)} texts have a current score; `{command}` scores the rest."
+
+
 def detector_section(
     detector: Detector,
     texts: Sequence[Text],
@@ -262,6 +273,7 @@ def detector_section(
                 f"{direction} is more AI-like; window {detector.window} tokens. Cut-off {cutoff}: "
                 f"{detector.threshold_source}."
             ),
+            coverage_line(detector, texts, scores),
             "### Scores by arm",
             distribution_table(detector, texts, scores),
             "### Provenance: the human text against model texts on the same topic",
@@ -277,20 +289,14 @@ def detector_section(
     )
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--manifest", type=Path, default=MANIFEST_FILE)
-    parser.add_argument("--scores", type=Path, default=SCORES_DIR)
-    parser.add_argument("--corpus", help="limit to one corpus")
-    args = parser.parse_args()
-    texts = [text for text in read_manifest(args.manifest) if args.corpus in (None, text.corpus)]
-    human_years = {
-        pair["id"]: int(pair["human"]["date"][:4]) for pair in bheijden_pairs(BHEIJDEN_CORPUS_DIR)
-    }
+def summary(
+    texts: Sequence[Text], prepared: dict[str, str], scores_dir: Path, human_years: dict[str, int]
+) -> str:
+    """Every section, from the score records that match each text's current prepared text."""
     scores_by_detector = {
-        name: {row["id"]: row for row in read_jsonl(scores_file(args.scores, name))}
-        for name in DETECTORS
-        if scores_file(args.scores, name).exists()
+        name: split_pending(prepared, scores_file(scores_dir, name), detector)[0]
+        for name, detector in DETECTORS.items()
+        if scores_file(scores_dir, name).exists()
     }
     sections = [
         "## Overview",
@@ -301,7 +307,20 @@ def main() -> None:
             for name, scores in scores_by_detector.items()
         ),
     ]
-    print("\n\n".join(sections))
+    return "\n\n".join(sections)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--manifest", type=Path, default=MANIFEST_FILE)
+    parser.add_argument("--scores", type=Path, default=SCORES_DIR)
+    parser.add_argument("--corpus", help="limit to one corpus")
+    args = parser.parse_args()
+    texts = [text for text in read_manifest(args.manifest) if args.corpus in (None, text.corpus)]
+    human_years = {
+        pair["id"]: int(pair["human"]["date"][:4]) for pair in bheijden_pairs(BHEIJDEN_CORPUS_DIR)
+    }
+    print(summary(texts, prepared_texts(texts, REPO_ROOT), args.scores, human_years))
 
 
 if __name__ == "__main__":

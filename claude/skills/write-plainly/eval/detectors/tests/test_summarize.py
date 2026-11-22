@@ -1,5 +1,5 @@
 import pytest
-from scoring import DETECTORS, Text
+from scoring import DETECTORS, ChunkScore, Text, score_record, scores_file, text_sha256, write_jsonl
 from summarize import (
     PLANTED_CONTRASTS,
     chunk_noise_line,
@@ -8,6 +8,7 @@ from summarize import (
     past_cutoff,
     provenance_table,
     spread_line,
+    summary,
 )
 
 YEARS = {"t0": 1900, "t1": 1900, "t2": 2010, "t3": 2010}
@@ -123,3 +124,34 @@ class TestPastCutoff:
     )
     def test_past_cutoff_counts_on_the_detectors_ai_side(self, detector, values, flagged):
         assert past_cutoff(DETECTORS[detector], values) == flagged
+
+
+class TestSummary:
+    def test_a_score_of_an_earlier_version_of_a_text_is_left_out_and_counted_as_missing(
+        self, tmp_path
+    ):
+        texts = [
+            Text(f"bheijden/{arm}/{topic}", "bheijden", arm, topic, "r", 100, "p")
+            for arm in ("human", "corpus-claude-opus-5")
+            for topic in YEARS
+        ]
+        texts.append(Text("pairwise/merged/task-1", "pairwise", "merged", "task-1", "r", 250, "p"))
+        prepared = {text.id: f"The words of {text.id}." for text in texts}
+        detector = DETECTORS["binoculars"]
+        records = [
+            score_record(
+                text.id,
+                text_sha256("An earlier draft." if text.arm == "merged" else prepared[text.id]),
+                detector,
+                [ChunkScore(10, 0.1 * index**2)],
+            )
+            for index, text in enumerate(texts)
+        ]
+        write_jsonl(scores_file(tmp_path, detector.name), records)
+        markdown = summary(texts, prepared, tmp_path, YEARS)
+        assert "| pairwise | merged |" not in markdown
+        assert "| bheijden | human | 4 |" in markdown
+        assert (
+            "8 of 9 texts have a current score; "
+            "`heavy --light -- uv run sagemaker_job.py run` scores the rest."
+        ) in markdown
