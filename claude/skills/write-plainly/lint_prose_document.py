@@ -19,10 +19,10 @@ from lint_prose_markdown import (
 )
 from lint_prose_patterns import (
     ARITHMETIC,
-    DECIMAL_RATE,
     LARGE_SPELLED_NUMBER,
     NOT_A_NUMBER,
     NUMBER,
+    RATE_CONTRAST,
     SPELLED_NUMBER,
     SUPPORTING_STATISTIC,
     YEAR_ORDINAL_OR_VERSION,
@@ -149,7 +149,7 @@ def supporting_statistic_findings(blocks: list[Block]) -> list[Finding]:
     """Flag a sentence outside the back matter that quotes a statistic supporting a result.
 
     The statistics are a test statistic, degrees of freedom, a p-value, an interval, a plus-minus
-    spread and two rates written as decimals. Tables, captions and footnotes are exempt.
+    spread and two decimal rates set against each other. Tables, captions and footnotes are exempt.
     """
     findings: list[Finding] = []
     for block in blocks:
@@ -165,8 +165,7 @@ def _quotes_supporting_statistic(sentence: str) -> bool:
     masked = NOT_A_NUMBER.sub(blank_match, sentence)
     if SUPPORTING_STATISTIC.search(masked):
         return True
-    rates = [match for match in NUMBER.finditer(masked) if DECIMAL_RATE.fullmatch(match.group())]
-    return len(rates) > 1 and not ARITHMETIC.search(sentence)
+    return bool(RATE_CONTRAST.search(masked)) and not ARITHMETIC.search(sentence)
 
 
 def summary_findings(blocks: list[Block]) -> list[Finding]:

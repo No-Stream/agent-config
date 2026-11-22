@@ -237,5 +237,9 @@ SUPPORTING_STATISTIC = re.compile(
     rf"|(?i:\b(?:CI|intervals?)\b)[^.;]{{0,25}}?{ENDPOINT}\s*(?:to|–|-)\s*[-+−]?\d"
     r"|\d\s*(?:±|\+/-)\s*\d"
 )
-DECIMAL_RATE = re.compile(r"[-+−]?0?\.\d+")
+DECIMAL_RATE = r"(?<![\d.])[-+−]?0?\.\d+(?!\.\d)"
+RATE_CONTRAST = re.compile(
+    rf"{DECIMAL_RATE}[^.;]*?\b(?:against|versus|vs\.?|while|compared (?:with|to))(?!\w)"
+    rf"[^.;]*?{DECIMAL_RATE}"
+)
 ARITHMETIC = re.compile(r"\d[\s)]*[=×*][\s(]*[-+−$€£]?\d|=\s*[-+−$€£]?\d")

@@ -304,9 +304,11 @@ class TestSupportingStatistic:
             "The 95% interval runs from 1.0 to 3.2 minutes.",
             "Each loaf lost 2.1 ± 0.4 grams of water.",
             "The new probe read within 0.92 of the true heat, against 0.97 for the old one.",
+            "The new tin browned 0.62 of the crust, vs. 0.71 for the old tin.",
         )
         text = OVEN_OPENING + "\n\n".join(sentences) + "\n"
-        assert _lines("supporting-statistic", text) == [3, 5, 7, 9, 11, 13]
+        paragraph_lines = [3 + 2 * index for index in range(len(sentences))]
+        assert _lines("supporting-statistic", text) == paragraph_lines
 
     def test_flags_a_summary_and_an_opening_paragraph_too(self) -> None:
         summary = "## TL;DR\n\nThe new oven bakes bread faster (p < 0.01).\n"
@@ -318,8 +320,10 @@ class TestSupportingStatistic:
         text = (
             OVEN_OPENING + "The new oven bakes a loaf in 25 minutes, 20% faster than the old one."
             " The share is 0.25 * 0.4 = 0.1 of the day.\n\n"
+            "Its crust score rose from 0.81 to 0.84. The oven alarm sounds at humidity 0.05 and"
+            " 0.2.\n\n"
             "![Bake times](bake.png)\n\n"
-            "The two probes read 0.92 and 0.97 of the true heat.\n\n"
+            "The two probes read 0.92 against 0.97 of the true heat.\n\n"
             "| oven | t | p |\n| new | 3.10 | 0.01 |\n\n"
             "The new oven is faster.[^1]\n\n"
             "[^1]: A t of 3.10 on 14 df, p = 0.01.\n\n"

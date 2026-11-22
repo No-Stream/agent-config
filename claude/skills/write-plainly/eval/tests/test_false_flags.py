@@ -11,8 +11,9 @@ FAKES_DIR = Path(__file__).resolve().parent / "fakes"
 sys.path.insert(0, str(EVAL_DIR))
 sys.path.insert(0, str(EVAL_DIR.parent))
 
-import false_flags
 import lint_prose
+
+import false_flags
 
 HUMAN_PUMP = (
     "The pump moves water from the tank to the field at night — the tank fills again by dawn."
