@@ -4,7 +4,7 @@
 # dependencies = ["scipy>=1.14"]
 # ///
 """Summarize detector scores: distributions by arm, two paired checks on the bheijden matched
-topics, and the spread and chunk noise of scores among model-drafted texts.
+topics, and the spread of scores among model drafts and between the chunks of one draft.
 
 Writes markdown to stdout. `--corpus bheijden` limits it to the public matched corpus.
 """
@@ -306,7 +306,7 @@ def detector_section(
             contrast_table(detector, by_arm, words, SKILL_CONTRASTS),
             "### Planted bad writing",
             contrast_table(detector, by_arm, words, PLANTED_CONTRASTS),
-            "### Spread among model drafts and noise between chunks",
+            "### Spread among model drafts and between the chunks of one draft",
             spread_line(detector, texts, scores),
             chunk_noise_line(texts, scores),
         ]
