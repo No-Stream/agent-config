@@ -248,37 +248,6 @@ PHRASE_RULES = {
     "signposting": re.compile(rf"(?i)\b(?P<hit>{SIGNPOSTS})\b"),
 }
 # Model-tell lists, written from Wikipedia's "Signs of AI writing" and stop-slop (sources.md).
-AI_VOCABULARY = (
-    r"delv(?:e|es|ed|ing)|pivotal|interplay|intrica(?:te|tely|cy|cies)|multi-?faceted"
-    r"|garner(?:s|ed|ing)?|bolster(?:s|ed|ing)?|showcas(?:e|es|ed|ing)|ever-evolving"
-    r"|deep[- ]dives?|boasts (?=(?:a|an|the|over|nearly|more|many|several|some)\b|\d)"
-    r"|foster(?:s|ed|ing)?(?! (?:care|parents?|homes?|child|children|famil(?:y|ies)|kids?)\b)"
-    r"|leverag(?:es|ing)|(?:to|can|could|will|would|should|must|we|they|you) leverage"
-    r"|orchestrat(?:es|ed|ing)|the realm of"
-    r"|embark(?:s|ed|ing)? on (?:a|an|this|our|the) (?:journey|mission|quest|path|adventure)"
-    r"|navigat(?:e|es|ed|ing) the (?:complexities|intricacies|challenges|landscape)"
-    r"|(?:digital|competitive|evolving|ever-changing|changing|shifting|business|tech|technology"
-    r"|regulatory|media|market|threat) landscape"
-)
-UNLOCKED_THINGS = (
-    r"potential|value|growth|insights?|opportunit(?:y|ies)|possibilit(?:y|ies)|power|benefits?"
-    r"|capabilit(?:y|ies)|savings|efficienc(?:y|ies)|revenue|productivity|innovation"
-)
-PROMOTIONAL_WORDS = (
-    r"supercharg(?:e|es|ed|ing)|game[- ]?chang(?:er|ers|ing)|cutting[- ]edge|best[- ]in[- ]class"
-    r"|world[- ]class|next[- ]level|transformative"
-    rf"|unlock(?:s|ed|ing)? (?:(?:the|new|its|your|their|our|full|hidden|real|true) )+"
-    rf"(?:\w+ )?(?:{UNLOCKED_THINGS})"
-    r"|the future (?:looks|is) (?:bright|promising)|exciting times (?:are |lie )?ahead"
-)
-CONCEDED_THINGS = (
-    r"challenges|limitations|obstacles|hurdles|setbacks|drawbacks|difficulties|shortcomings"
-    r"|concerns|caveats|risks|issues"
-)
-VAGUE_CHALLENGE_COUNT = (
-    r"several|many|numerous|significant|various|new|some|unique|considerable|serious|ongoing"
-    r"|multiple|a number of|a range of|its own|their own"
-)
 SECTION_LABELS = (
     r"key takeaways?|takeaways|why (?:it|this|that) matters|the bottom line|bottom line"
     r"|final thoughts|closing thoughts|the big picture|wrapping up|key insights?"
@@ -286,52 +255,14 @@ SECTION_LABELS = (
 )
 SECTION_LABEL_HEADING = re.compile(rf"(?i)^(?:{SECTION_LABELS})[.:!]?$")
 SECTION_LABEL_RUN_IN = re.compile(
-    rf"(?i)^\s*(?:[-*+]\s+|\d+[.)]\s+)?(?:\*\*|__)?(?P<hit>(?:{SECTION_LABELS}))"
+    rf"(?i)^\s*(?:\*\*|__)?(?P<hit>(?:{SECTION_LABELS}))"
     r"(?:[.:](?:\*\*|__)|(?:\*\*|__)?[.:])(?=\s|$)"
 )
 
 TELL_RULES = {
-    "ai-vocabulary": re.compile(rf"(?i)\b(?P<hit>{AI_VOCABULARY})\b"),
-    "promotional-word": re.compile(rf"(?i)\b(?P<hit>{PROMOTIONAL_WORDS})\b"),
     "borrowed-jargon": re.compile(
         r"(?i)\b(?P<hit>orthogonal(?:ly)?|inflection points?|quantum leaps?|paradigm shifts?"
         r"|non-?zero (?:chance|risk|possibility|likelihood))\b"
-    ),
-    "stock-concession": re.compile(
-        rf"(?i)\b(?P<hit>despite (?:these|those|this|its|their|the|such|all|some|many|several"
-        rf"|our|any|his|her) (?:\w+ )?(?:{CONCEDED_THINGS})"
-        rf"|fac(?:e|es|ed|ing) (?:(?:{VAGUE_CHALLENGE_COUNT}) )?challenges|challenges remain)\b"
-    ),
-    "era-framing": re.compile(
-        r"(?i)\b(?P<hit>in today['’]s (?:[\w-]+ ){0,2}(?:world|age|era|landscape|climate|market"
-        r"|economy|environment|society|times)"
-        r"|in (?:this|the) day and age|now more than ever"
-        r"|in the (?:digital|information) (?:age|era)"
-        r"|in an? (?:\w+ )?era (?:of|where|when|in which)|in a world (?:where|in which)"
-        r"|(?:fast-paced|rapidly (?:evolving|changing)) (?:world|landscape|environment|market"
-        r"|field|industry|times))(?!\w)"
-    ),
-    "dead-transition": re.compile(
-        r"(?i)\b(?P<hit>(?<![a-z] )(?:moving|going) forward(?=,)"
-        r"|(?<!\bis )(?<!\bare )(?<!\bwas )(?<!\bwere )(?<!\bbe )(?<!\bkeep )(?<!\bkept )"
-        r"going forward(?=\s*(?:[.;!?)]|$))"
-        r"|circl(?:e|es|ed|ing) back|when all is said and done|last but not least)\b"
-    ),
-    "insight-teaser": re.compile(
-        r"(?i)(?<!here['’]s )(?<!here is )\b(?P<hit>the (?:part|thing|bit) (?:everyone|everybody"
-        r"|most people|nobody|no one|people) (?:misses|miss|overlooks|overlook|forgets|forget"
-        r"|ignores|ignore)|conventional wisdom (?:says|holds that|tells us|suggests|dictates|is that)"
-        r"|contrary to (?:popular|common) (?:belief|opinion|wisdom)"
-        r"|(?:dirty|best-kept|little-known) secret|few people reali[sz]e"
-        r"|most people (?:don['’]t|do not|never) (?:reali[sz]e|notice)"
-        r"|this is where (?:it|things) gets? (?:interesting|tricky|fun|good))\b"
-    ),
-    "engagement-bait": re.compile(
-        r"(?i)\b(?P<hit>let (?:that|this) sink in(?=\s*(?:[.!?,:;)]|$)| for a (?:moment|second))"
-        r"|think about (?:it|that)(?=\s*[.:!?])|what if I (?:told|said to) you|plot twist"
-        r"|spoiler(?: alert)?(?=\s*:)"
-        r"|(?:this|that|it) changes everything|make no mistake|(?:imagine|picture) this(?=\s*:)"
-        r"|buckle up)\b"
     ),
     "chat-phrasing": re.compile(
         r"(?i)\b(?P<hit>let me know (?:if|whether|what|how|when|which|in)"
@@ -339,14 +270,6 @@ TELL_RULES = {
         r"|feel free to (?:reach out|ask|contact|let|ping)"
         r"|(?:I['’]d be|I would be|I['’]m|I am) happy to|happy to (?:help|iterate|expand|clarify)"
         r"|great question|is there anything else|you['’]re absolutely right)\b"
-    ),
-    "whether-range": re.compile(
-        r"(?i)(?<![a-z,] )\b(?P<hit>whether (?:it['’]s|it is|you['’]re|you are|they['’]re|they are"
-        r"|we['’]re|we are) [^.,;]{1,40}? or (?!not\b)[^.,;]{1,40}?,)"
-    ),
-    "vague-quantifier": re.compile(
-        r"(?i)\b(?P<hit>a number of|a (?:wide|broad|diverse|vast) (?:array|spectrum) of"
-        r"|myriad|a plethora of|a (?:whole )?host of|a multitude of)\b"
     ),
 }
 # Pictographic emoji blocks, BMP emoji shown as pictures, and arrows; the footnote return "↩" passes.
@@ -376,6 +299,11 @@ CLEFT = re.compile(
 SERIES_ITEM = r"(?!(?:and|or)\b)[\w'’-]+(?:\s+[\w'’-]+){0,3}"
 SERIES = re.compile(
     rf"\b(?P<before_conjunction>{SERIES_ITEM}(?:,\s+{SERIES_ITEM})+),?\s+(?:and|or)\s+[\w'’-]+"
+)
+# A clause of four or more words before the first comma is the sentence's own, not an opening.
+OPENING_PHRASE = re.compile(
+    r"(?i)\s*(?:in|on|at|after|before|during|since|for|by|with|when|while|if|although|because"
+    r"|however|meanwhile|today|now|then|also|finally|instead)\b(?:\s+[^\s,.]+){0,3},\s+"
 )
 
 CAPITALIZED_RUN = re.compile(

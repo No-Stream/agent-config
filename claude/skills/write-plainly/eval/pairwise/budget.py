@@ -11,6 +11,7 @@ from pipeline_config import (
     AuthorStage,
     BareDraftStage,
     Config,
+    CopiedDraftStage,
     DraftStage,
     FidelityGate,
     LintLoop,
@@ -25,9 +26,9 @@ def call_bounds(config: Config) -> dict[str, dict[str, tuple[int, int]]]:
         turns = [0, 0]
         for stage in pipeline.stages:
             match stage:
-                case DraftStage(from_pipeline=None) | BareDraftStage() | AgentStage():
+                case DraftStage() | BareDraftStage() | AgentStage():
                     fresh = [fresh[0] + 1, fresh[1] + 1]
-                case DraftStage():  # copied from another pipeline, so no call
+                case CopiedDraftStage():  # another pipeline's draft, so no call
                     pass
                 case AuthorStage(loop=None):
                     turns = [turns[0] + 1, turns[1] + 1]

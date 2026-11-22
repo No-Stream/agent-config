@@ -110,16 +110,20 @@ class TestCommand:
         assert completed.returncode != 0 and "RuntimeError" in completed.stderr
         assert not list((tmp_path / "judges").glob("*.json"))
 
-    def test_a_codex_judge_that_skips_the_guidance_stops_the_run(
+    @pytest.mark.parametrize(
+        "fake_switch", ["FAKE_CODEX_SKIP_READS", "FAKE_CODEX_FAIL_READS"], ids=["skips", "fails"]
+    )
+    def test_a_codex_judge_that_skips_or_fails_to_read_the_guidance_stops_the_run(
         self,
         tmp_path: Path,
         fake_claude: Path,
         fake_codex: Path,
         monkeypatch: pytest.MonkeyPatch,
+        fake_switch: str,
     ) -> None:
-        monkeypatch.setenv("FAKE_CODEX_SKIP_READS", "1")
+        monkeypatch.setenv(fake_switch, "1")
         completed = judge(tmp_path, fake_claude, fake_codex, "--judges", "codex")
-        assert completed.returncode != 0 and "the codex judge did not read" in completed.stderr
+        assert completed.returncode != 0 and "RuntimeError" in completed.stderr
         assert not list((tmp_path / "judges").glob("*.json"))
 
 

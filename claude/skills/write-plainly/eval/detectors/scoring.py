@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
+EVAL_DIR = Path(__file__).resolve().parents[1]
 PRIVATE_DETECTORS = REPO_ROOT / ".private" / "eval" / "detectors"
 MANIFEST_FILE = PRIVATE_DETECTORS / "manifest.jsonl"
 SCORES_DIR = PRIVATE_DETECTORS / "scores"
@@ -115,6 +116,7 @@ GPU_DETECTORS = ("binoculars", "fast-detectgpt")
 
 BHEIJDEN, PAIRWISE, VOICE_CORPUS = "bheijden", "pairwise", "human-private"
 BHEIJDEN_ARMS = {"human": "human", "ai": "corpus-claude-opus-5"}  # pairs.json side: arm
+BHEIJDEN_CORPUS_DIR = EVAL_DIR / ".cache" / "bheijden-slop" / "data" / "corpus"
 VOICE_ARM = "human-jan"
 NO_SKILL, SKILL_DRAFT = "no-skill", "skill-draft"
 DEGRADED, TELLS_INJECTED, NEUTRAL_REWRITE = "degraded", "tells-injected", "neutral-rewrite"
@@ -190,6 +192,10 @@ def read_manifest(path: Path) -> list[Text]:
         texts.append(Text(**row))
     check_unique_ids(texts)
     return texts
+
+
+def bheijden_pairs(corpus_dir: Path) -> list[dict]:
+    return json.loads((corpus_dir / "pairs.json").read_text())["pairs"]
 
 
 def check_unique_ids(texts: Sequence[Text]) -> None:

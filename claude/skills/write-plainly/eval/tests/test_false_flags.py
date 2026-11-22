@@ -208,10 +208,14 @@ class TestMain:
 
         assert capsys.readouterr().out == ""
         report = output.read_text(encoding="utf-8")
-        modules = (
-            "lint_prose.py, lint_prose_document.py, lint_prose_markdown.py, lint_prose_patterns.py"
+        skill_modules = sorted(
+            Path(module.__file__).name
+            for module in list(sys.modules.values())
+            if getattr(module, "__file__", None)
+            and Path(module.__file__).resolve().parent == false_flags.SKILL_DIR
         )
-        assert f"{modules} sha256 " in report.splitlines()[2]
+        assert "lint_prose.py" in skill_modules
+        assert f"{', '.join(skill_modules)} sha256 " in report.splitlines()[2]
         assert "| **agent total** |  | 2 | 80 | 0 |" in report
         assert "| techdoc agent (41 w) |" in report
         assert (tmp_path / "rights.tsv").read_text(

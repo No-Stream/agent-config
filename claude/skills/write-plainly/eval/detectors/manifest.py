@@ -15,7 +15,6 @@ Sources, all found by path so that new texts need only a rerun:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import tomllib
 from collections import Counter
@@ -26,12 +25,15 @@ from pathlib import Path
 from scoring import (
     BHEIJDEN,
     BHEIJDEN_ARMS,
+    BHEIJDEN_CORPUS_DIR,
+    EVAL_DIR,
     MANIFEST_FILE,
     PAIRWISE,
     REPO_ROOT,
     VOICE_ARM,
     VOICE_CORPUS,
     Text,
+    bheijden_pairs,
     prepare_text,
     word_count,
     write_manifest,
@@ -39,8 +41,6 @@ from scoring import (
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-EVAL_DIR = Path(__file__).resolve().parents[1]
-BHEIJDEN_CORPUS_DIR = EVAL_DIR / ".cache" / "bheijden-slop" / "data" / "corpus"
 VOICE_REGISTER = "work-doc"
 
 
@@ -77,10 +77,6 @@ def make_text(corpus: str, arm: str, topic: str, register: str, path: Path, repo
         words=word_count(prepare_text(path.read_text())),
         path=str(path.relative_to(repo)),
     )
-
-
-def bheijden_pairs(corpus_dir: Path) -> list[dict]:
-    return json.loads((corpus_dir / "pairs.json").read_text())["pairs"]
 
 
 def bheijden_texts(pairs: Iterable[dict], corpus_dir: Path, repo: Path) -> list[Text]:

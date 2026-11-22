@@ -12,7 +12,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from lint_prose_document import (
-    MAX_SUMMARY_SENTENCES,
+    DOCUMENT_MESSAGES,
     heading_density_findings,
     number_density_findings,
     section_findings,
@@ -21,6 +21,7 @@ from lint_prose_document import (
     supporting_statistic_findings,
 )
 from lint_prose_markdown import (
+    LIST_MARKER,
     PROSE_KINDS,
     WORD,
     Block,
@@ -51,6 +52,7 @@ from lint_prose_patterns import (
     INTENSIFIER,
     LABEL_PATTERN,
     LIST_ENTRY_WORDS,
+    OPENING_PHRASE,
     ORDINARY_WORD,
     PHRASE_RULES,
     PRONOUN_I_AFTER_LABEL,
@@ -77,6 +79,7 @@ FREE_TRIADS_PER_SECTION = 2
 FREE_INTENSIFIERS_PER_SECTION = 2
 
 MESSAGES = {
+    **DOCUMENT_MESSAGES,
     "em-dash": "Em dash; use a comma, parentheses, a colon, a semicolon or a new sentence.",
     "dash-substitute": "Dash used as a pause; use punctuation that shows how the clauses connect.",
     "coined-label": (
@@ -84,12 +87,6 @@ MESSAGES = {
         " by what it is, with any ID after that description, unless the reader already knows it."
     ),
     "bold-run-in": "Bold run-in heading; use a heading or plain prose.",
-    "thin-h2-section": (
-        "Section has little body; merge it into a neighbor or make it a minor heading."
-    ),
-    "short-paragraph-run": (
-        "Run of very short paragraphs; combine related sentences and state how they connect."
-    ),
     "title-case-heading": "Heading looks like Title Case; use sentence case.",
     "stacked-hedge": "Two hedges on one claim; keep the one that states the real uncertainty.",
     "nominalization-of": (
@@ -137,10 +134,6 @@ MESSAGES = {
         f"Check: more than {FREE_TRIADS_PER_SECTION} lists of three in this section (advisory);"
         " keep the ones that matter."
     ),
-    "tldr-shape": (
-        f"Summary runs past {MAX_SUMMARY_SENTENCES} sentences or carries more than the headline"
-        " numbers; keep what and why, the main findings and the ask."
-    ),
     "undefined-acronym": (
         "Check: acronym used before it is defined (advisory). Spell it out at first use with"
         " the short form in parentheses."
@@ -152,43 +145,13 @@ MESSAGES = {
         f"Sentence of {COMPLEX_SENTENCE_WORDS} or more words; split it so each sentence makes"
         " one point."
     ),
-    "number-density": (
-        "Too many numbers for body prose; move them to a table or figure and say what they show."
-    ),
-    "supporting-statistic": (
-        "Check: a statistic that supports a result (advisory), such as a test statistic, degrees"
-        " of freedom, a p-value, an interval or two rates set against each other. Move it to a"
-        " table, footnote or appendix unless the reader needs it to decide."
-    ),
-    "heading-density": (
-        "More top-level sections than the length supports; merge sections or nest them."
-    ),
-    "ai-vocabulary": (
-        "Check: a word language models overuse (advisory). Keep it only if it is literal and the"
-        " plainest word; otherwise say the specific thing."
-    ),
-    "promotional-word": "Promotional wording; state the specific gain or cut it.",
     "borrowed-jargon": (
         "Check: a scientific term borrowed for weight (advisory). Unless the literal sense is"
         ' meant, say "unrelated", "a change" or "a chance".'
     ),
-    "stock-concession": (
-        "Check: a concession that names no specific challenge (advisory). Name the challenge"
-        " and what it changes, or cut the sentence."
-    ),
-    "era-framing": "Opening that frames the topic by the times; start with the information.",
-    "dead-transition": (
-        "Filler transition; cut it, or use a connective that says how the sentences relate."
-    ),
-    "insight-teaser": "Teaser that sells a point as insider knowledge; state the point.",
-    "engagement-bait": "Line that performs for the reader; cut it and let the facts carry it.",
     "chat-phrasing": (
         "Check: chat phrasing addressed to the requester (advisory). Cut it from a document;"
         " it is fine in a message the user sends."
-    ),
-    "vague-quantifier": (
-        "Check: a quantifier that stands in for a count (advisory). Give the number or name the"
-        " items if you know them."
     ),
     "section-label": "Stock section label; name the section by its content, or state the point.",
     "intensifier": (
@@ -211,10 +174,6 @@ MESSAGES = {
         'Check: a finance word for a plain idea (advisory). Write "lost" for "foregone", "earns'
         ' back" for "recoups", "accounts for 30%" for "carries 30%".'
     ),
-    "whether-range": (
-        'Check: "whether it\'s X or Y" range filler (advisory). If the sentence does not depend on'
-        " the two cases, say who or what it is about."
-    ),
     "metaphor": (
         "Check: an image or stock idiom in place of the literal claim (advisory). Name the"
         " threshold, method, cause or quantity itself."
@@ -235,6 +194,7 @@ CODE_ID_SHAPES = (TRACKER_ID, HEX_ID, HASH_NUMBER)  # a short code in backticks 
 LABEL_SHAPES = (LABEL_PATTERN, *CODE_ID_SHAPES, SHORT_CODE)
 LINE_BREAK = re.compile(r"[ \t]*\n[ \t]*")
 INTERNAL_PUNCTUATION = re.compile(r"[,;:](?=\s)|[(—–]|\s--?\s")
+BOLD_RUN_IN = re.compile(rf"^\s*(?:{LIST_MARKER}\s+)?(?:\*\*(.+?)\*\*|__(.+?)__)(.*)$")
 
 
 def _in_link_text(source_line: str, column: int) -> bool:
@@ -249,7 +209,7 @@ def _is_title_case_heading(line: str) -> bool:
         return False
     candidate_words = [word for word in words[1:] if word.lower() not in TITLE_SMALL_WORDS]
     uppercase_words = [
-        word for word in candidate_words if word.islower() is False and not word.isupper()
+        word for word in candidate_words if not word.islower() and not word.isupper()
     ]
     return len(uppercase_words) >= 3
 
@@ -272,9 +232,9 @@ def _line_hits(visible: str) -> Iterator[tuple[str, int]]:
         yield "dash-substitute", match.start() + 1
     if _is_title_case_heading(visible):
         yield "title-case-heading", 1
-    run_in = re.match(r"^\s*(?:[-*]\s+|\d+\.\s+)?(?:\*\*(.+?)\*\*|__(.+?)__)(.*)$", visible)
+    run_in = BOLD_RUN_IN.match(visible)
     if run_in:
-        bold_text = run_in.group(1) or run_in.group(2) or ""
+        bold_text = run_in.group(1) or run_in.group(2)
         trailing = run_in.group(3)
         terminal_inside = bold_text.endswith((".", ":"))
         terminal_after = bool(re.match(r"^[:.—–](?=\s|\w)", trailing))
@@ -441,11 +401,13 @@ def _sentence_shape_findings(prose: list[Block]) -> list[Finding]:
 
 
 def _three_item_series(text: str, start: int, end: int) -> re.Match[str] | None:
-    """Return the first comma series in the span with exactly two items before its conjunction."""
+    """Return the first comma series in the sentence with exactly two items before its
+    conjunction, reading it after any opening phrase such as "In winter,"."""
+    opening = OPENING_PHRASE.match(text, start, end)
     return next(
         (
             match
-            for match in SERIES.finditer(text, start, end)
+            for match in SERIES.finditer(text, opening.end() if opening else start, end)
             if match.group("before_conjunction").count(",") == 1
         ),
         None,
@@ -496,7 +458,7 @@ def _is_ordinary_word(token: str) -> bool:
 
 def _spells(acronym: str, words: str) -> bool:
     """Whether the initials of the words, with or without small words, or their capitals spell it."""
-    parts = re.split(r"[\s-]+", words)
+    parts = re.findall(r"[^\s-]+", words)
     initials = "".join(part[0] for part in parts)
     content_initials = "".join(part[0] for part in parts if part.lower() not in TITLE_SMALL_WORDS)
     capitals = re.sub(r"[^A-Z]", "", words)

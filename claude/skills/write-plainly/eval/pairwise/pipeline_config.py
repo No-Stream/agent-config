@@ -6,7 +6,7 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, get_args
 
 from agents import ClaudeSettings
 
@@ -23,17 +23,16 @@ class LintLoop:
 
 @dataclass(frozen=True)
 class DraftStage:
+    """Starts the author conversation from the guidance files in `read`."""
+
     kind: ClassVar[str] = "draft"
     name: str
+    read: tuple[str, ...]
     instructions: str = ""
-    read: tuple[str, ...] = ()
-    from_pipeline: str | None = None
 
     def __post_init__(self) -> None:
-        if bool(self.read) == bool(self.from_pipeline):
-            raise ValueError(
-                f"stage {self.name}: a draft stage takes exactly one of read, from_pipeline"
-            )
+        if not self.read:
+            raise ValueError(f"stage {self.name}: a draft reads at least one file")
 
 
 @dataclass(frozen=True)
@@ -43,6 +42,15 @@ class BareDraftStage:
     kind: ClassVar[str] = "bare_draft"
     name: str
     instructions: str = ""
+
+
+@dataclass(frozen=True)
+class CopiedDraftStage:
+    """Another pipeline's draft and author session, so two pipelines share a draft; no call."""
+
+    kind: ClassVar[str] = "copied_draft"
+    name: str
+    from_pipeline: str
 
 
 @dataclass(frozen=True)
@@ -93,10 +101,9 @@ class FidelityGate:
     min_changed_sentences: int = 4
 
 
-Stage = DraftStage | BareDraftStage | AgentStage | AuthorStage | FidelityGate
-STAGE_TYPES = {
-    kind.kind: kind for kind in (DraftStage, BareDraftStage, AgentStage, AuthorStage, FidelityGate)
-}
+DRAFT_STAGES = DraftStage | BareDraftStage | CopiedDraftStage
+Stage = DRAFT_STAGES | AgentStage | AuthorStage | FidelityGate
+STAGE_TYPES = {kind.kind: kind for kind in get_args(Stage)}
 
 
 @dataclass(frozen=True)
@@ -193,7 +200,7 @@ def validate_config(config: Config) -> None:
     copied_drafts = {
         pipeline.name: pipeline.stages[0].from_pipeline
         for pipeline in config.pipelines
-        if isinstance(pipeline.stages[0], DraftStage) and pipeline.stages[0].from_pipeline
+        if isinstance(pipeline.stages[0], CopiedDraftStage)
     }
     for name, source in copied_drafts.items():
         if source not in names or source in copied_drafts:
@@ -202,8 +209,7 @@ def validate_config(config: Config) -> None:
 
 def validate_stages(pipeline: Pipeline, lints: dict[str, LintCommand]) -> None:
     first, *rest = pipeline.stages
-    drafts = DraftStage | BareDraftStage
-    if not isinstance(first, drafts) or any(isinstance(stage, drafts) for stage in rest):
+    if not isinstance(first, DRAFT_STAGES) or any(isinstance(s, DRAFT_STAGES) for s in rest):
         raise ValueError(f"pipeline {pipeline.name}: the first stage, and only it, is a draft")
     stage_names = [stage.name for stage in pipeline.stages]
     if len(set(stage_names)) != len(stage_names):
@@ -226,8 +232,7 @@ def validate_stages(pipeline: Pipeline, lints: dict[str, LintCommand]) -> None:
                         f"or lints {unknown_lints} are not defined"
                     )
             case FidelityGate() if not isinstance(
-                earlier.get(stage.compare_to),
-                DraftStage | BareDraftStage | AuthorStage | FidelityGate,
+                earlier.get(stage.compare_to), DRAFT_STAGES | AuthorStage | FidelityGate
             ):
                 raise ValueError(f"{where}: compare_to {stage.compare_to!r} is no earlier passage")
 
@@ -237,7 +242,7 @@ def named_files(stage: Stage) -> list[str]:
     match stage:
         case DraftStage() | AuthorStage():
             return list(stage.read)
-        case BareDraftStage():
+        case BareDraftStage() | CopiedDraftStage():
             return []
         case AgentStage():
             return [*stage.read, *([stage.agent_file] if stage.agent_file else [])]

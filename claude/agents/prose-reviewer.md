@@ -74,8 +74,8 @@ How a sentence makes its claim:
   something new ("the companion" for a function added beside an old one). An abbreviation used before it is defined
   counts, and so does an invented term where the field has a standard one. A term the source notes use freely is not
   one this reader knows: judge it by the reader's description. The fix explains the term in plain words where it first
-  appears, or replaces it with the plain description or the standard term. Explain it in words at every use, never
-  with a statistic: "its t statistic is below the critical value," not "a t of 1.4 on 22 df."
+  appears, or replaces it with the plain description or the standard term. Explain it in words, never with a
+  statistic: "its t statistic is below the critical value," not "a t of 1.4 on 22 df."
 - `stock figure`: an idiom anyone could use about anything ("double-edged sword," "low-hanging fruit," "move the
   needle," "unlock," "navigate," "landscape," "journey"), or an artifact given a will or a voice ("the data wants,"
   "the results refuse"). A term of art, a name the writer gives a status or option, the plainest everyday idiom, and

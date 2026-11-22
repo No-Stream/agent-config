@@ -1,10 +1,8 @@
 from __future__ import annotations
 
+from conftest import rule_lines
+
 import lint_prose
-
-
-def _lines(rule: str, text: str) -> list[int]:
-    return [finding.line for finding in lint_prose.lint_text(text) if finding.rule == rule]
 
 
 class TestThinH2Section:
@@ -29,7 +27,7 @@ class TestThinH2Section:
             "## Abstract\nThe comet returns in 2061.\n"
             "## Orbit\nThe orbit takes about 76 years.\n"
         )
-        assert _lines("thin-h2-section", text) == [9]
+        assert rule_lines("thin-h2-section", text) == [9]
 
     def test_exempts_a_references_list(self) -> None:
         text = (
@@ -42,7 +40,7 @@ class TestThinH2Section:
             "- a scale\n"
             "- a [lame](https://example.com/lame)\n"
         )
-        assert _lines("thin-h2-section", text) == [8]
+        assert rule_lines("thin-h2-section", text) == [8]
 
     def test_a_list_of_wrapped_or_spaced_items_is_one_list(self) -> None:
         text = (
@@ -53,7 +51,7 @@ class TestThinH2Section:
             "- a banneton lined with a linen cloth\n\n"
             "---\n"
         )
-        assert _lines("thin-h2-section", text) == [1]
+        assert rule_lines("thin-h2-section", text) == [1]
 
 
 class TestShortParagraphRun:
@@ -80,14 +78,14 @@ class TestShortParagraphRun:
             "Preheat the oven while you mix.\n\n"
             "Grease the tin with butter.\n"
         )
-        assert _lines("short-paragraph-run", text) == []
+        assert rule_lines("short-paragraph-run", text) == []
 
     def test_nonparagraph_blocks_break_the_run(self) -> None:
         text = (
             "One sentence.\n\n- list item.\n\nSecond sentence.\n\n> quote.\n\nThird sentence.\n\n"
             "| cell |\n"
         )
-        assert _lines("short-paragraph-run", text) == []
+        assert rule_lines("short-paragraph-run", text) == []
 
 
 REOPENING = (
@@ -99,7 +97,7 @@ REOPENING = (
 
 class TestTldrShape:
     def test_flags_a_long_summary(self) -> None:
-        assert _lines("tldr-shape", f"## TL;DR\n\n{REOPENING}\n") == [1]
+        assert rule_lines("tldr-shape", f"## TL;DR\n\n{REOPENING}\n") == [1]
 
     def test_flags_a_summary_with_more_than_the_headline_numbers(self) -> None:
         text = (
@@ -107,7 +105,7 @@ class TestTldrShape:
             "Loans rose 2.1% (95% interval 1.0% to 3.2%) and visits rose 4.0%"
             " (95% interval 2.5% to 5.5%).\n"
         )
-        assert _lines("tldr-shape", text) == [3]
+        assert rule_lines("tldr-shape", text) == [3]
 
     def test_leaves_a_short_summary_and_body_sections_alone(self) -> None:
         text = (
@@ -117,7 +115,7 @@ class TestTldrShape:
             " later closing time.\n\n"
             f"## Results\n\n{REOPENING}\n"
         )
-        assert _lines("tldr-shape", text) == []
+        assert rule_lines("tldr-shape", text) == []
 
 
 TREE_SURVEY = (
@@ -146,7 +144,7 @@ class TestNumberDensity:
             "- Sales rose 3x in spring and fell by -12 loaves after a 1.5 hour outage.\n\n"
             "Each loaf weighs 800 g and costs $4.\n"
         )
-        assert _lines("number-density", text) == [7, 9, 10]
+        assert rule_lines("number-density", text) == [7, 9, 10]
 
     def test_does_not_count_years_dates_references_names_or_labels(self) -> None:
         text = (
@@ -156,7 +154,7 @@ class TestNumberDensity:
             " show, after the V3 timer and the GPT-4 notes arrived on 2024-05-01 for the 2nd time"
             " [12]. Section 5 covers the 1990s.\n"
         )
-        assert _lines("number-density", text) == []
+        assert rule_lines("number-density", text) == []
 
     def test_exempts_summary_back_matter_captions_tables_code_footnotes_and_arithmetic(
         self,
@@ -185,7 +183,7 @@ class TestNumberDensity:
             "## Results\n\n"
             "The oven heats evenly.\n"
         )
-        assert _lines("number-density", text) == []
+        assert rule_lines("number-density", text) == []
 
     def test_flags_dense_body_prose_once_even_when_no_paragraph_is_over(self) -> None:
         dense = TREE_SURVEY.format(
@@ -201,8 +199,8 @@ class TestNumberDensity:
             bulbs="spring",
             days="several times",
         )
-        assert _lines("number-density", dense) == [3]
-        assert _lines("number-density", sparse) == []
+        assert rule_lines("number-density", dense) == [3]
+        assert rule_lines("number-density", sparse) == []
 
     def test_counts_spelled_out_numbers_from_ten_up_and_multiples(self) -> None:
         spelled = TREE_SURVEY.format(
@@ -215,7 +213,7 @@ class TestNumberDensity:
             bulbs="twenty-five",
             days="three times",
         )
-        assert _lines("number-density", spelled) == [3]
+        assert rule_lines("number-density", spelled) == [3]
 
     def test_leaves_small_spelled_out_counts_alone(self) -> None:
         text = (
@@ -223,7 +221,7 @@ class TestNumberDensity:
             "The complaints came from two directions: three regulars wrote four letters about the"
             " two rye loaves.\n"
         )
-        assert _lines("number-density", text) == []
+        assert rule_lines("number-density", text) == []
 
     def test_counts_a_compound_spelled_out_number_once(self) -> None:
         text = (
@@ -231,7 +229,7 @@ class TestNumberDensity:
             "The bakery sold two hundred and fifty loaves on Monday and ninety-two on Tuesday.\n\n"
             "Thursday brought three hundred loaves, forty cakes and twelve pies.\n"
         )
-        assert _lines("number-density", text) == [5]
+        assert rule_lines("number-density", text) == [5]
 
     def test_exempts_emphasized_captions(self) -> None:
         text = (
@@ -240,14 +238,14 @@ class TestNumberDensity:
             "_Figure 2: Gas use was 1.1, 1.3 and 1.4 kWh._\n\n"
             "**Figure 3:** Peak temperatures were 210, 220 and 230 C.\n"
         )
-        assert _lines("number-density", text) == []
+        assert rule_lines("number-density", text) == []
 
     def test_does_not_count_version_numbers(self) -> None:
         text = (
             "We checked the linters on public essays.\n\n"
             "We ran the parser 2.10.0 and the formatter 0.5.1 on 32,000 words from 2 machines.\n"
         )
-        assert _lines("number-density", text) == []
+        assert rule_lines("number-density", text) == []
 
     def test_does_not_count_footnote_references(self) -> None:
         text = (
@@ -256,7 +254,7 @@ class TestNumberDensity:
             "[^1]: Prices from the spring menu.\n"
             "[^2]: The owner confirmed this.\n"
         )
-        assert _lines("number-density", text) == []
+        assert rule_lines("number-density", text) == []
 
     def test_superscript_footnotes_are_footnotes(self) -> None:
         text = (
@@ -265,15 +263,23 @@ class TestNumberDensity:
             "¹ Prices from the spring menu, at 3 stores, 12 stalls and 40 carts.\n\n"
             "² The owner confirmed this.\n"
         )
-        assert _lines("number-density", text) == []
-        assert _lines("short-paragraph-run", text) == []
+        assert rule_lines("number-density", text) == []
+        assert rule_lines("short-paragraph-run", text) == []
 
     def test_opening_paragraph_stands_in_for_a_missing_summary(self) -> None:
         text = (
             "The bakery sold 340 loaves on Monday, 410 on Tuesday and 380 on Wednesday.\n\n"
             "Thursday brought 290 loaves, 35 cakes and 60 pies.\n"
         )
-        assert _lines("number-density", text) == [3]
+        assert rule_lines("number-density", text) == [3]
+
+    def test_an_opening_is_body_prose_when_the_document_has_a_summary(self) -> None:
+        text = (
+            "The bakery sold 340 loaves on Monday, 410 on Tuesday and 380 on Wednesday.\n\n"
+            "## Summary\n\n"
+            "Sales held steady.\n"
+        )
+        assert rule_lines("number-density", text) == [1]
 
     def test_an_opening_longer_than_a_summary_is_body_prose(self) -> None:
         text = (
@@ -282,14 +288,14 @@ class TestNumberDensity:
             " tool costs $2 a day. Volunteers check each tool when it comes back. Broken tools go"
             " to a repair night. The council pays for new tools. Last spring it bought 30 of them.\n"
         )
-        assert _lines("number-density", text) == [1]
+        assert rule_lines("number-density", text) == [1]
 
     def test_an_opening_with_more_than_the_headline_numbers_is_body_prose(self) -> None:
         text = (
             "The bakery sold 340 loaves on Monday, 410 on Tuesday, 380 on Wednesday and 290 on"
             " Thursday, and 35 cakes on Friday.\n"
         )
-        assert _lines("number-density", text) == [1]
+        assert rule_lines("number-density", text) == [1]
 
 
 OVEN_OPENING = "We tested whether the new oven bakes bread faster than the old one.\n\n"
@@ -309,22 +315,37 @@ class TestSupportingStatistic:
             "The new tin browned 0.62 of the crust, vs. 0.71 for the old tin.",
             "The share of burnt loaves had a 95% Wilson interval of 0.12 to 0.19.",
             "The 95% confidence interval is [12, 18] minutes.",
+            "The loaves rose higher, t(22) = 2.10.",
+            "The oven factor had an F of 3.1.",
+            "The z-score was 2.3.",
+            "The chi-squared was 4.2.",
+            "Sales rose 4.0% (95% CI 2.5–5.5%).",
+            "Visits rose 3.1% (90% CI 1.2-5.0%).",
+            "Each loaf lost 2.1 +/- 0.4 grams.",
+            "The Welch test had df = 9.7.",
+            "The test ran on 14 degrees of freedom.",
+            "The credible interval runs from 0.1 to 0.4.",
+            "The new probe read 0.92 versus 0.97 for the old one.",
+            "The new probe read 0.92 while the old one read 0.97.",
+            "The new probe read 0.92 compared with 0.97 for the old one.",
         )
         text = OVEN_OPENING + "\n\n".join(sentences) + "\n"
         paragraph_lines = [3 + 2 * index for index in range(len(sentences))]
-        assert _lines("supporting-statistic", text) == paragraph_lines
+        assert rule_lines("supporting-statistic", text) == paragraph_lines
 
     def test_flags_a_summary_and_an_opening_paragraph_too(self) -> None:
         summary = "## TL;DR\n\nThe new oven bakes bread faster (p < 0.01).\n"
         opening = "The new oven bakes bread faster, with a t of 3.10.\n"
-        assert _lines("supporting-statistic", summary) == [3]
-        assert _lines("supporting-statistic", opening) == [1]
+        assert rule_lines("supporting-statistic", summary) == [3]
+        assert rule_lines("supporting-statistic", opening) == [1]
 
     def test_leaves_headline_numbers_arithmetic_and_exempt_blocks_alone(self) -> None:
         text = (
             OVEN_OPENING + "The new oven bakes a loaf in 25 minutes, 20% faster than the old one."
             " Its probe reads within 0.92 of the true heat while the oven warms up. The share is"
             " 0.25 * 0.4 = 0.1 of the day.\n\n"
+            "The new tin browned 0.62 of the crust against 0.71 for the old tin, so the gap is"
+            " 0.71 - 0.62 = 0.09.\n\n"
             "Its crust score rose from 0.81 to 0.84. The oven alarm sounds at humidity 0.05 and"
             " 0.2.\n\n"
             "The bakery spent most of its budget on flour ($14,200). Bread sales rose in both"
@@ -339,7 +360,7 @@ class TestSupportingStatistic:
             "## Appendix\n\n"
             "The 95% interval runs from 1.0 to 3.2 minutes.\n"
         )
-        assert _lines("supporting-statistic", text) == []
+        assert rule_lines("supporting-statistic", text) == []
 
 
 CROPS = ("Tomatoes", "Beans", "Potatoes", "Onions", "Lettuce", "Carrots", "Peppers", "Squash")
@@ -360,11 +381,11 @@ def _garden(marker: str, crops: tuple[str, ...], body: str) -> str:
 class TestHeadingDensity:
     def test_flags_the_first_top_level_section_past_the_budget(self) -> None:
         text = "# Garden notes\n\n" + _garden("##", CROPS, "The beds need water in dry weeks.")
-        assert _lines("heading-density", text) == [27]
+        assert rule_lines("heading-density", text) == [27]
 
     def test_counts_h1_sections_when_there_is_no_lone_title(self) -> None:
         text = _garden("#", CROPS, "The beds need water in dry weeks.")
-        assert _lines("heading-density", text) == [25]
+        assert rule_lines("heading-density", text) == [25]
 
     def test_leaves_six_sections_nested_headings_and_long_documents_alone(self) -> None:
         short_body = "The beds need water in dry weeks."
@@ -372,6 +393,6 @@ class TestHeadingDensity:
         nested = "# Garden notes\n\n## Beds\n\n" + _garden("###", CROPS, short_body)
         long_body = f"{GARDEN_PARAGRAPH}\n\n{GARDEN_PARAGRAPH}"
         long_document = "# Garden notes\n\n" + _garden("##", CROPS, long_body)
-        assert _lines("heading-density", six_sections) == []
-        assert _lines("heading-density", nested) == []
-        assert _lines("heading-density", long_document) == []
+        assert rule_lines("heading-density", six_sections) == []
+        assert rule_lines("heading-density", nested) == []
+        assert rule_lines("heading-density", long_document) == []

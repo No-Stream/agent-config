@@ -2,6 +2,7 @@
 reverse, and reports a `cat` of each file its prompt lists, as codex's JSONL events do.
 
 FAKE_CODEX_SKIP_READS=1 reports only the read of the set file, not of the listed files.
+FAKE_CODEX_FAIL_READS=1 reports the reads of the listed files as failed, with exit code 1.
 """
 
 import json
@@ -11,8 +12,8 @@ import sys
 from pathlib import Path
 
 
-def command_event(command: str) -> str:
-    item = {"type": "command_execution", "command": command, "exit_code": 0}
+def command_event(command: str, exit_code: int) -> str:
+    item = {"type": "command_execution", "command": command, "exit_code": exit_code}
     return json.dumps({"type": "item.completed", "item": item})
 
 
@@ -27,8 +28,10 @@ def main() -> None:
     set_file = Path(re.search(r"Then read (\S+), which holds", prompt).group(1))
     skip_reads = os.environ.get("FAKE_CODEX_SKIP_READS")
     listed = [] if skip_reads else re.findall(r"^- (/\S+)$", prompt, re.MULTILINE)
-    for path in [*listed, set_file]:
-        print(command_event(f"/bin/zsh -lc 'cat {path}'"))
+    listed_exit_code = 1 if os.environ.get("FAKE_CODEX_FAIL_READS") else 0
+    for path in listed:
+        print(command_event(f"/bin/zsh -lc 'cat {path}'", listed_exit_code))
+    print(command_event(f"/bin/zsh -lc 'cat {set_file}'", 0))
     letters = re.findall(r"^### Passage (\S+)$", set_file.read_text(), re.MULTILINE)
     answer = json.dumps({"ranking": "".join(reversed(letters)), "reason": "stub"})
     output_file.write_text(f"Here is the ranking.\n{answer}\n")

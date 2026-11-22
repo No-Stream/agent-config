@@ -7,9 +7,10 @@ import pytest
 from conftest import FAKES_DIR, STUB_TASKS, launcher
 
 from budget import call_bounds, cost_summary, format_plan
-from common import load_tasks
+from common import Task, load_tasks
 from fidelity import changed_sentence_count, unsupported_by_passage, unsupported_count
 from pipeline_config import load_config
+from prompts import TASK_RULES, task_brief
 from run_pipelines import Runner
 
 SCORE_LINT = (
@@ -78,7 +79,7 @@ name = "base"
 name = "variant"
 override = "Override for the variant."
   [[pipeline.stage]]
-  kind = "draft"
+  kind = "copied_draft"
   name = "draft"
   from_pipeline = "base"
   [[pipeline.stage]]
@@ -113,13 +114,21 @@ name = "solo"
   lint = ["plain"]
   instructions = "Triage the findings once."
 """
+BARE_PIPELINE = """
+[[pipeline]]
+name = "bare"
+  [[pipeline.stage]]
+  kind = "bare_draft"
+  name = "draft"
+"""
 AGENT_FILE = "---\nname: {name}\ndescription: test agent\ntools: Read, Grep\nmodel: sonnet\n---\n\nYou {name}.\n"
 CALLS_PER_TASK = 13
 LAST_STAGES = {"base": "04-fidelity", "variant": "03-score-loop", "solo": "01-lint"}
 GATE_CHECK = "The earlier version is the file"
 
 
-def write_config(tmp_path: Path, scores: str = "50,60,90") -> Path:
+def write_config(tmp_path: Path, scores: str = "50,60,90", extra: str = "") -> Path:
+    """The test config, with `extra` pipelines appended."""
     skill_dir = tmp_path / "skill"
     skill_dir.mkdir(exist_ok=True)
     (skill_dir / "guide.md").write_text("Write plainly.\n")
@@ -133,6 +142,7 @@ def write_config(tmp_path: Path, scores: str = "50,60,90") -> Path:
             score_lint=json.dumps(SCORE_LINT),
             scores=scores,
         )
+        + extra
     )
     return config_file
 
@@ -172,20 +182,27 @@ def logged_model(call: dict) -> str:
     return call["arguments"][call["arguments"].index("--model") + 1]
 
 
+def stub_task(tasks_file: Path, task_id: str) -> Task:
+    return next(task for task in load_tasks([tasks_file]) if task.task_id == task_id)
+
+
 class TestPlan:
     def test_bounds_follow_the_stage_kinds(self, tmp_path: Path, fake_claude: Path) -> None:
-        bounds = call_bounds(load_config(write_config(tmp_path), str(fake_claude)))
-        assert bounds == {
+        config = load_config(write_config(tmp_path, extra=BARE_PIPELINE), str(fake_claude))
+        assert call_bounds(config) == {
             "base": {"fresh_agents": (3, 4), "author_turns": (1, 2)},
             "variant": {"fresh_agents": (1, 1), "author_turns": (2, 4)},
             "solo": {"fresh_agents": (1, 1), "author_turns": (1, 1)},
+            "bare": {"fresh_agents": (1, 1), "author_turns": (0, 0)},
         }
 
     def test_totals_scale_with_tasks_and_count_the_fidelity_measurement(
         self, tmp_path: Path, fake_claude: Path
     ) -> None:
-        plan = format_plan(load_config(write_config(tmp_path), str(fake_claude)), task_count=2)
-        assert "| **all, 2 tasks** | 12 to 14 | 8 to 14 |" in plan
+        config = load_config(write_config(tmp_path, extra=BARE_PIPELINE), str(fake_claude))
+        plan = format_plan(config, task_count=2)
+        assert "| bare | 1 to 1 | 0 to 0 |" in plan
+        assert "| **all, 2 tasks** | 14 to 16 | 8 to 14 |" in plan
 
 
 @dataclass(frozen=True)
@@ -247,6 +264,13 @@ class TestFullRun:
         assert variant_draft["copied_from"] == "base"
         assert variant_draft["passage"] == base_draft["passage"]
         assert len(full_run.prompts_starting("You are drafting")) == 4  # base and solo, two tasks
+
+    def test_every_draft_states_the_task_and_the_rules_of_the_run(self, full_run: FullRun) -> None:
+        drafts = full_run.prompts_starting("You are drafting")
+        for task_id in ("stub-kettle", "stub-bridge"):
+            brief = task_brief(stub_task(full_run.root / "tasks.toml", task_id))
+            task_drafts = [prompt for prompt in drafts if brief in prompt]
+            assert len(task_drafts) == 2 and all(TASK_RULES in p for p in task_drafts), task_id
 
     def test_reviewers_see_only_what_their_stage_names(self, full_run: FullRun) -> None:
         reader_tests = full_run.prompts_starting("List the questions")
@@ -385,11 +409,7 @@ class TestBareDraft:
     def test_a_bare_draft_gets_the_task_but_no_guidance_tools_or_path_note(
         self, tmp_path: Path, fake_claude: Path, stub_tasks_file: Path, claude_calls
     ) -> None:
-        config_file = write_config(tmp_path)
-        bare_pipeline = (
-            '\n[[pipeline]]\nname = "bare"\n  [[pipeline.stage]]\n  kind = "bare_draft"\n'
-        )
-        config_file.write_text(config_file.read_text() + bare_pipeline + '  name = "draft"\n')
+        config_file = write_config(tmp_path, extra=BARE_PIPELINE)
         out_dir = tmp_path / "out"
         make_runner(config_file, fake_claude, stub_tasks_file, out_dir).run(
             ["stub-kettle"], ["bare"], jobs=1
@@ -398,7 +418,8 @@ class TestBareDraft:
         arguments, prompt = call["arguments"], call["prompt"]
         assert arguments[arguments.index("--tools") + 1] == ""
         assert logged_model(call) == "opus"
-        assert "bimetal" in prompt and "about 180 words" in prompt
+        assert task_brief(stub_task(stub_tasks_file, "stub-kettle")) in prompt
+        assert TASK_RULES in prompt
         for absent in ("guidance", "files", "Later turns", "Path note for the test."):
             assert absent not in prompt, absent
         draft = stage(out_dir, "stub-kettle", "bare", "00-draft")
@@ -452,6 +473,10 @@ class TestFidelityGate:
         assert claude_calls()[-1]["prompt"].startswith(GATE_CHECK)
 
 
+DRAFT_NO_READ = 'kind = "draft"\n  name = "draft"'
+READS_NOTHING = DRAFT_NO_READ + "\n  read = []"
+
+
 class TestConfigChecks:
     @pytest.mark.parametrize(
         ("old", "new"),
@@ -463,8 +488,7 @@ class TestConfigChecks:
                 'kind = "bare_draft"\n  name = "lint"',
             ),
             ('from_pipeline = "base"', 'from_pipeline = "variant"'),
-            ('  from_pipeline = "base"\n', ""),
-            ('from_pipeline = "base"\n', 'from_pipeline = "base"\n  read = ["guide.md"]\n'),
+            ('kind = "copied_draft"\n  name = "draft"\n  from_pipeline = "base"', READS_NOTHING),
             ('name = "reviewer"\n', 'name = "reviewer"\n  brief = "Review it."\n'),
             ('kind = "agent"\n  name = "style"', 'kind = "critic"\n  name = "style"'),
             ('sees = ["passage"]\n  group', 'sees = ["passage", "mood"]\n  group'),
@@ -479,7 +503,6 @@ class TestConfigChecks:
             "second-draft",
             "draft-copied-from-a-copy",
             "draft-reads-nothing",
-            "copied-draft-also-reads",
             "agent-file-and-brief",
             "unknown-kind",
             "sees-outside-the-list",
@@ -495,14 +518,28 @@ class TestConfigChecks:
         with pytest.raises(ValueError):
             load_config(edited_config(tmp_path, old, new), str(fake_claude))
 
-    def test_a_key_on_a_stage_kind_that_does_not_take_it_stops_the_load(
-        self, tmp_path: Path, fake_claude: Path
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            ('brief = "Style pass."\n', 'brief = "Style pass."\n  lint = ["plain"]\n'),
+            ('from_pipeline = "base"\n', 'from_pipeline = "base"\n  read = ["guide.md"]\n'),
+            ('from_pipeline = "base"\n', 'from_pipeline = "base"\n  instructions = "Draft."\n'),
+            ('  from_pipeline = "base"\n', ""),
+            ('kind = "copied_draft"\n  name = "draft"\n  from_pipeline = "base"', DRAFT_NO_READ),
+        ],
+        ids=[
+            "agent-stage-with-lint",
+            "copied-draft-also-reads",
+            "copied-draft-with-instructions",
+            "copied-draft-without-a-source",
+            "draft-without-read",
+        ],
+    )
+    def test_a_key_its_kind_does_not_take_or_a_missing_required_key_stops_the_load(
+        self, tmp_path: Path, fake_claude: Path, old: str, new: str
     ) -> None:
-        config_file = edited_config(
-            tmp_path, 'brief = "Style pass."\n', 'brief = "Style pass."\n  lint = ["plain"]\n'
-        )
         with pytest.raises(TypeError):
-            load_config(config_file, str(fake_claude))
+            load_config(edited_config(tmp_path, old, new), str(fake_claude))
 
 
 CHECKED = '- UNSUPPORTED: "a" (was: absent). Reason.\n- SUPPORTED: "b" (was: "c"). Reason.\n'
