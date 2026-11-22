@@ -130,6 +130,13 @@ TREE_SURVEY = (
     "Residents planted {bulbs} bulbs under the lime tree and watered them {days} a week until the"
     " first frost came in.\n"
 )
+TWO_MORE_NUMBERS = " The bakery also sold 40 loaves and 12 buns."
+
+
+def _paragraph_flags(sentence: str, more: str = TWO_MORE_NUMBERS) -> bool:
+    """Whether a paragraph of the sentence and more numbers, after a short opening, has too many."""
+    text = f"The bakery tracks how many loaves it sells each day.\n\n{sentence}{more}\n"
+    return rule_lines("number-density", text) == [3]
 
 
 class TestNumberDensity:
@@ -218,9 +225,60 @@ class TestNumberDensity:
         text = (
             "The bakery tracks how many loaves it sells each day.\n\n"
             "The complaints came from two directions: three regulars wrote four letters about the"
-            " two rye loaves.\n"
+            " two rye loaves. All but four of the breads are rye, and four of the five ovens run"
+            " at night.\n"
         )
         assert rule_lines("number-density", text) == []
+
+    def test_counts_a_dozen_and_the_large_magnitudes(self) -> None:
+        for counted in (
+            "Rye sold a dozen loaves.",
+            "Rye sold two dozen loaves.",
+            "The oven toasted a million crumbs.",
+            "The town ate two billion crumbs.",
+        ):
+            assert _paragraph_flags(counted), counted
+        for vague in (
+            "Rye sold half a dozen loaves.",
+            "Rye sold dozens of loaves.",
+            "Rye sold hundreds of loaves.",
+            "The multi-million rebuild finished.",
+        ):
+            assert not _paragraph_flags(vague), vague
+
+    def test_counts_a_magnitude_word_after_digits_as_part_of_that_number(self) -> None:
+        for sentence in (
+            "The town ate 40 thousand crumbs.",
+            "The rebuild cost $2 million.",
+            "The town ate 1.5 billion crumbs.",
+        ):
+            assert not _paragraph_flags(sentence, more=" The bakery also sold 40 loaves."), sentence
+
+    def test_counts_a_small_number_word_that_is_a_multiple_percentage_or_share(self) -> None:
+        for counted in (
+            "Rye sales rose fourfold.",
+            "Rye sales rose two-fold.",
+            "Rye sales rose three percent.",
+            "Rye sales rose five percentage points.",
+            "One in four loaves was rye.",
+            "Two out of three buns were sweet.",
+        ):
+            assert _paragraph_flags(counted), counted
+        assert not _paragraph_flags("Rye sold well in two shops.")
+
+    def test_counts_multiples_written_without_a_number_word(self) -> None:
+        for counted in (
+            "Rye sold twice as many loaves.",
+            "Rye cost twice the price of wheat.",
+            "Rye sales doubled.",
+            "Rye sales tripled.",
+            "Rye sales halved.",
+            "Rye sales rose 3-fold.",
+            "Rye sales rose 10fold.",
+        ):
+            assert _paragraph_flags(counted), counted
+        for repeat_or_name in ("We baked the rye twice.", "Rye sales have a doubling time."):
+            assert not _paragraph_flags(repeat_or_name), repeat_or_name
 
     def test_counts_a_compound_spelled_out_number_once(self) -> None:
         text = (
@@ -327,6 +385,14 @@ class TestSupportingStatistic:
             "The new probe read 0.92 versus 0.97 for the old one.",
             "The new probe read 0.92 while the old one read 0.97.",
             "The new probe read 0.92 compared with 0.97 for the old one.",
+            "The Welch test ran on fourteen degrees of freedom.",
+            "Sales rose 4.0% (95 percent CI 2.5% to 5.5%).",
+            "The ninety-five percent interval runs from 1.0 to 3.2 minutes.",
+            "The 95% interval runs between 1.0 and 3.2 minutes.",
+            "Each loaf lost 2.1 plus or minus 0.4 grams.",
+            "The crust darkened, with a p-value below 0.05.",
+            "The crust darkened, with a p-value that was less than 0.05.",
+            "Loaves rose higher in it (p under 0.05).",
         )
         text = OVEN_OPENING + "\n\n".join(sentences) + "\n"
         paragraph_lines = [3 + 2 * index for index in range(len(sentences))]

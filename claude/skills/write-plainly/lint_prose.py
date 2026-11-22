@@ -85,6 +85,7 @@ MESSAGES = {
     "coined-label": (
         "Check: label or ID that may have been coined during the work (advisory). Name the thing"
         " by what it is, with any ID after that description, unless the reader already knows it."
+        ' A reworded label ("step four", "the round-three fix") is still a label.'
     ),
     "bold-run-in": "Bold run-in heading; use a heading or plain prose.",
     "title-case-heading": "Heading looks like Title Case; use sentence case.",
@@ -107,7 +108,10 @@ MESSAGES = {
     "announcing-sentence": (
         "Check: sentence only announces what follows (advisory). Say the point itself."
     ),
-    "stock-emphasis": "Stock emphasis phrase; cut it, or state the fact that makes the point.",
+    "stock-emphasis": (
+        "Stock emphasis phrase; cut it, or state the fact that makes the point. Another emphasis"
+        " phrase in its place is not a fix."
+    ),
     "history-in-document": (
         "Edit history in the text; state the current fact and drop what it replaced."
     ),
@@ -116,7 +120,8 @@ MESSAGES = {
     ),
     "rather-than": (
         'Check: contrast with "rather than", ", not" or "less about ... more about" (advisory).'
-        " If no reader expects the alternative, state only what is true."
+        " If no reader expects the alternative, state only what is true;"
+        ' "instead of" is the same contrast.'
     ),
     "american-spelling": (
         "British spelling; use the American form (color, center, license, organize, analyze,"
@@ -153,10 +158,14 @@ MESSAGES = {
         "Check: chat phrasing addressed to the requester (advisory). Cut it from a document;"
         " it is fine in a message the user sends."
     ),
-    "section-label": "Stock section label; name the section by its content, or state the point.",
+    "section-label": (
+        "Stock section label; name the section by its content, or state the point. Another stock"
+        " label is not a fix."
+    ),
     "intensifier": (
         f"Check: more than {FREE_INTENSIFIERS_PER_SECTION} intensifiers in this section"
-        " (advisory); keep one only where the sentence says less without it."
+        " (advisory); keep one only where the sentence says less without it. An intensifier"
+        ' missing from the list ("really", "super") is not a fix.'
     ),
     "passive-by-agent": (
         "Check: passive voice with a named actor (advisory). Make the actor the subject unless"
@@ -176,7 +185,7 @@ MESSAGES = {
     ),
     "metaphor": (
         "Check: an image or stock idiom in place of the literal claim (advisory). Name the"
-        " threshold, method, cause or quantity itself."
+        " threshold, method, cause or quantity itself; a different image is not a fix."
     ),
     "signposting": (
         "Check: a signpost that announces what the text covers or that a recap follows"

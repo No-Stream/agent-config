@@ -350,34 +350,47 @@ NOT_A_NUMBER = re.compile(
 NUMBER = re.compile(
     r"(?<![\w.,/:-])[-+−]?[$€£]?\d+(?:[.,]\d+)*(?:%|×|[A-Za-zµ]{1,3}\b)?(?![\w/-]|[.,:]\d)"
 )
-# A small count in words ("two directions") is ordinary prose: only ten up and multiples count.
+# A small count in words ("two directions") is prose; ten up, multiples, shares and percents count.
 SMALL_NUMBER_WORD = r"(?:one|two|three|four|five|six|seven|eight|nine)"
 LARGE_NUMBER_WORD = (
     r"(?:ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty"
-    r"|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)"
+    r"|thirty|forty|fifty|sixty|seventy|eighty|ninety"
+    r"|(?<!\d )(?:hundred|thousand|million|billion|trillion|(?<!half )(?<!half a )dozen))"
 )
 NUMBER_WORD = rf"(?:{SMALL_NUMBER_WORD}|{LARGE_NUMBER_WORD})"
+SPELLED_COMPOUND = (
+    rf"(?<![\w-]){NUMBER_WORD}(?:(?:-|\s+|(?:(?<=hundred)|(?<=thousand))\s+and\s+){NUMBER_WORD})*"
+)
 SPELLED_NUMBER = re.compile(
-    rf"(?i)\b{NUMBER_WORD}(?:(?:-|\s+|(?:(?<=hundred)|(?<=thousand))\s+and\s+){NUMBER_WORD})*\b"
-    r"(?P<times>\s+times\b)?"
+    rf"(?i){SPELLED_COMPOUND}(?:(?P<not_a_count>\s+times\b|-?fold\b"
+    r"|\s+(?:percent|per cent|percentage points?)\b"
+    rf"|\s+(?:in|out of)\s+{SPELLED_COMPOUND}\b)|\b)"
 )
 LARGE_SPELLED_NUMBER = re.compile(rf"(?i)\b{LARGE_NUMBER_WORD}\b")
+MULTIPLE_WITHOUT_NUMBER_WORD = re.compile(
+    r"(?i)\b(?:twice|thrice)\s+(?:as|the|that|what|this|its|their|our|his|her|my|your)\b"
+    r"|\b(?:doubl|tripl|quadrupl|halv)ed\b|(?<![\w.-])\d+(?:\.\d+)?-?fold\b"
+)
 YEAR = r"(?:1[6-9]|20)\d\d"
 YEAR_ORDINAL_OR_VERSION = re.compile(rf"{YEAR}s?|\d+(?:st|nd|rd|th)|\d+(?:\.\d+){{2,}}")
 ENDPOINT = rf"(?!{YEAR}\b)[-+−]?[$€£]?\d[\d.,]*%?"
 INTERVAL_PAIR = rf"\s*{ENDPOINT}\s*,(?!\d{{3}}(?!\d))\s*{ENDPOINT}\s*"
+NUMERAL = rf"(?:\d+(?:\.\d+)?|(?i:{SPELLED_COMPOUND}))"
+CONFIDENCE_LEVEL = rf"{NUMERAL}(?:%|\s+(?i:percent|per cent)\b)"
 INTERVAL_LABEL = (
-    r"(?:\d+(?:\.\d+)?%\s*(?:[\w-]+\s+)?|(?i:confidence|credible)\s+)(?:CI|(?i:intervals?))\b"
+    rf"(?:{CONFIDENCE_LEVEL}\s*(?:[\w-]+\s+)?|(?i:confidence|credible)\s+)(?:CI|(?i:intervals?))\b"
     r"[^.;]{0,25}?"
 )
+P_COMPARISON = r"(?:[<>=≤≥]|\b(?:below|under|above|over|(?:less|greater|smaller) than))"
 SUPPORTING_STATISTIC = re.compile(
     r"(?<![\w.-])(?:[tzF]|t-stat(?:istic)?|z-score|chi-squared?|χ²)"
     r"\s*(?:\(\s*\d[\d.,\s]*\))?\s*(?:=|of|was|is)\s*[-+−]?\d"
-    r"|\b\d+(?:\.\d+)?\s*(?:df|degrees of freedom)\b|\bdf\s*=\s*\d"
-    r"|(?<![\w.-])p\s*[<>=≤≥]\s*0?\.\d|\bp-?values? (?:of|was|is|=|<)\s*0?\.\d"
+    rf"|\b{NUMERAL}\s*(?:df|degrees of freedom)\b|\bdf\s*=\s*\d"
+    rf"|(?<![\w.-])p\s*{P_COMPARISON}\s*0?\.\d"
+    rf"|\bp-?values?\b[^.;\d]{{0,20}}?(?:{P_COMPARISON}|\b(?:of|was|is|were|are))\s*0?\.\d"
     rf"|[\[(]{INTERVAL_PAIR}[\])]"
-    rf"|{INTERVAL_LABEL}{ENDPOINT}\s*(?:to|–|-)\s*[-+−]?\d"
-    r"|\d\s*(?:±|\+/-)\s*\d"
+    rf"|{INTERVAL_LABEL}{ENDPOINT}\s*(?:to|and|–|-)\s*[-+−]?\d"
+    r"|\d\s*(?:±|\+/-|(?i:plus or minus))\s*\d"
 )
 LABELED_BRACKET_INTERVAL = re.compile(rf"{INTERVAL_LABEL}\[{INTERVAL_PAIR}\]")
 DECIMAL_RATE = r"(?<![\d.])[-+−]?0?\.\d+(?!\.\d)"

@@ -21,6 +21,7 @@ from lint_prose_patterns import (
     ARITHMETIC,
     LABELED_BRACKET_INTERVAL,
     LARGE_SPELLED_NUMBER,
+    MULTIPLE_WITHOUT_NUMBER_WORD,
     NOT_A_NUMBER,
     NUMBER,
     RATE_CONTRAST,
@@ -48,16 +49,21 @@ DOCUMENT_MESSAGES = {
         "More top-level sections than the length supports; merge sections or nest them."
     ),
     "number-density": (
-        "Too many numbers for body prose; move them to a table or figure and say what they show."
+        "Too many numbers for body prose. Move them into a table or figure, or cut the ones the"
+        " reader does not need, and keep only the headline numbers in prose. Spelling a number"
+        ' out or rewording it ("all but four") is not a fix.'
     ),
     "supporting-statistic": (
         "Check: a statistic that supports a result (advisory), such as a test statistic, degrees"
         " of freedom, a p-value, an interval or two rates set against each other. Move it to a"
-        " table, footnote or appendix unless the reader needs it to decide."
+        " table, footnote or appendix, or cut it, unless the reader needs it to decide, and keep"
+        ' only the headline number in prose. Spelling it out or rewording it ("plus or minus")'
+        " is not a fix."
     ),
     "tldr-shape": (
         f"Summary runs past {MAX_SUMMARY_SENTENCES} sentences or carries more than the headline"
-        " numbers; keep what and why, the main findings and the ask."
+        " numbers; keep what and why, the main findings and the ask. Spelling numbers out or"
+        " joining sentences is not a fix."
     ),
 }
 
@@ -124,9 +130,10 @@ def _number_count(sentence: str) -> int:
     spelled = [
         match
         for match in SPELLED_NUMBER.finditer(masked)
-        if match.group("times") or LARGE_SPELLED_NUMBER.search(match.group())
+        if match.group("not_a_count") or LARGE_SPELLED_NUMBER.search(match.group())
     ]
-    return len(counted) + len(spelled)
+    multiples = MULTIPLE_WITHOUT_NUMBER_WORD.findall(masked)
+    return len(counted) + len(spelled) + len(multiples)
 
 
 def _sentences(block: Block) -> list[str]:
