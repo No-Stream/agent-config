@@ -48,7 +48,7 @@ Each rule falls into one of three groups, and only tell rules can be demoted:
 
 - House-style rules encode this skill's own preferences: no em dashes, no dashes as pauses, few numbers in body prose, paragraph shape and sentence length. They stay whatever their human rate, and their rates are reported for information. A rule from another linter that contradicts one of them is removed whatever its rates.
 - Tell rules exist to catch model habits. A tell rule that fires more often per 1,000 words on the human side than on the agent side, on at least three human texts, gets an advisory "Check:" message or is removed. The three-text floor was added during the triage, because two texts against none is within noise for corpora this small, and it is provisional until the skill's owner confirms it. Without it, `stacked-hedge` would get a "Check:" message, `check-prose.sh` would also skip sloplint's `same-determiner-chain` and `stands-serves-as`, and slop-guard's `pithy_fragment` would be turned off.
-- Markdown-structure rules (headings, bold, bullets) are not judged here, because the agent texts are plain text and cannot trigger them. They are judged again on the passages that the pairwise evaluation in `pairwise/` generates, by running `false_flags.py --private` with each generated `final.md` listed as an agent-side `[[file]]` entry in `.private/eval/corpora-private.toml`. That run judges the bold and bullet rules. The heading rules (`title-case-heading`, `thin-h2-section`, `heading-density` and slop-guard's bold-header check) stay unjudged, because those passages are body text with no headings, until a source of agent-written documents with headings is added.
+- Markdown-structure rules (headings, bold, bullets) cannot fire on the matched corpus, which is plain text, so they are judged on the passages that the pairwise evaluation in `pairwise/` generated, as "Markdown rules on generated passages" describes. Those passages have no bold and no headings, so the only one judged is `bullet_density`, which is kept.
 
 Rates are hits per 1,000 words. "Human" is every human text, "agent" is the model halves of the matched corpus, and "matched human" is the human halves written on the same topics. The texts columns count texts with at least one hit.
 
@@ -82,13 +82,13 @@ Rates are hits per 1,000 words. "Human" is every human text, "agent" is the mode
 | `complex-sentence` | lint_prose | house | 4.04 | 4.43 | 3.38 | 25/31 | 23/24 | kept |
 | `paragraph_cv` | slop-guard | house | 0.25 | 0.98 | 0.59 | 14/31 | 23/24 | removed, contradicts the paragraph floor |
 | `paragraph_balance` | slop-guard | house | 0.02 | 0.00 | 0.04 | 1/31 | 0/24 | removed, contradicts the paragraph floor |
-| `bold-run-in` | lint_prose | markdown | 1.68 | 0.00 | 0.00 | 6/31 | 0/24 | not judged |
-| `structural`, bold headers and bullet runs | slop-guard | markdown | 0.23 | 0.00 | 0.00 | 4/31 | 0/24 | not judged |
-| `bold_bullet_list` | slop-guard | markdown | 0.21 | 0.00 | 0.00 | 5/31 | 0/24 | not judged |
-| `title-case-heading` | lint_prose | markdown | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | not judged |
-| `bullet_density` | slop-guard | markdown | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | not judged |
-| `thin-h2-section` | lint_prose | markdown | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | not judged |
-| `intrasentence_keyword_bold` | slop-guard | markdown | 0.02 | 0.00 | 0.00 | 1/31 | 0/24 | not judged |
+| `bold-run-in` | lint_prose | markdown | 1.68 | 0.00 | 0.00 | 6/31 | 0/24 | not judged, no bold in the passages |
+| `structural`, bold headers and bullet runs | slop-guard | markdown | 0.23 | 0.00 | 0.00 | 4/31 | 0/24 | not judged, no bold or bullet run in the passages |
+| `bold_bullet_list` | slop-guard | markdown | 0.21 | 0.00 | 0.00 | 5/31 | 0/24 | not judged, no bold in the passages |
+| `title-case-heading` | lint_prose | markdown | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | not judged, no headings in the passages |
+| `bullet_density` | slop-guard | markdown | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | kept, one passage hit |
+| `thin-h2-section` | lint_prose | markdown | 0.05 | 0.00 | 0.00 | 3/31 | 0/24 | not judged, no headings in the passages |
+| `intrasentence_keyword_bold` | slop-guard | markdown | 0.02 | 0.00 | 0.00 | 1/31 | 0/24 | not judged, no bold in the passages |
 
 Nine more rules fired on a single text, too few to read: sloplint's `not-by-x-but-by-y`, `actually-not-x`, `impact-verb`, `real-x-real-y` and `is-is` and slop-guard's `ai_disclosure` on one human text each, and sloplint's `short-run`, `notice-what` and `thats-how-x` on one agent text each. Most of sloplint's default rules, two in five of slop-guard's categories and `lint_prose.py`'s `heading-density` never fired, so these corpora say nothing about them; the last section of the output lists them.
 
@@ -109,14 +109,27 @@ The house-style rules fire more often on careful human prose, as expected. `dash
 
 One kept tell rule flips between the two comparisons: `contrast_pairs` fires more often on the matched human halves than on the agent texts, and less often over all human text. It stays because the triage compares the whole human side.
 
+### Markdown rules on generated passages
+
+The pairwise evaluation generated 25 passages, five tasks each written by its five pipelines. Each passage's `final.md` is an agent-side `[[file]]` entry in `.private/eval/corpora-private.toml`. `false_flags.py --private` ran on them on 2026-11-21, with `lint_prose.py` and `lint_prose_patterns.py` at sha256 `0836dddb75c3`. The human side for these rules is the seven web pages, since no other human text has markdown structure. No passage uses bold or has a heading, because the prompt asks for body text with no heading, so no bold or heading rule can be judged until a source of agent-written documents with bold and headings is added.
+
+| measure | generated passages | human web pages |
+|---|---|---|
+| texts | 25 | 7 |
+| words | 6,258 | 33,024 |
+| `bullet_density` hits per 1,000 words | 0.16 | 0.09 |
+| texts with a `bullet_density` hit | 1 | 3 |
+
+Two passages on one task, from the `merged` and `merged-style-pass` pipelines, have a list of four bullets, and none of the five passages written with no skill has a list. Neither list reaches the six bullets in a row that slop-guard's bullet-run check needs, so that check stays unjudged too. `bullet_density` fired on one of the two, a pull-request description in which four of its seven lines are bullets. Its rate per 1,000 words is higher on the passages, so the rule is kept, but the verdict rests on that single hit. The rule fires at most once per text and compares bullet lines with all non-empty lines. A short text can therefore trip it with one list, and counted per text the comparison runs the other way.
+
 ### Threats to these results
 
 Beyond the general limits in "What it does not show", four threats bear on these changes:
 
 - The corpora are small. The matched corpus has at most three pairs per register, about 1,000 words per text, so one text can move a rate several times over. Hits cluster: the two Amodei essays carry more than half of the human `slop_words` hits.
 - One model wrote every agent text, `claude-opus-5` prompted one way. Other models, other prompts and real agent drafts can fire these rules at different rates.
-- The rates are counts of matches. They do not say whether a reader would want a flagged sentence changed. The change notes above quote the hits that were read for this triage.
-- The agent side is plain text, so the markdown rules are not judged, and the human side's 33,024 words of web pages have no agent counterpart. Each tell-rule change above points the same way on the matched corpus alone, where both sides are plain text on the same topics, though `tone` and `impact-noun-bare` fire on only one matched human text each.
+- The rates are counts of matches. They do not say whether a reader would want a flagged sentence changed. The notes under "Changes" quote the hits that were read for this triage.
+- The matched agent texts are plain text, so the markdown rules rest on the 25 generated passages, whose only markdown structure is two short lists. The human side's 33,024 words of web pages have no agent counterpart on the same topics or at their length. Each tell-rule change above points the same way on the matched corpus alone, where both sides are plain text on the same topics, though `tone` and `impact-noun-bare` fire on only one matched human text each.
 
 ## Rules from the owner's corrections
 
