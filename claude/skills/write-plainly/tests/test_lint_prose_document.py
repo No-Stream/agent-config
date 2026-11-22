@@ -275,6 +275,14 @@ class TestNumberDensity:
         )
         assert _lines("number-density", text) == [3]
 
+    def test_an_opening_is_body_prose_when_the_document_has_a_summary(self) -> None:
+        text = (
+            "The bakery sold 340 loaves on Monday, 410 on Tuesday and 380 on Wednesday.\n\n"
+            "## Summary\n\n"
+            "Sales held steady.\n"
+        )
+        assert _lines("number-density", text) == [1]
+
     def test_an_opening_longer_than_a_summary_is_body_prose(self) -> None:
         text = (
             "The library lends tools as well as books. Members borrow drills, ladders and sewing"
@@ -309,6 +317,19 @@ class TestSupportingStatistic:
             "The new tin browned 0.62 of the crust, vs. 0.71 for the old tin.",
             "The share of burnt loaves had a 95% Wilson interval of 0.12 to 0.19.",
             "The 95% confidence interval is [12, 18] minutes.",
+            "The loaves rose higher, t(22) = 2.10.",
+            "The oven factor had an F of 3.1.",
+            "The z-score was 2.3.",
+            "The chi-squared was 4.2.",
+            "Sales rose 4.0% (95% CI 2.5–5.5%).",
+            "Visits rose 3.1% (90% CI 1.2-5.0%).",
+            "Each loaf lost 2.1 +/- 0.4 grams.",
+            "The Welch test had df = 9.7.",
+            "The test ran on 14 degrees of freedom.",
+            "The credible interval runs from 0.1 to 0.4.",
+            "The new probe read 0.92 versus 0.97 for the old one.",
+            "The new probe read 0.92 while the old one read 0.97.",
+            "The new probe read 0.92 compared with 0.97 for the old one.",
         )
         text = OVEN_OPENING + "\n\n".join(sentences) + "\n"
         paragraph_lines = [3 + 2 * index for index in range(len(sentences))]
@@ -325,6 +346,8 @@ class TestSupportingStatistic:
             OVEN_OPENING + "The new oven bakes a loaf in 25 minutes, 20% faster than the old one."
             " Its probe reads within 0.92 of the true heat while the oven warms up. The share is"
             " 0.25 * 0.4 = 0.1 of the day.\n\n"
+            "The new tin browned 0.62 of the crust against 0.71 for the old tin, so the gap is"
+            " 0.71 - 0.62 = 0.09.\n\n"
             "Its crust score rose from 0.81 to 0.84. The oven alarm sounds at humidity 0.05 and"
             " 0.2.\n\n"
             "The bakery spent most of its budget on flour ($14,200). Bread sales rose in both"
