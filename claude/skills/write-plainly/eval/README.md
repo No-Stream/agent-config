@@ -162,12 +162,12 @@ No rule was dropped.
 
 ## Blind grades on the public tasks
 
-The skill's owner graded the passages of the blind evaluation in `pairwise/` without knowing which pipeline wrote which, giving each passage a letter grade from A+ to F. Two of the evaluation's five tasks are public, both in `pairwise/tasks/public.toml`: a proposal paragraph on replacing a dashboard's Wald interval for conversion rates (`pub-wilson-interval`), and a design-doc explanation of SQLite's journal modes for a job queue with several worker processes (`pub-sqlite-wal`). The other three tasks, the analysis and the full readout are private. The passages come from write-plainly at commit e603d90 and five pipelines:
+The skill's owner graded the passages of the blind evaluation in `pairwise/` without knowing which pipeline wrote which, giving each passage a letter grade from A+ to F. Two of the evaluation's five tasks are public, both in `pairwise/tasks/public.toml`: a proposal paragraph on replacing a dashboard's Wald interval for conversion rates (`pub-wilson-interval`), and a design-doc explanation of SQLite's journal modes for a job queue with several worker processes (`pub-sqlite-wal`). The other three tasks, the analysis and the full readout are private. Five pipelines wrote the passages, and the three merged ones read write-plainly at commit e603d90:
 
-- `current`: the owner's earlier writing skill, with a humanizer pass and a slop-guard loop.
+- `current`: the owner's earlier writing skill, with its style-editing pass, a humanizer pass and a slop-guard loop.
 - `merged`: write-plainly with the owner's private work layer.
-- `merged-style-pass`: `merged` plus a style-editing pass from the earlier skill.
-- `merged-loose-paragraphs`: `merged` with the four-sentence paragraph minimum and the section-size rules relaxed.
+- `merged-style-pass`: the same draft as `merged`, then the earlier skill's style-editing pass before `merged`'s review steps.
+- `merged-loose-paragraphs`: `merged` with no rules on paragraph length or section size.
 - `no-skill`: the bare task, with no skill files.
 
 | pipeline | `pub-wilson-interval` | `pub-sqlite-wal` |
