@@ -158,6 +158,15 @@ class TestBoldRunIn:
             ("bold-run-in", 2),
         ]
 
+    def test_flags_run_ins_after_every_list_marker(self) -> None:
+        text = (
+            "+ **Note:** the cache expires daily.\n"
+            "1) **Note:** the cache expires daily.\n"
+            "2. **Note:** the cache expires daily.\n"
+            "* __Note:__ the cache expires daily.\n"
+        )
+        assert _lines("bold-run-in", text) == [1, 2, 3, 4]
+
 
 class TestTitleCaseHeading:
     def test_flags_title_case_and_ignores_sentence_case_or_short_headings(self) -> None:

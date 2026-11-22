@@ -12,13 +12,15 @@ from lint_prose_patterns import QUOTATION
 EXCERPT_LEFT_CONTEXT = 30
 HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+")
 FENCE = re.compile(r"^\s*(```+|~~~+)")
-ORDERED_ITEM = re.compile(r"^\s*\d+[.)]\s+")
+ORDERED_MARKER = r"\d+[.)]"
+LIST_MARKER = rf"(?:[-*+]|{ORDERED_MARKER})"
+ORDERED_ITEM = re.compile(rf"^\s*{ORDERED_MARKER}\s+")
 SUMMARY_HEADING = re.compile(r"(?i)^(?:tl;?\s?dr|summary|abstract|executive summary)$")
 BACK_MATTER_HEADING = re.compile(
     r"(?i)^(?:appendix\b.*|appendices|references|bibliography|notes|footnotes)$"
 )
 CAPTION_START = re.compile(r"(?i)^[*_]{0,3}(?:fig(?:ure)?\.?|table)\s+\d+[a-z]?\s*[.:]")
-LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+LIST_ITEM = re.compile(rf"^\s*{LIST_MARKER}\s+")
 FOOTNOTE_DEFINITION = re.compile(r"^\s*(?:\[\^[^\]]+\]:|[⁰¹²³⁴⁵⁶⁷⁸⁹]+\s)")
 IMAGE_LINE = re.compile(r"^\s*!\[")
 THEMATIC_BREAK = re.compile(r"^\s{0,3}(?:[-*_]\s*){3,}$")

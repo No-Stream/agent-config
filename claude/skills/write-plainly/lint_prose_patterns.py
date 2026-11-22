@@ -255,7 +255,7 @@ SECTION_LABELS = (
 )
 SECTION_LABEL_HEADING = re.compile(rf"(?i)^(?:{SECTION_LABELS})[.:!]?$")
 SECTION_LABEL_RUN_IN = re.compile(
-    rf"(?i)^\s*(?:[-*+]\s+|\d+[.)]\s+)?(?:\*\*|__)?(?P<hit>(?:{SECTION_LABELS}))"
+    rf"(?i)^\s*(?:\*\*|__)?(?P<hit>(?:{SECTION_LABELS}))"
     r"(?:[.:](?:\*\*|__)|(?:\*\*|__)?[.:])(?=\s|$)"
 )
 

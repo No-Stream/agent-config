@@ -21,6 +21,7 @@ from lint_prose_document import (
     supporting_statistic_findings,
 )
 from lint_prose_markdown import (
+    LIST_MARKER,
     PROSE_KINDS,
     WORD,
     Block,
@@ -213,6 +214,7 @@ CODE_ID_SHAPES = (TRACKER_ID, HEX_ID, HASH_NUMBER)  # a short code in backticks 
 LABEL_SHAPES = (LABEL_PATTERN, *CODE_ID_SHAPES, SHORT_CODE)
 LINE_BREAK = re.compile(r"[ \t]*\n[ \t]*")
 INTERNAL_PUNCTUATION = re.compile(r"[,;:](?=\s)|[(—–]|\s--?\s")
+BOLD_RUN_IN = re.compile(rf"^\s*(?:{LIST_MARKER}\s+)?(?:\*\*(.+?)\*\*|__(.+?)__)(.*)$")
 
 
 def _in_link_text(source_line: str, column: int) -> bool:
@@ -250,9 +252,9 @@ def _line_hits(visible: str) -> Iterator[tuple[str, int]]:
         yield "dash-substitute", match.start() + 1
     if _is_title_case_heading(visible):
         yield "title-case-heading", 1
-    run_in = re.match(r"^\s*(?:[-*]\s+|\d+\.\s+)?(?:\*\*(.+?)\*\*|__(.+?)__)(.*)$", visible)
+    run_in = BOLD_RUN_IN.match(visible)
     if run_in:
-        bold_text = run_in.group(1) or run_in.group(2) or ""
+        bold_text = run_in.group(1) or run_in.group(2)
         trailing = run_in.group(3)
         terminal_inside = bold_text.endswith((".", ":"))
         terminal_after = bool(re.match(r"^[:.—–](?=\s|\w)", trailing))
