@@ -1,0 +1,6 @@
+# check-prose.sh runs the linter on the system Python, which may be 3.9.
+target-version = "py39"
+line-length = 100
+
+[lint.isort]
+known-first-party = ["conftest", "lint_prose", "lint_prose_document", "lint_prose_markdown", "lint_prose_patterns"]

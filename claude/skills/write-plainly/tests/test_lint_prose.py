@@ -5,9 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from conftest import rule_lines
-
 import lint_prose
+from conftest import rule_lines
 
 
 class TestEmDash:

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from conftest import rule_lines
-
 import lint_prose
+from conftest import rule_lines
 
 
 class TestBorrowedJargon:
