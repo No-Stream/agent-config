@@ -220,6 +220,8 @@ class TestSignposting:
         text = (
             "The table below lists the hours.\n"
             "The guide has a section on parking, and in short weeks the café closes early.\n"
+            "Loans rose, in short, because the bus returned.\n"
+            "In short weeks the café closes early.\n"
             "In this guide, we willingly keep the old format.\n"
         )
         assert _lines("signposting", text) == []
