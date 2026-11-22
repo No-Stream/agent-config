@@ -15,7 +15,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to get past 
 
 ## Structure
 
-- Open with a cell that states the question, the data (source, population, time window, pull date), the result's status (final, interim, simulated, at what scale) and where the main results are.
+- Open with a cell that states the question, the data (source, population, time window, pull date), the result's status (final, interim, simulated, at what scale) and where the main results are; that cell renders the facts held in the config or data.
 - Before the first result, define each method, model or arm compared in a plain sentence, and call it everywhere (prose, table rows, labels, legends) by a plain name, the field's standard one where it exists, replacing any code coined during the work rather than prefixing it.
 - Keep one population, unit, outcome window and estimator throughout; a section that changes one says so first.
 - Keep each cell to a few named steps, not one `run_everything(...)` call that hides them. Move substantial logic (more than about 20 lines of transforms, estimation or plotting) into an importable module, or into a helpers cell when it is display-only and one-off. Fix a library you own rather than work around it in a cell.
@@ -27,19 +27,19 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to get past 
 ## Outputs
 
 - Follow every figure and table with one or two plain sentences on what it shows and means for the question, quoting only the numbers the claim needs. When an output changes, check its markdown against it and fix what no longer holds.
-- Give each effect, and each difference between arms, as an estimate with its interval in the reader's units, never a verdict: no pass or fail, and no "no effect" from an underpowered read. Call a winner only when the interval on the difference excludes zero; otherwise say the data cannot name one and why, name the leader as a labelled best guess, and say what would settle it.
+- Give each effect, and each difference between arms, as an estimate with its interval in the reader's units, never a verdict: no pass or fail. Claim no or negligible effect only from a narrow interval around zero, and say it is narrow. Call a winner only when the interval on the difference excludes zero; otherwise say the data cannot name one and why, name the leader as a labelled best guess, and say what would settle it.
 - Never type a result, or the window, pull date, estimator or model behind one, into markdown or a figure title: render that text from the config, data and result objects (`display(Markdown(f"lift {res.lift:.1%}, 95% CI [{res.lo:.1%}, {res.hi:.1%}]"))`, or `mo.md(f"...")`), and tables as DataFrames. Assert any claim the prose depends on, such as a sign or an ordering, in the cell that computes it.
 - Open each section with the figure for its core comparison, then breakdowns (per segment, per fold); ablations and diagnostics go after them or in an appendix. Say how a pooled result is weighted.
 - `display()` every frame: only a cell's last bare expression renders, and IPython's output cache keeps that object alive after `del`. Show each matplotlib figure once, with `plt.show()`.
 - Preview a few rows of the columns you need. Show each finding as a figure, with its table after it in full (every candidate, neutral and negative results included), raising the renderer's row limit (`pl.Config.set_tbl_rows`) instead of filtering.
-- Format for reading: round each metric to the precision it needs (a global three decimals shows 0.0004 as 0.000), cast integer-valued floats to integers, and name columns in plain words with units, not abbreviations or labels coined during the work.
+- Format for reading: round each metric to the precision it needs (a global three decimals shows 0.0004 as 0.000), cast integer-valued floats to integers, and name columns in plain words with units, not abbreviations or coined labels.
 - Keep the saved file small: cap figure sizes that scale with the data, and put per-iteration logs behind a verbosity flag.
 
 ## Running
 
 - After editing a cell, re-run it and every cell that depends on it, or restart and run all, before reading later outputs or calling the notebook done; the kernel still holds the old state. After editing an imported module, reload it or restart.
 - Leave a finished notebook as it is when upstream code changes, unless the change could move a conclusion; practically identical results count as identical.
-- Run a long job you may still adjust in a live kernel you can address, so a late-cell fix re-runs against in-memory state. Use a fresh-kernel batch runner (papermill, nbconvert, nbclient) for runs you will not touch; a run whose expensive cells have not finished is cheap to restart.
+- Run a long job you may still adjust in a live kernel you can address, so a late-cell fix re-runs against in-memory state. Use a fresh-kernel batch runner (papermill, nbclient) for runs you will not touch; a run whose expensive cells have not finished is cheap to restart.
 - Before a long run of changed code, smoke-run the changed cells on a small slice or review them.
 - Never edit a notebook while a run that saves it is in flight; the run writes back the copy it loaded.
 - A tool's timeout on a live kernel does not stop the cell; check it before running it again.
