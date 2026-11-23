@@ -14,7 +14,6 @@ import time
 from pathlib import Path
 
 import torch
-import transformers
 from scoring import (
     DETECTORS,
     FALCON,
@@ -37,10 +36,9 @@ if len(WINDOWS) != 1:
 (WINDOW,) = WINDOWS
 
 
-def load(name_and_revision: tuple[str, str], device: str) -> AutoModelForCausalLM:
-    name, revision = name_and_revision
+def load(name: str, device: str) -> AutoModelForCausalLM:
     return AutoModelForCausalLM.from_pretrained(
-        name, revision=revision, dtype=torch.bfloat16, device_map={"": device}
+        name, dtype=torch.bfloat16, device_map={"": device}
     ).eval()
 
 
@@ -96,10 +94,8 @@ def main() -> None:
     started = time.monotonic()
     observer = load(FALCON, devices[0])
     performer = load(FALCON_INSTRUCT, devices[-1])
-    tokenizer = AutoTokenizer.from_pretrained(FALCON[0], revision=FALCON[1])
-    performer_tokenizer = AutoTokenizer.from_pretrained(
-        FALCON_INSTRUCT[0], revision=FALCON_INSTRUCT[1]
-    )
+    tokenizer = AutoTokenizer.from_pretrained(FALCON)
+    performer_tokenizer = AutoTokenizer.from_pretrained(FALCON_INSTRUCT)
     if tokenizer.get_vocab() != performer_tokenizer.get_vocab():
         raise ValueError("observer and performer tokenizers differ")
     logger.info(f"loaded both models on {devices} in {time.monotonic() - started:.0f} s")
@@ -122,8 +118,6 @@ def main() -> None:
     (args.out / "job.json").write_text(
         json.dumps(
             {
-                "torch": torch.__version__,
-                "transformers": transformers.__version__,
                 "gpu": torch.cuda.get_device_name(0),
                 "texts": len(rows),
                 "seconds": time.monotonic() - started,

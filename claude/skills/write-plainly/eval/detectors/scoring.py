@@ -54,7 +54,6 @@ class Detector:
 
     name: str
     model: str
-    revision: str
     window: int
     higher_is_ai: bool
     unit: str
@@ -62,15 +61,13 @@ class Detector:
     threshold_source: str
 
 
-FALCON = ("tiiuae/falcon-7b", "ec89142b67d748a1865ea4451372db8313ada0d8")
-FALCON_INSTRUCT = ("tiiuae/falcon-7b-instruct", "8782b5c5d8c9290412416618f36a133653e85285")
+FALCON, FALCON_INSTRUCT = "tiiuae/falcon-7b", "tiiuae/falcon-7b-instruct"
 DETECTORS = {
     detector.name: detector
     for detector in (
         Detector(
             name="desklib",
             model="desklib/ai-text-detector-v1.01",
-            revision="5fdea974cd4287c61674951ec78803aa274e2fb7",
             window=768,
             higher_is_ai=True,
             unit="log-odds of P(AI)",
@@ -80,7 +77,6 @@ DETECTORS = {
         Detector(
             name="gpttrace",
             model="nakas/gpttrace-v8s-1b",
-            revision="ac748e32ca8c90bb8858fadc427757728e27b063",
             window=512,
             higher_is_ai=True,
             unit="machine logit minus human logit",
@@ -89,8 +85,7 @@ DETECTORS = {
         ),
         Detector(
             name="binoculars",
-            model=f"{FALCON[0]} observer, {FALCON_INSTRUCT[0]} performer",
-            revision=f"{FALCON[1][:12]}, {FALCON_INSTRUCT[1][:12]}",
+            model=f"{FALCON} observer, {FALCON_INSTRUCT} performer",
             window=512,
             higher_is_ai=False,
             unit="log-perplexity over cross-perplexity",
@@ -99,8 +94,7 @@ DETECTORS = {
         ),
         Detector(
             name="fast-detectgpt",
-            model=f"{FALCON[0]} sampling, {FALCON_INSTRUCT[0]} scoring",
-            revision=f"{FALCON[1][:12]}, {FALCON_INSTRUCT[1][:12]}",
+            model=f"{FALCON} sampling, {FALCON_INSTRUCT} scoring",
             window=512,
             higher_is_ai=True,
             unit="analytic sampling discrepancy",
@@ -279,7 +273,6 @@ def score_record(text_id: str, sha: str, detector: Detector, chunks: Sequence[Ch
         "id": text_id,
         "sha256": sha,
         "detector": detector.name,
-        "revision": detector.revision,
         "window": detector.window,
         **aggregate(chunks),
     }
@@ -288,12 +281,11 @@ def score_record(text_id: str, sha: str, detector: Detector, chunks: Sequence[Ch
 def reusable_scores(
     existing: Sequence[dict], wanted: dict[str, str], detector: Detector
 ) -> dict[str, dict]:
-    """Records still valid for the wanted {id: sha256}: same text, detector, revision and window."""
+    """Records still valid for the wanted {id: sha256}: same text, detector and window."""
     return {
         row["id"]: row
         for row in existing
         if row["detector"] == detector.name
-        and row["revision"] == detector.revision
         and row["window"] == detector.window
         and wanted.get(row["id"]) == row["sha256"]
     }

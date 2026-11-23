@@ -1,9 +1,9 @@
-#!/usr/bin/env -S uv run --script
+#!/usr/bin/env -S uv run --upgrade --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
 #   "torch>=2.9",
-#   "transformers==5.23.0",
+#   "transformers>=5.23",
 #   "safetensors>=0.6",
 #   "huggingface-hub>=1.0",
 # ]
@@ -16,8 +16,8 @@
 # ///
 """Score every manifest text with the CPU classifiers, writing one JSONL per detector.
 
-A text already scored with the same prepared text, model revision and window keeps its record, so
-a rerun scores only new or changed texts.
+A text already scored with the same prepared text and window keeps its record, so a rerun scores
+only new or changed texts. Each model loads at its latest revision on the Hugging Face Hub.
 """
 
 from __future__ import annotations
@@ -92,11 +92,9 @@ def gpttrace_normalize(text: str) -> str:
 
 def load_desklib(detector: Detector) -> tuple[AutoTokenizer, Scorer, Callable[[str], str]]:
     """The model card's DesklibAIDetectionModel: DeBERTa-v3-large, masked mean pool, one logit."""
-    config = AutoConfig.from_pretrained(detector.model, revision=detector.revision)
+    config = AutoConfig.from_pretrained(detector.model)
     backbone = AutoModel.from_config(config).eval()
-    weights = load_file(
-        hf_hub_download(detector.model, "model.safetensors", revision=detector.revision)
-    )
+    weights = load_file(hf_hub_download(detector.model, "model.safetensors"))
     unknown = [key for key in weights if not key.startswith(("model.", "classifier."))]
     if unknown:
         raise ValueError(f"desklib weights have unexpected keys: {unknown}")
@@ -119,13 +117,13 @@ def load_desklib(detector: Detector) -> tuple[AutoTokenizer, Scorer, Callable[[s
         mask = encoding["attention_mask"].unsqueeze(-1).to(hidden.dtype)
         return head((hidden * mask).sum(1) / mask.sum(1)).item()
 
-    tokenizer = AutoTokenizer.from_pretrained(detector.model, revision=detector.revision)
+    tokenizer = AutoTokenizer.from_pretrained(detector.model)
     return tokenizer, score, lambda text: text
 
 
 def load_gpttrace(detector: Detector) -> tuple[AutoTokenizer, Scorer, Callable[[str], str]]:
     model = AutoModelForSequenceClassification.from_pretrained(
-        detector.model, subfolder="model", revision=detector.revision
+        detector.model, subfolder="model"
     ).eval()
 
     def score(encoding: dict[str, torch.Tensor]) -> float:
@@ -134,9 +132,7 @@ def load_gpttrace(detector: Detector) -> tuple[AutoTokenizer, Scorer, Callable[[
         ).logits[0]
         return (logits[1] - logits[0]).item()
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        detector.model, subfolder="model", revision=detector.revision
-    )
+    tokenizer = AutoTokenizer.from_pretrained(detector.model, subfolder="model")
     return tokenizer, score, gpttrace_normalize
 
 
