@@ -60,6 +60,11 @@ def load_tasks(task_files: Iterable[Path]) -> list[Task]:
                     f"{task_file}: task {entry['id']} target_words outside "
                     f"{MIN_PASSAGE_WORDS}-{MAX_PASSAGE_WORDS}"
                 )
+            blank = [
+                key for key in ("question", "left_to_other_documents") if not entry[key].strip()
+            ]
+            if blank:
+                raise ValueError(f"{task_file}: task {entry['id']} has an empty {', '.join(blank)}")
             tasks.append(
                 Task(
                     task_id=entry["id"],
