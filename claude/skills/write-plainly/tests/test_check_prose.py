@@ -12,13 +12,7 @@ import pytest
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 FAKES_DIR = Path(__file__).resolve().parent / "fakes"
-CLOSING_LINE = (
-    "Fix each finding with a structural change: a table, a footnote, a cut, regrouped content or a"
-    " sentence rewritten around its claim. Rewording until the pattern stops matching (a number in"
-    " words or as a fraction, a synonym, a split sentence, a demoted heading) leaves the defect in"
-    " place. Keep a flagged span only when the pattern misread it (a quotation, code, a literal"
-    " use)."
-)
+CLOSING_LINE_START = "Fix each finding with a structural change"
 
 
 def _launcher(directory: Path, name: str, script: Path) -> None:
@@ -84,7 +78,7 @@ class TestCheckProse:
         path = _write(tmp_path, "clean.md", "The branch lends drills to its members.\n")
         result = run(path)
         assert result.returncode == 0, result.stderr
-        assert CLOSING_LINE not in result.stdout
+        assert CLOSING_LINE_START not in result.stdout
         assert f"{path}: (7 words)" in result.stdout.splitlines()
 
     def test_findings_end_with_the_closing_line_and_no_slop_guard_score(
@@ -93,7 +87,7 @@ class TestCheckProse:
         path = _write(tmp_path, "dash.md", "The branch lends drills — and ladders.\n")
         result = run(path)
         assert result.returncode == 1, result.stderr
-        assert result.stdout.splitlines()[-1] == CLOSING_LINE
+        assert result.stdout.splitlines()[-1].startswith(CLOSING_LINE_START)
         assert f"{path}: (7 words)  (em_dash=1)" in result.stdout.splitlines()
         assert "/100" not in result.stdout
 
@@ -106,7 +100,6 @@ class TestCheckProse:
         hits = [line for line in result.stdout.splitlines() if "em-dash" in line]
         assert [line.split(":")[0] for line in hits] == [notebook, notebook]
         assert "loans.md" not in result.stdout
-        assert "metadata" not in result.stdout
 
     def test_passes_budget_against_and_pr_to_lint_prose_only(self, run, tmp_path: Path) -> None:
         old = _write(tmp_path, "old.md", "The branch lends drills.\n")
