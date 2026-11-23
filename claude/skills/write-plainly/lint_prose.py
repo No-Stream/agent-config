@@ -658,7 +658,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
         "--budget", type=_positive_int, metavar="N", help="report main text over 110%% of N words"
     )
     parser.add_argument(
-        "--against", metavar="OLD", help="report growth against OLD, the version this revises"
+        "--against",
+        metavar="OLD",
+        help="report growth against OLD, the version a cleanup or review pass revises",
     )
     parser.add_argument(
         "--pr", action="store_true", help="check the shape of a pull request description"
