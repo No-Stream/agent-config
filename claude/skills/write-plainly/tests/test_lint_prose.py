@@ -771,26 +771,22 @@ class TestExcerpt:
         assert "may possibly" in finding.excerpt
 
 
+def _run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
+    script_path = Path(lint_prose.__file__).resolve()
+    return subprocess.run(
+        [sys.executable, str(script_path), *arguments], capture_output=True, text=True, check=False
+    )
+
+
 class TestCli:
     def test_exit_codes_and_json_output(self, tmp_path: Path) -> None:
-        script_path = Path(lint_prose.__file__).resolve()
         clean_path = tmp_path / "clean.md"
         flagged_path = tmp_path / "flagged.md"
         clean_path.write_text("A clear sentence.\n", encoding="utf-8")
         flagged_path.write_text("An em dash — here.\n", encoding="utf-8")
 
-        clean_result = subprocess.run(
-            [sys.executable, str(script_path), str(clean_path)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        flagged_result = subprocess.run(
-            [sys.executable, str(script_path), "--json", str(flagged_path)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        clean_result = _run_cli(str(clean_path))
+        flagged_result = _run_cli("--json", str(flagged_path))
 
         assert clean_result.returncode == 0
         assert flagged_result.returncode == 1
@@ -845,10 +841,3 @@ class TestCli:
         assert _run_cli(missing).returncode == 2
         assert _run_cli(str(path), missing).returncode == 2
         assert _run_cli("--against", missing, str(path)).returncode == 2
-
-
-def _run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
-    script_path = Path(lint_prose.__file__).resolve()
-    return subprocess.run(
-        [sys.executable, str(script_path), *arguments], capture_output=True, text=True, check=False
-    )
