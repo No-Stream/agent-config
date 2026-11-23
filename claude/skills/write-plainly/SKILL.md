@@ -5,7 +5,7 @@ description: Use when writing, co-drafting or revising nonfiction prose that peo
 
 # Write plainly
 
-Write so the reader understands on the first reading, with the least effort. Preserve accuracy and meaning first; then aim for clarity, information density, intuitive explanation, and rigor without verbosity. A document should take longer to write than to read, and every sentence in it should be about this particular work. The register is casual, straightforward and a bit breezy, and also direct and literal: plain words, with no metaphor, flash, or sales and search-engine language. From technical standards take only their precision: stable terms, modality treated as content, explicit conditions, and claims the reader can check. First person, contractions, and direct judgments are fine.
+Write so the reader understands on the first reading, with the least effort. Preserve accuracy and meaning first; then aim for clarity, information density, intuitive explanation, and rigor without verbosity. A document should take longer to write than to read, and every sentence should be about this particular work. The register is casual, straightforward and a bit breezy, and also direct and literal: plain words, with no metaphor, flash, or sales and search-engine language. From technical standards take only their precision: stable terms, modality treated as content, explicit conditions, and claims the reader can check. First person, contractions, and direct judgments are fine.
 
 Sounding human gets little weight, and sounding polished or impressive gets none. The obvious model tics still matter, because a reader who spots an em dash or a reflexive "not X, but Y" stops reading carefully.
 
@@ -124,7 +124,7 @@ A message drafted for the user to send to a colleague, such as a chat post, an e
 
 ## Edit by removing
 
-A revision, cleanup or review pass should leave the main text shorter. Delete, replace and restructure first, and before adding a sentence, check whether an existing one can carry the point.
+A cleanup or review pass should leave the main text shorter. Delete, replace and restructure first, and before adding a sentence, check whether an existing one can carry the point.
 
 Sort weak sentences into two kinds. A fixable sentence has a real claim under bad prose: rewrite it to state that claim. A hollow sentence has no claim to recover (it restates, announces, or praises): delete it. A sentence that would fit just as well in a document about a different project is generic: replace it with the specific thing this work found, or delete it.
 
@@ -146,7 +146,7 @@ For a design doc, proposal, report, or similar document written with the user, w
 
 Run these checks once, in order.
 
-1. Run `~/.claude/skills/write-plainly/check-prose.sh FILE` on the draft. It runs sloplint, slop-guard and `lint_prose.py`. Pass the outline's word budget with `--budget N`, the version a revision replaces with `--against OLD`, and `--pr` for a pull request or code-review description.
+1. Run `~/.claude/skills/write-plainly/check-prose.sh FILE` on the draft. It runs sloplint, slop-guard and `lint_prose.py`. Pass the outline's word budget with `--budget N`, the version a cleanup or review pass replaces with `--against OLD`, and `--pr` for a pull request or code-review description.
 2. Triage the findings once; never rerun the linters to chase a clean run. Fix every em dash, high-confidence sloplint note, and `stands-serves-as`, `same-determiner-chain` or `pithy_fragment` hit unless it names something literally. Fix a finding whose message starts with "Check:" only when the flagged text is a real instance. A finding asks for a structural change (a table, a cut, regrouped content, a rewrite of the sentence's claim), and rewording to slip past the pattern is the same defect in another form. Spelling numbers out, splitting or adding sentences, and swapping in a synonym are such rewordings. Treat a single word-level hit ("pivotal") as a prompt to check that the word is literal and earned. Skip findings in quoted material, code, and tables.
 3. Search the draft for passives (`lint_prose.py` flags only those that name an actor) and make each active unless the actor is unknown or irrelevant. Compare against the source for numbers, negation, modality, scope, and attribution.
 4. For a standalone document others will read, run the review by a fresh reader below. A linked appendix gets steps 1 and 2 only.
