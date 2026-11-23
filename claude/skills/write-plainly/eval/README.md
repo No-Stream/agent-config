@@ -189,7 +189,7 @@ How the rules decide:
 
 No rule was dropped. Three proposed forms were left out because they flagged good prose. `history-in-document` does not read "an early version of the", which a held-out page uses for a book section first published as an article, and which also covers "an earlier version of the census". It reads "earlier drafts" and "earlier revisions" but not "earlier write-ups" or "prior readouts", which in the owner's model text named earlier published studies. `number-notation` reads "of" and "out of" before a base only after "every", so a score passes.
 
-`supporting-statistic` replaced two simpler caps on numbers, which flag more careful human prose than `number-density` does when numbers are counted the same way. A cap of two per sentence flags nothing that `number-density`'s cap of two per paragraph does not already flag.
+`supporting-statistic` replaced two simpler caps on numbers, which flag more careful human prose than `number-density` does when numbers are counted the same way, in a run on 2026-11-22. A cap of two per sentence flags nothing that `number-density`'s cap of two per paragraph does not already flag.
 
 | cap on body prose | human hits per 1,000 words | human texts hit |
 |---|---|---|
