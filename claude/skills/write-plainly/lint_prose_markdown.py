@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from lint_prose_patterns import QUOTATION
@@ -329,3 +329,31 @@ def top_sections(blocks: list[Block]) -> list[tuple[Block | None, list[Block]]]:
         else:
             sections[-1][1].append(block)
     return sections
+
+
+def nested_sections(blocks: list[Block]) -> list[tuple[Block, list[Block]]]:
+    """Pair each heading, except a lone H1 title, with the blocks up to the next heading of its
+    level or higher, so a section holds its subsections."""
+    headings = [index for index, block in enumerate(blocks) if block.kind == "heading"]
+    titles = [index for index in headings if heading_level(blocks[index].text) == 1]
+    sections: list[tuple[Block, list[Block]]] = []
+    for index in headings:
+        if titles == [index]:
+            continue
+        level = heading_level(blocks[index].text)
+        end = next(
+            (
+                later
+                for later in headings
+                if later > index and heading_level(blocks[later].text) <= level
+            ),
+            len(blocks),
+        )
+        sections.append((blocks[index], blocks[index + 1 : end]))
+    return sections
+
+
+def pr_appendix_as_back_matter(blocks: list[Block]) -> list[Block]:
+    """Mark the blocks below a pull request description's first horizontal rule as back matter."""
+    rule = next((index for index, block in enumerate(blocks) if block.kind == "break"), len(blocks))
+    return [*blocks[:rule], *(replace(block, section="back-matter") for block in blocks[rule:])]

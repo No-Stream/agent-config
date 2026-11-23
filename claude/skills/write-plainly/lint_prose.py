@@ -17,7 +17,6 @@ from lint_prose_document import (
     budget_findings,
     heading_density_findings,
     number_density_findings,
-    pr_appendix_as_back_matter,
     pr_shape_findings,
     revision_findings,
     section_findings,
@@ -40,6 +39,7 @@ from lint_prose_markdown import (
     masked_lines,
     ordered_items_by_line,
     parse_blocks,
+    pr_appendix_as_back_matter,
     sentence_spans,
     top_sections,
 )

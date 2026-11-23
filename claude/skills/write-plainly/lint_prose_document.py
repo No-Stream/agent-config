@@ -4,7 +4,6 @@ and revisions."""
 from __future__ import annotations
 
 import re
-from dataclasses import replace
 
 from lint_prose_markdown import (
     LIST_ITEM,
@@ -15,6 +14,7 @@ from lint_prose_markdown import (
     blank_match,
     heading_level,
     is_summary_heading,
+    nested_sections,
     sentence_count,
     sentence_spans,
 )
@@ -101,13 +101,6 @@ LINK_OR_URL = re.compile(r"\]\(|https?://")
 DIAGRAM_FENCE = re.compile(r"^\s*(?:```+|~~~+)\s*mermaid\b")
 
 
-def _section_headings(blocks: list[Block]) -> list[int]:
-    """Return the index of each heading block, leaving out a lone H1, which is the title."""
-    headings = [index for index, block in enumerate(blocks) if block.kind == "heading"]
-    titles = [index for index in headings if heading_level(blocks[index].text) == 1]
-    return [index for index in headings if len(titles) != 1 or index != titles[0]]
-
-
 def section_findings(blocks: list[Block]) -> list[Finding]:
     """Flag a section outside the back matter with less body than its level needs.
 
@@ -117,22 +110,11 @@ def section_findings(blocks: list[Block]) -> list[Finding]:
     groups subsections.
     """
     findings: list[Finding] = []
-    for index in _section_headings(blocks):
-        heading = blocks[index]
-        level = heading_level(heading.text)
-        end = next(
-            (
-                later
-                for later in range(index + 1, len(blocks))
-                if blocks[later].kind == "heading" and heading_level(blocks[later].text) <= level
-            ),
-            len(blocks),
-        )
-        body = blocks[index + 1 : end]
+    for heading, body in nested_sections(blocks):
         grouping = body and body[0].kind == "heading"
         if heading.section == "back-matter" or is_summary_heading(heading.text) or grouping:
             continue
-        if _is_thin(body, level) and not _is_reference_list(body):
+        if _is_thin(body, heading_level(heading.text)) and not _is_reference_list(body):
             findings.append(heading.finding("thin-section", 0))
     return findings
 
@@ -175,9 +157,9 @@ def heading_density_findings(blocks: list[Block], prose: list[Block]) -> list[Fi
     """Count the headings at every level below a lone H1 title and outside the back matter
     against a budget."""
     sections = [
-        blocks[index].first_line
-        for index in _section_headings(blocks)
-        if blocks[index].section != "back-matter"
+        heading.first_line
+        for heading, _ in nested_sections(blocks)
+        if heading.section != "back-matter"
     ]
     words = sum(len(WORD.findall(block.text)) for block in prose)
     budget = FREE_SECTIONS + words // WORDS_PER_EXTRA_SECTION
@@ -369,12 +351,6 @@ def _pr_summary_problems(summary: list[Block]) -> list[str]:
     if later_heading:
         problems.append("a heading after the title")
     return problems
-
-
-def pr_appendix_as_back_matter(blocks: list[Block]) -> list[Block]:
-    """Mark the blocks below a pull request description's first horizontal rule as back matter."""
-    rule = next((index for index, block in enumerate(blocks) if block.kind == "break"), len(blocks))
-    return [*blocks[:rule], *(replace(block, section="back-matter") for block in blocks[rule:])]
 
 
 def pr_shape_findings(blocks: list[Block]) -> list[Finding]:
