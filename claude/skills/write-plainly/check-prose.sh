@@ -47,16 +47,14 @@ for tool in python3 uvx sloplint; do
     fi
 done
 
+tmp_dir="$(mktemp -d)" || exit 2
+trap 'rm -rf "$tmp_dir"' EXIT
+
 # Each notebook is linted as a markdown copy; converted[i] is that copy of notebooks[i].
 notebooks=()
 converted=()
-tmp_dir=""
 as_markdown() {
     local notebook="$1"
-    if [ -z "$tmp_dir" ]; then
-        tmp_dir="$(mktemp -d)"
-        trap 'rm -rf "$tmp_dir"' EXIT
-    fi
     local markdown
     markdown="$tmp_dir/${#notebooks[@]}/$(basename "${notebook%.ipynb}").md"
     mkdir -p "$(dirname "$markdown")"
