@@ -77,7 +77,7 @@ The tests cover the manifest, the chunking, which texts get rescored, the summar
 
 ```sh
 uv run --no-project --python 3.12 --with pytest --with scipy --with boto3 --with torch \
-  --with transformers==5.23.0 --index https://download.pytorch.org/whl/cpu python -m pytest tests
+  --with transformers --index https://download.pytorch.org/whl/cpu python -m pytest tests
 ```
 
 ## Results on the public corpus
