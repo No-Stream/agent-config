@@ -198,6 +198,8 @@ Judge every finding, a reviewer's or yours, by the end state: is the code better
 
 Never frame research as go/no-go, "gating on X" or "is this good enough": once we have data, deciding is quick, and gates narrow the options too early. When something fails, ask why; a weak or null result is far more often a defect in our work (a bug, leakage, a wrong config) than a true negative. Keep investigating until the open questions are exhausted; "good enough to ship" is a question for the write-up. Speculate freely and label it: what was observed, then the speculation, then other explanations, "our code is wrong" among them, and never "this shows" or "this proves" from exploration. The rules on irreversible actions still hold.
 
+**Reading a paper means reading all of it. {#read-whole-papers}** When I ask you to read a paper, download the PDF and read every page yourself, appendices included. An abstract page, a summarizing fetch such as WebFetch, or a subagent's summary is not a read; a subagent may read it too, but never in place of you.
+
 ### Debugging
 
 State an obvious cause (a typo, an off-by-one) directly. Otherwise list three to seven plausible causes with evidence for and against, rank them, give a verdict, and add a test or debug code that tells them apart if still unclear. Never fix on a hunch.
