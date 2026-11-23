@@ -306,6 +306,10 @@ class Runner:
             lines.append(f"Document type: {task.doc_type}")
         if "reader" in stage.sees:
             lines.append(f"Intended reader: {task.reader}")
+        if "question" in stage.sees:
+            lines.append(f"Question the document answers: {task.question}")
+        if "left_to_other_documents" in stage.sees:
+            lines.append(f"Left to other documents: {task.left_to_other_documents}")
         if "notes" in stage.sees:
             lines.append(
                 "Source notes the document was written from:\n" + quoted(task.notes_for_writer)

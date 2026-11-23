@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -154,7 +155,7 @@ class TestRender:
         self, texts: list[false_flags.Text]
     ) -> None:
         hits, catalogs = false_flags.collect_hits(texts)
-        lines = false_flags.render(texts, hits, catalogs, ["techdoc"], "versions").splitlines()
+        lines = false_flags.render(texts, hits, catalogs, ["techdoc"], "Run date.").splitlines()
         corpora = lines.index("## Corpora") + 2
         assert lines[corpora : corpora + 10] == [
             "| side | register | texts | words | texts with markdown structure |",
@@ -223,14 +224,7 @@ class TestMain:
 
         assert capsys.readouterr().out == ""
         report = output.read_text(encoding="utf-8")
-        skill_modules = sorted(
-            Path(module.__file__).name
-            for module in list(sys.modules.values())
-            if getattr(module, "__file__", None)
-            and Path(module.__file__).resolve().parent == false_flags.SKILL_DIR
-        )
-        assert "lint_prose.py" in skill_modules
-        assert f"{', '.join(skill_modules)} sha256 " in report.splitlines()[2]
+        assert re.fullmatch(r"Run \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\.", report.splitlines()[2])
         assert "| **agent total** |  | 2 | 80 | 0 |" in report
         assert "| techdoc agent (41 w) |" in report
         assert (tmp_path / "rights.tsv").read_text(

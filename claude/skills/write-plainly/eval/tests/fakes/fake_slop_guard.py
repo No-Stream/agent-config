@@ -1,4 +1,4 @@
-"""Stand-in for `uvx --from slop-guard==V sg -j -c CONFIG FILE...`: counts "not only" per file."""
+"""Stand-in for `uvx --from slop-guard@latest sg -j -c CONFIG FILE...`: counts "not only" per file."""
 
 import json
 import sys

@@ -35,6 +35,8 @@ class Task:
     task_id: str
     doc_type: str
     reader: str
+    question: str
+    left_to_other_documents: str
     target_words: int
     notes: str
     sources: tuple[str, ...]
@@ -58,11 +60,18 @@ def load_tasks(task_files: Iterable[Path]) -> list[Task]:
                     f"{task_file}: task {entry['id']} target_words outside "
                     f"{MIN_PASSAGE_WORDS}-{MAX_PASSAGE_WORDS}"
                 )
+            blank = [
+                key for key in ("question", "left_to_other_documents") if not entry[key].strip()
+            ]
+            if blank:
+                raise ValueError(f"{task_file}: task {entry['id']} has an empty {', '.join(blank)}")
             tasks.append(
                 Task(
                     task_id=entry["id"],
                     doc_type=entry["doc_type"],
                     reader=entry["reader"],
+                    question=entry["question"],
+                    left_to_other_documents=entry["left_to_other_documents"],
                     target_words=entry["target_words"],
                     notes=entry["notes"].strip(),
                     sources=tuple(entry["sources"]),

@@ -159,8 +159,7 @@ class TestManifestFile:
 
 
 class TestRescoring:
-    @pytest.mark.parametrize("change", [{"window": 512}, {"revision": "0" * 40}])
-    def test_only_new_or_changed_texts_or_a_changed_detector_are_rescored(self, tmp_path, change):
+    def test_only_new_or_changed_texts_or_a_changed_window_are_rescored(self, tmp_path):
         detector = DETECTORS["desklib"]
         scores_file = tmp_path / "desklib.jsonl"
         old = {"same": "unchanged text", "edited": "old text", "gone": "removed text"}
@@ -173,7 +172,7 @@ class TestRescoring:
         kept, pending = split_pending(now, scores_file, detector)
         assert set(kept) == {"same"} and set(pending) == {"edited", "added"}
 
-        _, pending = split_pending(now, scores_file, dataclasses.replace(detector, **change))
+        _, pending = split_pending(now, scores_file, dataclasses.replace(detector, window=512))
         assert set(pending) == set(now)
 
     def test_write_scores_keeps_manifest_order_and_reports_unscored(self, tmp_path):

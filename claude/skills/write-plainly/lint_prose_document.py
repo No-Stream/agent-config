@@ -1,4 +1,5 @@
-"""Rules about a document's shape: its sections, paragraph runs, headings, numbers and summary."""
+"""Rules about a document's shape: its sections, paragraphs, headings, numbers, summary, length
+and revisions."""
 
 from __future__ import annotations
 
@@ -11,16 +12,18 @@ from lint_prose_markdown import (
     Block,
     Finding,
     blank_match,
+    first_rule,
     heading_level,
     is_summary_heading,
+    nested_sections,
     sentence_count,
     sentence_spans,
-    top_sections,
 )
 from lint_prose_patterns import (
     ARITHMETIC,
     LABELED_BRACKET_INTERVAL,
     LARGE_SPELLED_NUMBER,
+    MEASURED_NUMBER_WORD,
     MULTIPLE_WITHOUT_NUMBER_WORD,
     NOT_A_NUMBER,
     NUMBER,
@@ -33,25 +36,35 @@ from lint_prose_patterns import (
 NUMBERS_PER_BLOCK = 2
 NUMBERS_PER_100_WORDS = 2
 MIN_BODY_WORDS_FOR_DENSITY = 100
-FREE_TOP_LEVEL_SECTIONS = 6
+FREE_SECTIONS = 6
 WORDS_PER_EXTRA_SECTION = 400
 MAX_SUMMARY_SENTENCES = 8
 MAX_SUMMARY_NUMBERS = 4
+MIN_FULL_PARAGRAPH_SENTENCES = 4
+BUDGET_TOLERANCE_PERCENT = 110
+MAX_PR_SUMMARY_SENTENCES = 6
+MAX_PR_SUMMARY_WORDS = 150
+PR_SUMMARY_BLOCK_NAMES = {"list-item": "a list", "table": "a table", "code": "a code block"}
 
 DOCUMENT_MESSAGES = {
-    "thin-h2-section": (
-        "Section has little body; merge it into a neighbor or make it a minor heading."
+    "thin-section": (
+        "Section has less than its level needs: two blocks under an h1 or h2, and under a lower"
+        f" heading a full paragraph's worth of prose, {MIN_FULL_PARAGRAPH_SENTENCES} sentences in"
+        " its paragraphs. Merge it into a neighboring section, or fold a subsection into its"
+        " parent's prose. Demoting the heading or padding the section is not a fix."
     ),
     "short-paragraph-run": (
         "Run of very short paragraphs; combine related sentences and state how they connect."
     ),
     "heading-density": (
-        "More top-level sections than the length supports; merge sections or nest them."
+        "More sections than the length supports; merge sections into paragraphs under fewer"
+        " headings. Demoting a heading is not a fix."
     ),
     "number-density": (
         "Too many numbers for body prose. Move them into a table or figure, or cut the ones the"
         " reader does not need, and keep only the headline numbers in prose. Spelling a number"
-        ' out or rewording it ("all but four") is not a fix.'
+        ' out, writing it as a fraction or as a measured amount in words ("three cents"), or'
+        ' rewording it ("all but four") is not a fix.'
     ),
     "supporting-statistic": (
         "Check: a statistic that supports a result (advisory), such as a test statistic, degrees"
@@ -65,25 +78,60 @@ DOCUMENT_MESSAGES = {
         " numbers; keep what and why, the main findings and the ask. Spelling numbers out or"
         " joining sentences is not a fix."
     ),
+    "over-budget": (
+        "Main text is over its word budget; cut whole paragraphs or sections, or move them to the"
+        " linked appendix. Trimming words inside sentences is not a fix."
+    ),
+    "revision-growth": (
+        "Main text is longer than in the version this revises; a cleanup or review pass should"
+        " leave it shorter. Delete, replace and restructure before adding, and cut a sentence for"
+        " each one you add. Compressing sentences to get under the old count is not a fix."
+    ),
+    "appendix-growth": (
+        "Check: the appendix and footnotes grew in this revision (advisory). Detail moved out of"
+        " the main text belongs there; add new detail only if a reader of the appendix needs it."
+    ),
+    "pr-shape": (
+        "Open with four to six plain sentences on the main change, for reviewers, then a"
+        " horizontal rule (---); lists, tables, code, details and the repo's template go below it"
+        " as the appendix. Joining sentences to meet the count is not a fix."
+    ),
 }
 
 LINK_OR_URL = re.compile(r"\]\(|https?://")
+DIAGRAM_FENCE = re.compile(r"^\s*(?:```+|~~~+)\s*mermaid\b")
 
 
 def section_findings(blocks: list[Block]) -> list[Finding]:
-    """Flag an H2 section whose body is a single block or a single list."""
+    """Flag a section outside the back matter with less body than its level needs.
+
+    A section runs to the next heading of its level or higher, so it holds its subsections. An H1
+    or H2 needs two blocks, and a lower heading a full paragraph's worth of prose: four sentences
+    in its paragraphs, however they are split. A heading followed straight by a deeper heading only
+    groups subsections.
+    """
     findings: list[Finding] = []
-    for heading, body in top_sections(blocks):
-        if heading is None or heading_level(heading.text) != 2:
+    for heading, body in nested_sections(blocks):
+        grouping = body and body[0].kind == "heading"
+        if heading.section == "back-matter" or is_summary_heading(heading.text) or grouping:
             continue
-        if is_summary_heading(heading.text):
-            continue
-        kinds = [block.kind for block in body if block.kind not in ("heading", "break")]
-        pairs = zip(["", *kinds], kinds)
-        merged = [kind for previous, kind in pairs if not (kind == previous == "list-item")]
-        if len(merged) < 2 and not _is_reference_list(body):
-            findings.append(heading.finding("thin-h2-section", 0))
+        if _is_thin(body, heading_level(heading.text)) and not _is_reference_list(body):
+            findings.append(heading.finding("thin-section", 0))
     return findings
+
+
+def _is_thin(body: list[Block], level: int) -> bool:
+    if level > 2:
+        sentences = sum(sentence_count(block.text) for block in body if block.kind == "paragraph")
+        return sentences < MIN_FULL_PARAGRAPH_SENTENCES
+    content = [block for block in body if block.kind not in ("heading", "break")]
+    pairs = zip([None, *content], content)
+    merged = [
+        block
+        for previous, block in pairs
+        if not (previous and previous.kind == block.kind == "list-item")
+    ]
+    return len(merged) < 2
 
 
 def _is_reference_list(body: list[Block]) -> bool:
@@ -106,20 +154,23 @@ def short_paragraph_findings(blocks: list[Block]) -> list[Finding]:
     return findings
 
 
+def _words(blocks: list[Block]) -> int:
+    return sum(len(WORD.findall(block.text)) for block in blocks)
+
+
 def heading_density_findings(blocks: list[Block], prose: list[Block]) -> list[Finding]:
-    """Count sections at the shallowest heading level below a lone H1 title against a budget."""
-    levels = [
-        (block.first_line, heading_level(block.text)) for block in blocks if block.kind == "heading"
+    """Count the headings at every level below a lone H1 title and outside the back matter
+    against a budget."""
+    sections = [
+        heading.first_line
+        for heading, _ in nested_sections(blocks)
+        if heading.section != "back-matter"
     ]
-    if [level for _, level in levels].count(1) == 1:
-        levels = [(line, level) for line, level in levels if level != 1]
-    top = min((level for _, level in levels), default=0)
-    sections = [line for line, level in levels if level == top]
-    words = sum(len(WORD.findall(block.text)) for block in prose)
-    budget = FREE_TOP_LEVEL_SECTIONS + words // WORDS_PER_EXTRA_SECTION
+    words = _words(prose)
+    budget = FREE_SECTIONS + words // WORDS_PER_EXTRA_SECTION
     if len(sections) <= budget:
         return []
-    summary = f"{len(sections)} top-level sections; {budget} fit {words} words of prose"
+    summary = f"{len(sections)} sections; {budget} fit {words} words of prose"
     return [Finding("heading-density", sections[budget], 1, summary)]
 
 
@@ -128,12 +179,17 @@ def _number_count(sentence: str) -> int:
     numbers = [match.group() for match in NUMBER.finditer(masked)]
     counted = [number for number in numbers if not YEAR_ORDINAL_OR_VERSION.fullmatch(number)]
     spelled = [
-        match
+        match.span()
         for match in SPELLED_NUMBER.finditer(masked)
         if match.group("not_a_count") or LARGE_SPELLED_NUMBER.search(match.group())
     ]
+    measured = [
+        match
+        for match in MEASURED_NUMBER_WORD.finditer(masked)
+        if not any(start < match.end() and match.start() < end for start, end in spelled)
+    ]
     multiples = MULTIPLE_WITHOUT_NUMBER_WORD.findall(masked)
-    return len(counted) + len(spelled) + len(multiples)
+    return len(counted) + len(spelled) + len(measured) + len(multiples)
 
 
 def _sentences(block: Block) -> list[str]:
@@ -221,3 +277,92 @@ def summary_findings(blocks: list[Block]) -> list[Finding]:
             measurement = f"summary has {sentences} sentences and {numbers} numbers"
             findings.append(Finding("tldr-shape", heading_line, 1, measurement))
     return findings
+
+
+def _main_text_words(blocks: list[Block]) -> int:
+    """Count the words of paragraphs and list items outside the back matter.
+
+    Headings, tables, figures, captions, code, quotations and footnotes are not main text.
+    """
+    return _words(
+        [
+            block
+            for block in blocks
+            if block.kind in ("paragraph", "list-item") and block.section != "back-matter"
+        ]
+    )
+
+
+def _appendix_words(blocks: list[Block]) -> int:
+    return _words(
+        [
+            block
+            for block in blocks
+            if block.kind in PROSE_KINDS
+            and (block.section == "back-matter" or block.kind == "footnote")
+        ]
+    )
+
+
+def budget_findings(blocks: list[Block], budget: int) -> list[Finding]:
+    """Flag main text more than a tenth over the agreed word budget."""
+    words = _main_text_words(blocks)
+    if words * 100 <= budget * BUDGET_TOLERANCE_PERCENT:
+        return []
+    measurement = f"main text has {words} words against a budget of {budget}"
+    return [Finding("over-budget", 1, 1, measurement)]
+
+
+def revision_findings(blocks: list[Block], old_blocks: list[Block]) -> list[Finding]:
+    """Flag a revision whose main text grew, and on a second line one whose appendix grew."""
+    findings: list[Finding] = []
+    words, old_words = _main_text_words(blocks), _main_text_words(old_blocks)
+    if words > old_words:
+        measurement = f"main text has {words} words against {old_words} in the old version"
+        findings.append(Finding("revision-growth", 1, 1, measurement))
+    appendix, old_appendix = _appendix_words(blocks), _appendix_words(old_blocks)
+    if appendix > old_appendix:
+        measurement = (
+            f"appendix and footnotes have {appendix} words against {old_appendix}"
+            " in the old version"
+        )
+        findings.append(Finding("appendix-growth", 1, 1, measurement))
+    return findings
+
+
+def _pr_summary_problems(summary: list[Block]) -> list[str]:
+    """Name what a pull request summary carries beyond a few plain sentences under one title."""
+    prose = [block for block in summary if block.kind in ("paragraph", "caption")]
+    sentences = sum(len(sentence_spans(block.text)) for block in prose)
+    words = _words(prose)
+    kinds = {block.kind for block in summary if not DIAGRAM_FENCE.match(block.source_lines[0])}
+    bold_lead_in = any(
+        block.kind == "paragraph" and block.source_lines[0].lstrip().startswith(("**", "__"))
+        for block in summary
+    )
+    later_heading = any(
+        block.kind == "heading" and position > 0 for position, block in enumerate(summary)
+    )
+    problems = []
+    if sentences > MAX_PR_SUMMARY_SENTENCES or words > MAX_PR_SUMMARY_WORDS:
+        problems.append(f"{sentences} sentences and {words} words")
+    problems += [name for kind, name in PR_SUMMARY_BLOCK_NAMES.items() if kind in kinds]
+    if bold_lead_in:
+        problems.append("a bold lead-in")
+    if later_heading:
+        problems.append("a heading after the title")
+    return problems
+
+
+def pr_shape_findings(blocks: list[Block]) -> list[Finding]:
+    """Flag a pull request description whose summary, above the first horizontal rule, is long or
+    carries a list, a table, code, a bold lead-in or a heading after one leading title."""
+    rule = first_rule(blocks)
+    problems = _pr_summary_problems([block for block in blocks[:rule] if block.kind != "masked"])
+    if not problems:
+        return []
+    listed = ", ".join(problems[:-1]) + " and " + problems[-1] if len(problems) > 1 else problems[0]
+    where = "summary above the first horizontal rule has"
+    if rule == len(blocks):
+        where = "no horizontal rule, and the whole description has"
+    return [Finding("pr-shape", 1, 1, f"{where} {listed}")]

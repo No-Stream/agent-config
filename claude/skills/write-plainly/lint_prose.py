@@ -9,12 +9,16 @@ import re
 import sys
 from collections.abc import Iterator, Sequence
 from dataclasses import asdict
+from itertools import groupby
 from pathlib import Path
 
 from lint_prose_document import (
     DOCUMENT_MESSAGES,
+    budget_findings,
     heading_density_findings,
     number_density_findings,
+    pr_shape_findings,
+    revision_findings,
     section_findings,
     short_paragraph_findings,
     summary_findings,
@@ -35,6 +39,7 @@ from lint_prose_markdown import (
     masked_lines,
     ordered_items_by_line,
     parse_blocks,
+    pr_appendix_as_back_matter,
     sentence_spans,
     top_sections,
 )
@@ -42,6 +47,7 @@ from lint_prose_patterns import (
     ACRONYM,
     ACRONYM_DEFINITION,
     ANNOUNCING_COLON,
+    ANNOUNCING_NOTES,
     ANNOUNCING_QUESTION,
     CAPITALIZED_RUN,
     CLEFT,
@@ -57,11 +63,14 @@ from lint_prose_patterns import (
     PHRASE_RULES,
     PRONOUN_I_AFTER_LABEL,
     PUBLIC_IDS,
+    PULL_REQUEST_FILE_NAME,
+    REVERSE_CLEFT,
     ROMAN_NUMERALS,
     SECTION_LABEL_HEADING,
     SECTION_LABEL_RUN_IN,
     SERIES,
     SHORT_CODE,
+    STACCATO_DETERMINERS,
     STANDARD_ID_PREFIXES,
     SYMBOL_IN_PROSE,
     TELL_RULES,
@@ -75,6 +84,8 @@ LONG_SENTENCE_MAX_PUNCTUATION = 1
 COMPLEX_SENTENCE_WORDS = 40
 FREE_COMPLEX_SENTENCES = 1
 ANNOUNCING_QUESTION_MAX_WORDS = 12
+STACCATO_MAX_WORDS = 12
+STACCATO_RUN = 3
 FREE_TRIADS_PER_SECTION = 2
 FREE_INTENSIFIERS_PER_SECTION = 2
 
@@ -84,8 +95,9 @@ MESSAGES = {
     "dash-substitute": "Dash used as a pause; use punctuation that shows how the clauses connect.",
     "coined-label": (
         "Check: label or ID that may have been coined during the work (advisory). Name the thing"
-        " by what it is, with any ID after that description, unless a smart reader outside the work would know it."
-        ' A reworded label ("step four", "the round-three fix") is still a label.'
+        " by what it is, with any ID after that description, unless a smart reader outside the"
+        ' work would know it. A reworded label ("step four", "the round-three fix") is still a'
+        " label."
     ),
     "bold-run-in": "Bold run-in heading; use a heading or plain prose.",
     "title-case-heading": "Heading looks like Title Case; use sentence case.",
@@ -102,29 +114,33 @@ MESSAGES = {
     ),
     "inverted-animacy-check": (
         "Check: a thing that earns, holds, buys or wins (advisory). Make the person the subject,"
-        " or say what the thing has or contains."
+        " or say what the thing has or contains. Another verb that gives the thing the same"
+        ' agency ("came out ahead") is not a fix.'
     ),
     "back-reference": (
         "Check: points back to earlier text (advisory). Restate the thing here so this text"
         " stands alone."
     ),
     "announcing-sentence": (
-        "Check: sentence only announces what follows (advisory). Say the point itself."
+        "Check: sentence only announces what follows (advisory). Say the point itself. Dropping"
+        ' the colon or a word such as "honest" still announces.'
     ),
     "stock-emphasis": (
         "Stock emphasis phrase; cut it, or state the fact that makes the point. Another emphasis"
         " phrase in its place is not a fix."
     ),
     "history-in-document": (
-        "Edit history in the text; state the current fact and drop what it replaced."
+        "Edit history in the text; state the current fact and drop what it replaced. Rewording"
+        ' the old state ("also called", "initially") is not a fix.'
     ),
     "all-caps-emphasis": (
         "Ordinary word in capitals; use italics or plain wording, or backticks if it is code."
     ),
     "rather-than": (
-        'Check: contrast with "rather than", ", not" or "less about ... more about" (advisory).'
-        " If no reader expects the alternative, state only what is true;"
-        ' "instead of" is the same contrast.'
+        "Check: a contrast with an alternative the reader may not hold (advisory). If no reader"
+        ' expects the alternative, state what the thing is and what follows from it ("the branch'
+        ' lends tools, so members can borrow a drill"). Swapping in "instead of", "as opposed to"'
+        " or a second sentence about what it is not is the same contrast."
     ),
     "american-spelling": (
         "British spelling; use the American form (color, center, license, organize, analyze,"
@@ -137,6 +153,23 @@ MESSAGES = {
     ),
     "cleft-sentence": (
         "Check: cleft sentence (advisory). Try the plain clause with the real subject first."
+        ' Moving the frame into another form ("is the thing that", "is why") is not a fix.'
+    ),
+    "power-read": (
+        "Check: a result read off the test's power, or a winner the intervals do not separate"
+        " (advisory). Give the point estimate and say in words how large an effect it is. If"
+        ' power matters, say it plainly ("the survey is too small to show a difference between'
+        ' branches, and we found none"), with the detectable size in a table or footnote. Show'
+        " overlapping results as ranks with their intervals."
+    ),
+    "universal-negative": (
+        "Check: a claim that nothing exists or ever happened (advisory). Say what you searched"
+        ' and that you found none ("we could not find a branch that..."); the same absolute'
+        ' claim in other words ("branches to date have not...") is not a fix.'
+    ),
+    "number-notation": (
+        "Write a share as a percentage (1.8%) and a ranking metric at a cutoff as NDCG@10."
+        ' "Per hundred", "in every 100" and spelled-out forms are the same notation.'
     ),
     "triad-density": (
         f"Check: more than {FREE_TRIADS_PER_SECTION} lists of three in this section (advisory);"
@@ -152,6 +185,10 @@ MESSAGES = {
     "complex-sentence": (
         f"Sentence of {COMPLEX_SENTENCE_WORDS} or more words; split it so each sentence makes"
         " one point."
+    ),
+    "staccato-run": (
+        "Check: a run of short sentences of the same shape (advisory). Join them into one sentence"
+        " or a list; changing their first words is not a fix."
     ),
     "borrowed-jargon": (
         "Check: a scientific term borrowed for weight (advisory). Unless the literal sense is"
@@ -394,9 +431,12 @@ def _sentence_shape(sentence: str) -> str | None:
     """Name the shape rule a sentence breaks: an announcement of what follows, or a cleft."""
     plain = re.sub(r"[*_]", "", " ".join(sentence.split())).replace("’", "'").lstrip("'(")
     short = len(WORD.findall(plain)) <= ANNOUNCING_QUESTION_MAX_WORDS
-    if ANNOUNCING_COLON.match(plain) or (short and ANNOUNCING_QUESTION.match(plain)):
+    if ANNOUNCING_COLON.match(plain) or ANNOUNCING_NOTES.match(plain):
         return "announcing-sentence"
-    if CLEFT.match(plain) and not plain.rstrip("')]").endswith("?"):
+    if short and ANNOUNCING_QUESTION.match(plain):
+        return "announcing-sentence"
+    cleft = CLEFT.match(plain) or REVERSE_CLEFT.search(plain)
+    if cleft and not plain.rstrip("')]").endswith("?"):
         return "cleft-sentence"
     return None
 
@@ -409,6 +449,32 @@ def _sentence_shape_findings(prose: list[Block]) -> list[Finding]:
             rule = _sentence_shape(text[start:end])
             if rule:
                 findings.append(block.finding(rule, start))
+    return findings
+
+
+def _staccato_key(words: list[str]) -> str | None:
+    """Key a sentence by its opening: None when it is long, one key for every determiner such as
+    "the" or "each", and otherwise its first word."""
+    if len(words) > STACCATO_MAX_WORDS:
+        return None
+    first_word = words[0].lower()
+    return "" if first_word in STACCATO_DETERMINERS else first_word
+
+
+def _staccato_findings(prose: list[Block]) -> list[Finding]:
+    """Flag the first of three or more short sentences in a paragraph that open the same way."""
+    findings: list[Finding] = []
+    for block in prose:
+        if block.kind != "paragraph":
+            continue
+        spans = sentence_spans(mask_quotations(block.text))
+        keyed = [
+            (start, _staccato_key(WORD.findall(block.text[start:end]))) for start, end in spans
+        ]
+        for key, run in groupby(keyed, key=lambda sentence: sentence[1]):
+            starts = [start for start, _ in run]
+            if key is not None and len(starts) >= STACCATO_RUN:
+                findings.append(block.finding("staccato-run", starts[0]))
     return findings
 
 
@@ -469,7 +535,7 @@ def _is_ordinary_word(token: str) -> bool:
 
 
 def _spells(acronym: str, words: str) -> bool:
-    """Whether the initials of the words, with or without small words, or their capitals spell it."""
+    """Whether the words' initials, with or without small words, or their capitals spell it."""
     parts = re.findall(r"[^\s-]+", words)
     initials = "".join(part[0] for part in parts)
     content_initials = "".join(part[0] for part in parts if part.lower() not in TITLE_SMALL_WORDS)
@@ -520,10 +586,23 @@ def _undefined_acronym_findings(prose: list[Block]) -> list[Finding]:
     return findings
 
 
-def lint_text(text: str) -> list[Finding]:
-    """Return conservative style findings, retaining original line locations."""
+def _blocks(text: str, pr: bool) -> tuple[list[str], list[str], list[Block]]:
+    """Return the source lines, the lines with markup blanked, and the blocks of a document; in a
+    pull request description, the part below the first horizontal rule is the appendix."""
     original_lines, visible_lines, line_kinds = masked_lines(text)
     blocks = parse_blocks(original_lines, visible_lines, line_kinds)
+    return original_lines, visible_lines, pr_appendix_as_back_matter(blocks) if pr else blocks
+
+
+def lint_text(
+    text: str, *, budget: int | None = None, against: str | None = None, pr: bool = False
+) -> list[Finding]:
+    """Return conservative style findings, retaining original line locations.
+
+    `budget` is the agreed main-text word count, `against` the text of the version this one
+    revises, and `pr` marks a pull request description; each turns on the rule that needs it.
+    """
+    original_lines, visible_lines, blocks = _blocks(text, pr)
     prose = [block for block in blocks if block.kind in PROSE_KINDS]
     headings = [block for block in blocks if block.kind == "heading"]
     findings = _line_findings(original_lines, visible_lines)
@@ -536,6 +615,7 @@ def lint_text(text: str) -> list[Finding]:
     findings.extend(_intensifier_findings(blocks))
     findings.extend(_sentence_findings(prose))
     findings.extend(_sentence_shape_findings(prose))
+    findings.extend(_staccato_findings(prose))
     findings.extend(_triad_findings(blocks))
     findings.extend(_all_caps_findings(prose))
     findings.extend(_undefined_acronym_findings(prose))
@@ -543,6 +623,13 @@ def lint_text(text: str) -> list[Finding]:
     findings.extend(supporting_statistic_findings(blocks))
     findings.extend(heading_density_findings(blocks, prose))
     findings.extend(summary_findings(blocks))
+    if budget is not None:
+        findings.extend(budget_findings(blocks, budget))
+    if against is not None:
+        _, _, old_blocks = _blocks(against, pr)
+        findings.extend(revision_findings(blocks, old_blocks))
+    if pr:
+        findings.extend(pr_shape_findings(blocks))
     return sorted(findings, key=lambda finding: (finding.line, finding.column, finding.rule))
 
 
@@ -552,15 +639,47 @@ def _read_input(path: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
+def _positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"must be a positive whole number, got {value}")
+    return number
+
+
+def _is_pr_description_name(path: str) -> bool:
+    """Whether a file name marks a pull request or code review description, as pr-body.md does."""
+    return bool(PULL_REQUEST_FILE_NAME.search(Path(path).name))
+
+
 def main(arguments: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", help="write findings as JSON")
+    parser.add_argument(
+        "--budget", type=_positive_int, metavar="N", help="report main text over 110%% of N words"
+    )
+    parser.add_argument(
+        "--against",
+        metavar="OLD",
+        help="report growth against OLD, the version a cleanup or review pass revises",
+    )
+    parser.add_argument(
+        "--pr", action="store_true", help="check the shape of a pull request description"
+    )
     parser.add_argument("inputs", nargs="+", metavar="INPUT", help="file path or - for stdin")
     options = parser.parse_args(arguments)
+    if options.against is not None and len(options.inputs) != 1:
+        parser.error("--against compares one input with OLD; give exactly one INPUT")
+    paths = [*options.inputs, *([] if options.against is None else [options.against])]
+    missing = [path for path in paths if path != "-" and not Path(path).is_file()]
+    if missing:
+        parser.error(f"no such file: {', '.join(missing)}")
+    against = None if options.against is None else _read_input(options.against)
     all_findings: list[dict[str, object]] = []
     text_findings: list[str] = []
     for input_path in options.inputs:
-        for finding in lint_text(_read_input(input_path)):
+        pr = options.pr or _is_pr_description_name(input_path)
+        findings = lint_text(_read_input(input_path), budget=options.budget, against=against, pr=pr)
+        for finding in findings:
             message = MESSAGES[finding.rule]
             all_findings.append({**asdict(finding), "message": message, "path": input_path})
             text_findings.append(

@@ -1,6 +1,9 @@
-import pytest
+from pathlib import Path
 
-from common import parse_ranking, ranks, word_count
+import pytest
+from conftest import STUB_TASKS
+
+from common import load_tasks, parse_ranking, ranks, word_count
 
 LETTERS = ("A", "B", "C", "D", "E")
 
@@ -8,6 +11,27 @@ LETTERS = ("A", "B", "C", "D", "E")
 class TestWordCount:
     def test_contractions_decimals_and_hyphenated_words_count_once(self) -> None:
         assert word_count("The model's error fell 3.5% — a well-known drop.") == 8
+
+
+class TestLoadTasks:
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            ('question = "Why does the kettle switch itself off?"', 'question = ""'),
+            (
+                'left_to_other_documents = "how to descale the kettle"',
+                'left_to_other_documents = " "',
+            ),
+        ],
+        ids=["empty-question", "blank-left-to-other-documents"],
+    )
+    def test_a_task_must_state_its_question_and_what_it_leaves_out(
+        self, tmp_path: Path, old: str, new: str
+    ) -> None:
+        tasks_file = tmp_path / "tasks.toml"
+        tasks_file.write_text(STUB_TASKS.replace(old, new))
+        with pytest.raises(ValueError):
+            load_tasks([tasks_file])
 
 
 class TestRanking:

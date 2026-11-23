@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from lint_prose_patterns import QUOTATION
@@ -20,6 +20,7 @@ BACK_MATTER_HEADING = re.compile(
     r"(?i)^(?:appendix\b.*|appendices|references|bibliography|notes|footnotes)$"
 )
 CAPTION_START = re.compile(r"(?i)^[*_]{0,3}(?:fig(?:ure)?\.?|table)\s+\d+[a-z]?\s*[.:]")
+MAX_CAPTION_SENTENCES = 2
 LIST_ITEM = re.compile(rf"^\s*{LIST_MARKER}\s+")
 FOOTNOTE_DEFINITION = re.compile(r"^\s*(?:\[\^[^\]]+\]:|[⁰¹²³⁴⁵⁶⁷⁸⁹]+\s)")
 IMAGE_LINE = re.compile(r"^\s*!\[")
@@ -99,7 +100,7 @@ class _BlockDraft:
         """Build the block; its lines are consecutive source lines from its first line."""
         text = "\n".join(self.lines)
         caption = CAPTION_START.match(text.lstrip()) or (
-            self.after_image and sentence_count(text) <= 2
+            self.after_image and sentence_count(text) <= MAX_CAPTION_SENTENCES
         )
         kind = "caption" if self.kind == "paragraph" and caption else self.kind
         first = self.first_line - 1
@@ -328,3 +329,36 @@ def top_sections(blocks: list[Block]) -> list[tuple[Block | None, list[Block]]]:
         else:
             sections[-1][1].append(block)
     return sections
+
+
+def nested_sections(blocks: list[Block]) -> list[tuple[Block, list[Block]]]:
+    """Pair each heading, except a lone H1 title, with the blocks up to the next heading of its
+    level or higher, so a section holds its subsections."""
+    headings = [index for index, block in enumerate(blocks) if block.kind == "heading"]
+    titles = [index for index in headings if heading_level(blocks[index].text) == 1]
+    sections: list[tuple[Block, list[Block]]] = []
+    for index in headings:
+        if titles == [index]:
+            continue
+        level = heading_level(blocks[index].text)
+        end = next(
+            (
+                later
+                for later in headings
+                if later > index and heading_level(blocks[later].text) <= level
+            ),
+            len(blocks),
+        )
+        sections.append((blocks[index], blocks[index + 1 : end]))
+    return sections
+
+
+def first_rule(blocks: list[Block]) -> int:
+    """Return the index of the first horizontal rule, or the number of blocks when there is none."""
+    return next((index for index, block in enumerate(blocks) if block.kind == "break"), len(blocks))
+
+
+def pr_appendix_as_back_matter(blocks: list[Block]) -> list[Block]:
+    """Mark the blocks below a pull request description's first horizontal rule as back matter."""
+    rule = first_rule(blocks)
+    return [*blocks[:rule], *(replace(block, section="back-matter") for block in blocks[rule:])]

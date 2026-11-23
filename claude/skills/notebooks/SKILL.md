@@ -5,21 +5,21 @@ description: Use when creating, editing, reviewing or running a Jupyter or marim
 
 # Notebooks
 
-A research notebook displays an analysis. A reader, person or agent, follows it top to bottom as named steps and trusts that every output and number came from the code it shows, run in order, on all the data.
+A research notebook displays an analysis. A reader follows it top to bottom as named steps and trusts that every output came from the code it shows, run in order, on all the data.
 
-Prose follows `write-plainly`, and figures follow `visualization`. In marimo, reactive execution re-runs a cell's dependents (or marks them stale in lazy mode), a cell shows its last expression, a plot cell ends with the figure rather than `plt.show()`, and the `.py` file saves no outputs; the IPython, `pl.Config` and batch-runner rules below do not apply.
+Prose follows `write-plainly`, checked with its `check-prose.sh`, and figures follow `visualization`. In marimo, reactive execution re-runs a cell's dependents (or marks them stale in lazy mode), a cell shows its last expression, a plot cell ends with the figure rather than `plt.show()`, and the `.py` file saves no outputs; the IPython, `pl.Config` and batch-runner rules below do not apply.
 
 ## Never shrink the data or the analysis to make a cell finish
 
-Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to get past an out-of-memory error or a slow cell: results computed on a subset read as full-data results. Never drop an estimator, arm, outcome window or section to save time either, or run a simulation below the scale its question is about. Fix the cause or ask first, note an approved reduction beside it, and check for reductions earlier edits inserted. Fine without asking: a display preview, a smoke run on a small slice whose numbers are never reported, pulling more data, and only as many simulation replications as the question needs.
+Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to get past an out-of-memory error or a slow cell: results computed on a subset read as full-data results. Never drop an estimator, arm, outcome window or section to save time, or run a simulation below the scale its question is about. Fix the cause or ask first, note an approved reduction beside it, and check for reductions earlier edits inserted. Fine without asking: a display preview, a smoke run on a small slice whose numbers are never reported, pulling more data, and only as many simulation replications as the question needs.
 
 ## Structure
 
-- Open with a cell that states the question, the data (source, population, time window, pull date), the result's status (final, interim, simulated, at what scale) and where the main results are; that cell renders the facts held in the config or data.
-- Before the first result, define each method, model or arm compared in a plain sentence, and call it everywhere (prose, table rows, labels, legends) by a plain name, the field's standard one where it exists, replacing any code coined during the work rather than prefixing it.
+- Open with a cell that states the question, the data (source, population, time window, pull date), the result's status (final, interim, simulated, at what scale) and where the main results are. That cell renders the facts held in the config or data.
+- Before the first result, define each method, model or arm compared in a plain sentence. Call it everywhere (prose, table rows, labels, legends) by a plain name, the field's standard one where it exists, replacing any code coined during the work rather than prefixing it.
 - Keep one population, unit, outcome window and estimator throughout; a section that changes one says so first.
 - Keep each cell to a few named steps, not one `run_everything(...)` call that hides them. Move substantial logic (more than about 20 lines of transforms, estimation or plotting) into an importable module, or into a helpers cell when it is display-only and one-off. Fix a library you own rather than work around it in a cell.
-- When new work varies something already in the notebook (another estimator, a wider sweep, a re-cut chart), extend that section; search the notebook before adding a cell. Put other new work where it belongs in the argument (main result, then support, then detail), not at the end. Replace what a change supersedes, drop debugging outputs once their bug is fixed, and when patches pile up, rebuild the notebook from an outline.
+- When new work varies something already in the notebook (another estimator, a wider sweep), extend that section; search the notebook before adding a cell. Put other new work where it belongs in the argument (main result, then support, then detail), not at the end. Replace what a change supersedes, drop debugging outputs once their bug is fixed, and when patches pile up, rebuild the notebook from an outline.
 - A notebook that replaces or summarizes earlier ones carries every analysis of theirs the question needs: read them all, reuse their code, and list what you leave out.
 - Write new code in Polars, keeping pandas only where the code already uses it; seed every random step, use repo-relative paths, and import column names, thresholds and paths from the project's config module.
 - Assert the facts a frame must satisfy (unique keys, row counts kept across a join, no nulls in a key, covariates dated before treatment) in the cell that builds it.
@@ -27,7 +27,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to get past 
 ## Outputs
 
 - Follow every figure and table with one or two plain sentences on what it shows and means for the question, quoting only the numbers the claim needs. When an output changes, check its markdown against it and fix what no longer holds.
-- Give each effect, and each difference between arms, as an estimate with its interval in the reader's units, never a verdict: no pass or fail. Claim no or negligible effect only from a narrow interval around zero, and say it is narrow. Call a winner only when the interval on the difference excludes zero; otherwise say the data cannot name one and why, name the leader as a labelled best guess, and say what would settle it.
+- Give each effect, and each difference between arms, as an estimate with its interval in the reader's units, never a pass or fail verdict. Claim no or negligible effect only from a narrow interval around zero, and say it is narrow. Call a winner only when the interval on the difference excludes zero; otherwise show the ranks with their intervals, mention the leader only as a tentative best guess outside the headline, and say what would settle it.
 - Never type a result, or the window, pull date, estimator or model behind one, into markdown or a figure title: render that text from the config, data and result objects (`display(Markdown(f"lift {res.lift:.1%}, 95% CI [{res.lo:.1%}, {res.hi:.1%}]"))`, or `mo.md(f"...")`), and tables as DataFrames. Assert any claim the prose depends on, such as a sign or an ordering, in the cell that computes it.
 - Open each section with the figure for its core comparison, then breakdowns (per segment, per fold); ablations and diagnostics go in an appendix. Say how a pooled result is weighted.
 - `display()` every frame: only a cell's last bare expression renders, and IPython's output cache keeps that object alive after `del`. Show each matplotlib figure once, with `plt.show()`.
@@ -43,7 +43,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to get past 
 - Before a long run of changed code, smoke-run the changed cells on a small slice or review them.
 - Never edit a notebook while a run that saves it is in flight; the run writes back the copy it loaded.
 - A tool's timeout on a live kernel does not stop the cell; check it before running it again.
-- Run a pipeline of notebooks in its documented order (ask which ones if not told), each in a fresh kernel that you stop before starting the next. Check that each output exists, has a plausible row count and was written by this run.
+- Run a pipeline of notebooks in its documented order (ask which ones if not told), each in a fresh kernel that you stop before starting the next. Check that each output exists, has a plausible row count and came from this run.
 - Before a big run, list kernels left holding memory, and check whose they are before killing any. Confirm a suspected out-of-memory kill in the Linux kernel log (`journalctl -k` or `dmesg`), since a tool can report a dead kernel as alive.
 
 ## Large data and slow cells

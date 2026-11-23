@@ -1,7 +1,7 @@
-#!/usr/bin/env -S uv run --script
+#!/usr/bin/env -S uv run --upgrade --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["trafilatura==2.3.1"]
+# dependencies = ["trafilatura"]
 # ///
 """Compare prose lint hit rates on careful human prose and on agent drafts.
 
@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.metadata
 import json
 import logging
 import re
@@ -44,12 +43,10 @@ PUBLIC_CORPORA = EVAL_DIR / "corpora.toml"
 PRIVATE_DIR = REPO_ROOT / ".private" / "eval"
 PRIVATE_CORPORA = PRIVATE_DIR / "corpora-private.toml"
 PRIVATE_OUTPUT = PRIVATE_DIR / "false-flags-private.md"
-LINT_PROSE_FILES = tuple(sorted(SKILL_DIR.glob("lint_prose*.py")))
-SLOP_GUARD_VERSION = "0.5.0"
 SLOP_GUARD = [
     "uvx",
     "--from",
-    f"slop-guard=={SLOP_GUARD_VERSION}",
+    "slop-guard@latest",
     "sg",
     "-j",
     "-c",
@@ -295,7 +292,7 @@ def render(
     hits: dict[tuple[str, str], Counter[str]],
     catalogs: dict[str, set[str]],
     breakdown: list[str],
-    versions: str,
+    run_date: str,
 ) -> str:
     by_side = {side: [text for text in texts if text.side == side] for side in SIDES}
     measured = sorted(
@@ -345,7 +342,7 @@ def render(
     lines = [
         "# Prose lint false-flag check",
         "",
-        versions,
+        run_date,
         "",
         "## Corpora",
         "",
@@ -388,18 +385,8 @@ def render(
     return "\n".join(lines)
 
 
-def _versions() -> str:
-    lint_prose_bytes = b"".join(path.read_bytes() for path in LINT_PROSE_FILES)
-    lint_prose_sha = hashlib.sha256(lint_prose_bytes).hexdigest()[:12]
-    lint_prose_names = ", ".join(path.name for path in LINT_PROSE_FILES)
-    sloplint_version = _run(["sloplint", "--version"]).strip()
-    run_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    return (
-        f"Run {run_at}: {lint_prose_names} sha256 {lint_prose_sha}, "
-        f"sloplint {sloplint_version}, "
-        f"slop-guard {SLOP_GUARD_VERSION} with slop-guard.jsonl, "
-        f"trafilatura {importlib.metadata.version('trafilatura')} for HTML conversion."
-    )
+def _run_date() -> str:
+    return f"Run {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}."
 
 
 def main() -> None:
@@ -420,7 +407,7 @@ def main() -> None:
     (CACHE_DIR / "rights.tsv").write_text("\n".join(rights) + "\n", encoding="utf-8")
     breakdown = [register for config in configs for register in config["breakdown"]]
     hits, catalogs = collect_hits(texts)
-    report = render(texts, hits, catalogs, breakdown, _versions())
+    report = render(texts, hits, catalogs, breakdown, _run_date())
     if options.private:
         PRIVATE_OUTPUT.write_text(report, encoding="utf-8")
         logger.info(f"wrote {PRIVATE_OUTPUT}")

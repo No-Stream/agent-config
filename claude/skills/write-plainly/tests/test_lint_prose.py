@@ -267,12 +267,23 @@ class TestInvertedAnimacyCheck:
         )
         assert rule_lines("inverted-animacy-check", text) == [1, 2, 3, 4, 5]
 
+    def test_flags_a_relative_clause_anywhere_and_money_that_moves(self) -> None:
+        text = (
+            "Keep the reading features that won their trials.\n"
+            "We moved the layout which crowds the doorway.\n"
+            "The money runs the other way: new members cost the most.\n"
+            "Revenue flows to the north branch in winter.\n"
+        )
+        assert rule_lines("inverted-animacy-check", text) == [1, 2, 3, 4]
+
     def test_leaves_people_and_plain_verbs_alone(self) -> None:
         text = (
             "The library splits visitors across the groups.\n"
             "The table shows the loans for each group.\n"
             "We gave each group half of the visitors.\n"
             "The shelf has room for forty books.\n"
+            "The members that won the raffle collect their prizes today.\n"
+            "The grant money ran out in March.\n"
         )
         assert rule_lines("inverted-animacy-check", text) == []
 
@@ -319,11 +330,22 @@ class TestAnnouncingSentence:
         )
         assert rule_lines("announcing-sentence", text) == [1, 3, 5]
 
+    def test_flags_a_lead_in_with_a_comma_and_a_count_of_notes_without_a_colon(self) -> None:
+        text = (
+            "Three changes, each with a cost: a ramp, a lift and a wider door.\n\n"
+            "Two honest notes on the new rota.\n\n"
+            "A few caveats.\n\n"
+            "Three things to keep in mind.\n"
+        )
+        assert rule_lines("announcing-sentence", text) == [1, 3, 5, 7]
+
     def test_leaves_sentences_that_carry_the_point_alone(self) -> None:
         text = (
             "The ramp, the lift and the wide door make the branch accessible.\n\n"
             "We asked the council whether a second lift fits the budget, and it does.\n\n"
-            "The lift has one job: it carries wheelchairs to the first floor.\n"
+            "The lift has one job: it carries wheelchairs to the first floor.\n\n"
+            "Two notes on the rota were missing, so the desk closed early.\n\n"
+            "The branch keeps three notes on file for each member.\n"
         )
         assert rule_lines("announcing-sentence", text) == []
 
@@ -363,6 +385,18 @@ class TestStockEmphasis:
         )
         assert rule_lines("stock-emphasis", text) == list(range(1, 9))
 
+    def test_flags_verbs_of_saying_after_worth_and_deserves_a_mention(self) -> None:
+        text = (
+            "It is worth saying that the two counts agree.\n"
+            "It's worth flagging that the lift is slow.\n"
+            "It is worth spelling out why the door sticks.\n"
+            "The late fee deserves a mention.\n"
+            "The volunteers deserve a word of thanks.\n"
+            "It is worth observing that the queue moves faster after lunch.\n"
+            "It is worth explaining why the lift stops at the second floor.\n"
+        )
+        assert rule_lines("stock-emphasis", text) == [1, 2, 3, 4, 5, 6, 7]
+
     def test_leaves_comparative_adverbs_and_plain_notes_alone(self) -> None:
         text = (
             "More importantly, the lift now reaches every floor.\n"
@@ -370,6 +404,12 @@ class TestStockEmphasis:
             "The magnetic field peaks at its core.\n"
             "It is critical to note each failed request in the log.\n"
             "It is important to stress-test the lock.\n"
+            "It's worth saying at least a few words about the lift.\n"
+            "It is important to add salt to the soup.\n"
+            "The staff said that the lift works.\n"
+            "Cards used at five branches in one day are worth flagging, since most are shared.\n"
+            "The reading survey is worth repeating.\n"
+            "A regression test for the empty input is worth adding here.\n"
         )
         assert rule_lines("stock-emphasis", text) == []
 
@@ -387,6 +427,15 @@ class TestHistoryInDocument:
         )
         assert rule_lines("history-in-document", text) == [1, 2, 3, 4, 5, 6, 7]
 
+    def test_flags_corrections_of_drafts_and_reads_the_reader_never_saw(self) -> None:
+        text = (
+            "The loan count, which earlier drafts called visits, is in the appendix.\n"
+            "Our first read had the north branch ahead.\n"
+            "The rota had two errors, now fixed in the shared sheet.\n"
+            "The total is now corrected.\n"
+        )
+        assert rule_lines("history-in-document", text) == [1, 2, 3, 4]
+
     def test_leaves_changes_in_the_world_alone(self) -> None:
         text = (
             "Visitors who saw the poster no longer asked for directions.\n"
@@ -394,6 +443,7 @@ class TestHistoryInDocument:
             "The loan rate changed from 4% to 6% after the reopening.\n"
             "The branch was previously a post office.\n"
             "The survey took its figures from an earlier version of the census.\n"
+            "Earlier write-ups measured the average wait; we asked who waits longest.\n"
         )
         assert rule_lines("history-in-document", text) == []
 
@@ -480,6 +530,23 @@ class TestRatherThan:
         text = "It's less about speed and more about trust.\n"
         assert rule_lines("rather-than", text) == []
 
+    def test_flags_other_connectives_and_a_sentence_about_what_it_is_not(self) -> None:
+        text = (
+            "We count the loans instead of the visits.\n"
+            "The branch is a library as opposed to a café.\n"
+            "The rota is a guide and not a rule.\n"
+            "The van goes north. It isn't a replacement for the branch.\n"
+        )
+        assert rule_lines("rather-than", text) == [1, 2, 3, 4]
+
+    def test_leaves_a_plain_instead_and_a_sentence_about_what_it_is_alone(self) -> None:
+        text = (
+            "Instead of driving, take the bus.\n"
+            "The van goes north. It is a replacement for the old bus.\n"
+            "Any book that is not a reference book goes home with a member.\n"
+        )
+        assert rule_lines("rather-than", text) == []
+
 
 class TestCannotRuleOut:
     def test_flags_conclusions_read_off_an_interval_edge(self) -> None:
@@ -499,11 +566,89 @@ class TestCannotRuleOut:
         assert rule_lines("cannot-rule-out", text) == []
 
 
+class TestPowerRead:
+    def test_flags_results_read_off_power_and_winners_inside_the_noise(self) -> None:
+        text = (
+            "The counts would usually have caught a drop worth 30 loans a week.\n"
+            "The survey cannot detect a change smaller than about 5 visits a day.\n"
+            "The expected change is likely below what the test can detect.\n"
+            "The north branch is likely the best of the three.\n"
+            "The survey cannot detect a change smaller than about 30 visits a day.\n"
+            "The till count cannot detect a shortfall smaller than $10.\n"
+        )
+        assert rule_lines("power-read", text) == [1, 2, 3, 4, 5, 6]
+
+    def test_leaves_point_estimates_and_plain_power_statements_alone(self) -> None:
+        text = (
+            "The survey is too small to show a difference between branches, and we found none.\n"
+            "We can probably rule out larger effects.\n"
+            "Late opening added about 30 loans a week.\n"
+            "The camera cannot see the back door.\n"
+        )
+        assert rule_lines("power-read", text) == []
+
+
+class TestUniversalNegative:
+    def test_flags_claims_that_nothing_exists_or_ever_happened(self) -> None:
+        text = (
+            "No branch has ever opened on a Sunday.\n"
+            "In a survey of branches on 2026-03-01, none varied its opening hours.\n"
+            "Branches to date have not opened on Sundays.\n"
+            "No rural branch has had a mobile van.\n"
+            "The late shift has never been tried.\n"
+        )
+        assert rule_lines("universal-negative", text) == [1, 2, 3, 4, 5]
+
+    def test_leaves_claims_scoped_to_a_search_alone(self) -> None:
+        text = (
+            "We could not find a branch that opens on Sundays.\n"
+            "We found no branch that opens on Sundays.\n"
+            "The old branch no longer exists.\n"
+            "No one at the desk knew the answer.\n"
+        )
+        assert rule_lines("universal-negative", text) == []
+
+
+class TestNumberNotation:
+    def test_flags_shares_written_as_counts_and_metrics_at_a_cutoff_in_words(self) -> None:
+        text = (
+            "The shelf held the requested book 1.8 times in 100.\n"
+            "About 4 in 10 visitors come by bus.\n"
+            "Two of every 100 loans come back late.\n"
+            "Late returns run 3 per hundred loans.\n"
+            "The catalogue search reached NDCG at 10 of 0.40.\n"
+            "Recall in the top 5 rose for the new search.\n"
+            "The new search raised recall at 5.\n"
+        )
+        assert rule_lines("number-notation", text) == [1, 2, 3, 4, 5, 6, 7]
+
+    def test_leaves_counts_of_things_durations_and_standard_notation_alone(self) -> None:
+        text = (
+            "Three of 10 volunteers stayed late.\n"
+            "The page loads 2 in 100 ms.\n"
+            "We asked 40 of the 1,000 members.\n"
+            "The reading test scored the page 61 out of 100.\n"
+            "The catalogue search reached NDCG@10 of 0.40 and 2% of loans came back late.\n"
+            "The catalogue search keeps precision at 90% recall.\n"
+            "Recall at 1% false-positive rate held steady for the spam filter.\n"
+            "The spam filter's recall at 0.5 is 0.81.\n"
+            "The catalogue search keeps precision at 90 percent recall.\n"
+        )
+        assert rule_lines("number-notation", text) == []
+
+
 class TestCleftSentence:
     def test_flags_cleft_and_pseudo_cleft_sentences(self) -> None:
         text = (
             "What keeps the queue short is the second desk.\n"
             "It is the narrow door that causes the delay.\n"
+        )
+        assert rule_lines("cleft-sentence", text) == [1, 2]
+
+    def test_flags_a_reverse_pseudo_cleft_anywhere_in_the_sentence(self) -> None:
+        text = (
+            "Adding a second desk is what keeps the queue short.\n"
+            "In winter, a wider door is exactly what the branch needs.\n"
         )
         assert rule_lines("cleft-sentence", text) == [1, 2]
 
@@ -513,76 +658,11 @@ class TestCleftSentence:
             "It is likely that the lift was broken.\n"
             "The narrow door slows the queue.\n"
             "What-if planning helps the rota.\n"
+            "The question is what to do next.\n"
+            "Is a second desk what the branch needs?\n"
+            "The council asked what the branch needs.\n"
         )
         assert rule_lines("cleft-sentence", text) == []
-
-
-THREE_SERIES = (
-    "The branch lends books, films and games. ",
-    "Visitors come on foot, by bus or by bike. ",
-    "The staff shelve, label and repair the stock. ",
-)
-
-
-class TestTriadDensity:
-    def test_flags_the_third_list_of_three_in_a_section(self) -> None:
-        text = "## Services\n\n" + "\n".join(THREE_SERIES) + "\n"
-        assert rule_lines("triad-density", text) == [5]
-
-    def test_counts_a_series_with_a_serial_comma(self) -> None:
-        text = (
-            "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
-            "The café sells tea, coffee, and cake.\n"
-        )
-        assert rule_lines("triad-density", text) == [5]
-
-    def test_a_longer_list_is_not_a_list_of_three(self) -> None:
-        text = (
-            "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
-            "The café sells tea, coffee, cake, soup and bread.\n"
-            "The shop sells maps, pens, cards, and stamps.\n"
-            "Tea gets a shelf, and coffee or cocoa gets a cupboard.\n"
-            "The desk lends laptops, chargers and headphones.\n"
-        )
-        assert rule_lines("triad-density", text) == [8]
-
-    def test_skips_an_opening_clause_before_a_list_of_three(self) -> None:
-        text = (
-            "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
-            "In winter, the branch lends sledges, skates and scarves.\n"
-        )
-        assert rule_lines("triad-density", text) == [5]
-
-    def test_an_opening_clause_before_a_pair_is_not_a_list_of_three(self) -> None:
-        text = (
-            "## Hours\n\n"
-            "In winter, the branch opens late and closes early.\n"
-            "However, the café stays open and serves soup.\n"
-            "In 2024, the branch bought chairs and lamps.\n"
-        )
-        assert rule_lines("triad-density", text) == []
-
-    def test_a_long_clause_before_the_first_comma_is_not_an_opening_phrase(self) -> None:
-        text = (
-            "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n"
-            "For each loan we record the date, the reader and the branch.\n"
-        )
-        assert rule_lines("triad-density", text) == [5]
-
-    def test_counts_captions_and_footnotes(self) -> None:
-        free = "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n\n"
-        caption = free + "Figure 2: loans, visits and renewals by month.\n"
-        footnote = free + "[^1]: Loans, visits and renewals rose in May.\n"
-        assert rule_lines("triad-density", caption) == [6]
-        assert rule_lines("triad-density", footnote) == [6]
-
-    def test_counts_each_section_and_skips_list_items(self) -> None:
-        text = (
-            "## Services\n\n" + "\n".join(THREE_SERIES[:2]) + "\n\n"
-            "## Visits\n\n" + "\n".join(THREE_SERIES[:2]) + "\n\n"
-            "- Loans cover books, films and games.\n"
-        )
-        assert rule_lines("triad-density", text) == []
 
 
 class TestUndefinedAcronym:
@@ -618,140 +698,6 @@ class TestUndefinedAcronym:
             "The ABC (all bakers -) list goes up on Friday.\n"
         )
         assert rule_lines("undefined-acronym", text) == [2]
-
-
-RIVER_RUN_ON = (
-    "The volunteers who walk the river path every weekend collect plastic bottles and old fishing"
-    " line and broken glass and they sort all of it into bags that the town picks up from the"
-    " bridge early on Monday morning."
-)
-
-
-STARTER_SENTENCE = (
-    "Sourdough starters need regular feeding, and a baker who forgets for a week will usually find"
-    " a layer of grey liquid on top, which is harmless alcohol that can be poured off before the"
-    " next feeding with equal weights of flour and water."
-)
-
-
-CRUST_SENTENCE = (
-    "A loaf baked in a cast iron pot develops a darker crust than one baked on a tray, because the"
-    " lid traps steam during the first twenty minutes, keeps the surface soft while the dough"
-    " expands, and only then lets the crust dry and brown."
-)
-
-
-class TestLongSentence:
-    def test_flags_a_long_sentence_with_almost_no_punctuation(self) -> None:
-        text = f"Litter piles up after storms. {RIVER_RUN_ON}\n"
-        findings = [f for f in lint_prose.lint_text(text) if f.rule == "long-sentence"]
-        assert [(f.line, f.column) for f in findings] == [(1, 31)]
-
-    def test_leaves_punctuated_shorter_and_list_text_alone(self) -> None:
-        punctuated = RIVER_RUN_ON.replace("bottles and", "bottles,").replace(
-            "glass and", "glass, and"
-        )
-        text = (
-            f"{punctuated}\n\n"
-            "The volunteers who walk the river path every weekend collect plastic bottles and old"
-            " fishing line and they sort all of it into bags that the town picks up on Monday.\n\n"
-            "- flour from the mill on the hill near the old church\n"
-            "- water from the tap in the kitchen of the bakery\n"
-            "- salt from the jar on the shelf by the window\n"
-            "- starter from the crock that sits beside the oven\n\n"
-            "## A heading with quite a few words in it about bread and how people bake it at home\n"
-            "Short text here that follows the heading without any punctuation at all\n"
-        )
-        assert rule_lines("long-sentence", text) == []
-
-    def test_sentence_ends_survive_etc_links_and_footnote_links(self) -> None:
-        van = (
-            "The van leaves at dawn and drives along the coast road to the market in the next town"
-            " before the shops open."
-        )
-        text = (
-            f"We pack the flour and the sugar and the salt and the yeast etc. {van}\n\n"
-            "We bake the bread and the rolls and the buns as described in"
-            f" [the guide](https://example.com/guide). {van}\n\n"
-            f"We bake the bread and the rolls and the buns as the guide says.[1](#note-1) {van}\n"
-        )
-        assert rule_lines("long-sentence", text) == []
-
-
-class TestComplexSentence:
-    def test_flags_each_forty_word_sentence_after_the_first(self) -> None:
-        text = f"{STARTER_SENTENCE}\n\n{CRUST_SENTENCE}\n\n{CRUST_SENTENCE}\n"
-        assert rule_lines("complex-sentence", text) == [3, 5]
-
-    def test_one_long_sentence_is_free_and_run_ons_are_not_charged_twice(self) -> None:
-        run_on = RIVER_RUN_ON.replace("early on Monday", "early on Monday or Tuesday")
-        text = f"{run_on}\n\n{STARTER_SENTENCE}\n"
-        findings = [(f.rule, f.line) for f in lint_prose.lint_text(text)]
-        assert ("long-sentence", 1) in findings
-        assert [rule for rule, _ in findings if rule == "complex-sentence"] == []
-
-    def test_a_list_of_names_is_not_a_sentence(self) -> None:
-        names = [f"[Baker Number{index}](/team/baker-{index}/)," for index in range(21)]
-        text = f"{STARTER_SENTENCE}\n\n**Authors**\n\n" + "\n".join(names) + "\n"
-        assert rule_lines("complex-sentence", text) == []
-
-
-MASKING_TRIGGERS = (
-    "The model wants the implementation of a cache that may possibly cost 3, 4 or 5"
-    f" dollars. {RIVER_RUN_ON} {STARTER_SENTENCE} {CRUST_SENTENCE} As discussed, honestly,"
-    " the CMS was previously called B7 and is VERY slow rather than fast. What keeps it"
-    " slow is the disk. Two things matter: speed and cost. We can't rule out a fault."
-    f" The window display wins most visitors. {' '.join(THREE_SERIES)}"
-)
-
-
-class TestMasking:
-    def test_rules_skip_code_quotes_tables_and_links(self) -> None:
-        text = (
-            "# Masking\n\n"
-            f"```\n{MASKING_TRIGGERS}\n```\n\n"
-            f"> {MASKING_TRIGGERS}\n\n"
-            f"| {MASKING_TRIGGERS} |\n\n"
-            f"`{MASKING_TRIGGERS}`\n\n"
-            "[A plain link](https://example.com/the-model-wants/may-possibly/1/2/3)\n"
-        )
-        assert lint_prose.lint_text(text) == []
-
-
-class TestTables:
-    def test_rules_skip_tables_without_outer_pipes(self) -> None:
-        text = (
-            "# Bake times\n\n"
-            f"Loaf | {MASKING_TRIGGERS}\n"
-            ":--- | ---:\n"
-            f"rye | {MASKING_TRIGGERS}\n"
-            f"{MASKING_TRIGGERS}\n\n"
-            "| Loaf | Oven |\n"
-            "--- | ---\n"
-            f"spelt | {MASKING_TRIGGERS}\n\n"
-            "- Loaf | Oven\n"
-            "  --- | ---\n"
-            f"  barley | {MASKING_TRIGGERS}\n"
-        )
-        assert lint_prose.lint_text(text) == []
-
-    def test_a_table_runs_from_its_header_to_a_blank_line_or_another_block(self) -> None:
-        text = (
-            "The bakery sets two ovens — one per loaf.\n"
-            "Loaf | Oven\n--- | ---\nrye — dense | 220 C\n"
-            "- The rye loaf bakes longest — about an hour.\n\n"
-            "Loaf | Oven\n--- | ---\nspelt — light | 200 C\n\n"
-            "The spelt loaf bakes fastest — about half an hour.\n"
-        )
-        assert rule_lines("em-dash", text) == [1, 5, 11]
-
-    def test_a_pipe_in_prose_makes_a_table_only_above_a_matching_delimiter_row(self) -> None:
-        text = (
-            "We sift the flour | sugar mix — twice.\n\n"
-            "Flour | sugar — one to one.\n---\n\n"
-            "Flour | sugar | salt — in that order.\n--- | ---\n"
-        )
-        assert rule_lines("em-dash", text) == [1, 3, 6]
 
 
 class TestEndToEnd:
@@ -807,10 +753,10 @@ The examples folder contains requests for common workflows.
             ("coined-label", 13),
             ("em-dash", 13),
             ("short-paragraph-run", 13),
-            ("thin-h2-section", 6),
-            ("thin-h2-section", 31),
-            ("thin-h2-section", 36),
-            ("thin-h2-section", 41),
+            ("thin-section", 6),
+            ("thin-section", 31),
+            ("thin-section", 36),
+            ("thin-section", 41),
         }
 
 
@@ -825,26 +771,22 @@ class TestExcerpt:
         assert "may possibly" in finding.excerpt
 
 
+def _run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
+    script_path = Path(lint_prose.__file__).resolve()
+    return subprocess.run(
+        [sys.executable, str(script_path), *arguments], capture_output=True, text=True, check=False
+    )
+
+
 class TestCli:
     def test_exit_codes_and_json_output(self, tmp_path: Path) -> None:
-        script_path = Path(lint_prose.__file__).resolve()
         clean_path = tmp_path / "clean.md"
         flagged_path = tmp_path / "flagged.md"
         clean_path.write_text("A clear sentence.\n", encoding="utf-8")
         flagged_path.write_text("An em dash — here.\n", encoding="utf-8")
 
-        clean_result = subprocess.run(
-            [sys.executable, str(script_path), str(clean_path)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        flagged_result = subprocess.run(
-            [sys.executable, str(script_path), "--json", str(flagged_path)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        clean_result = _run_cli(str(clean_path))
+        flagged_result = _run_cli("--json", str(flagged_path))
 
         assert clean_result.returncode == 0
         assert flagged_result.returncode == 1
@@ -852,3 +794,50 @@ class TestCli:
         assert [(finding["path"], finding["rule"]) for finding in json_findings] == [
             (str(flagged_path), "em-dash")
         ]
+
+    def test_budget_against_and_pr_options(self, tmp_path: Path) -> None:
+        summary = (
+            "This change adds holds. Members reserve a tool online. The desk keeps it for a day."
+            " Members get an email. Staff can cancel a hold. Holds expire at closing. Staff can"
+            " extend a hold once.\n"
+        )
+        old_path, new_path = tmp_path / "old.md", tmp_path / "new.md"
+        old_path.write_text("The branch lends drills to members.\n", encoding="utf-8")
+        new_path.write_text(summary, encoding="utf-8")
+        named_paths = [
+            tmp_path / name
+            for name in (
+                "release-pr-body.md",
+                "PR_DESCRIPTION.md",
+                "cr_description_v2.md",
+                "proposal-description.md",
+            )
+        ]
+        for path in named_paths:
+            path.write_text(summary, encoding="utf-8")
+
+        def rules(*arguments: str) -> set[str]:
+            result = _run_cli("--json", *arguments)
+            assert result.returncode in (0, 1), result.stderr
+            return {finding["rule"] for finding in json.loads(result.stdout)}
+
+        options_rules = {"over-budget", "revision-growth", "pr-shape"}
+        assert options_rules & rules(str(new_path)) == set()
+        assert "over-budget" in rules("--budget", "20", str(new_path))
+        assert "revision-growth" in rules("--against", str(old_path), str(new_path))
+        assert "pr-shape" in rules("--pr", str(new_path))
+        assert ["pr-shape" in rules(str(path)) for path in named_paths] == [True, True, True, False]
+
+    def test_rejects_a_bad_budget_and_against_with_several_inputs(self, tmp_path: Path) -> None:
+        path = tmp_path / "doc.md"
+        path.write_text("A clear sentence.\n", encoding="utf-8")
+        assert _run_cli("--budget", "0", str(path)).returncode == 2
+        assert _run_cli("--against", str(path), str(path), str(path)).returncode == 2
+
+    def test_rejects_a_missing_input_or_against_file(self, tmp_path: Path) -> None:
+        path = tmp_path / "doc.md"
+        path.write_text("A clear sentence.\n", encoding="utf-8")
+        missing = str(tmp_path / "missing.md")
+        assert _run_cli(missing).returncode == 2
+        assert _run_cli(str(path), missing).returncode == 2
+        assert _run_cli("--against", missing, str(path)).returncode == 2

@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --script
+#!/usr/bin/env -S uv run --upgrade --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["scipy>=1.14"]
@@ -54,7 +54,7 @@ SKILL_CONTRASTS = ((SKILL_DRAFT, NO_SKILL),)
 PROVENANCE_CONTRAST = (CORPUS_MODEL, HUMAN)
 MIN_PAIRED_TOPICS = 2  # the fewest that give a paired interval
 OLD_TEXT_YEAR = 1930
-CPU_RESCORE, GPU_RESCORE = "./rescore.sh", "heavy --light -- uv run sagemaker_job.py run"
+CPU_RESCORE, GPU_RESCORE = "./rescore.sh", "heavy --light -- uv run --upgrade sagemaker_job.py run"
 ByArm = dict[str, dict[str, float]]
 Pairs = list[tuple[str, float, float]]
 OVERVIEW = (
@@ -293,7 +293,7 @@ def detector_section(
         [
             f"## {detector.name}",
             (
-                f"`{detector.model}`, revision {detector.revision}; score is the {detector.unit}, "
+                f"`{detector.model}`; score is the {detector.unit}, "
                 f"{direction} is more AI-like; window {detector.window} tokens. Cut-off {cutoff}: "
                 f"{detector.threshold_source}."
             ),

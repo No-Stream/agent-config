@@ -22,9 +22,6 @@ def _notes(path: str) -> list[dict]:
 
 def main() -> None:
     arguments = sys.argv[1:]
-    if arguments == ["--version"]:
-        print("0.10.0")
-        return
     if arguments == ["rules", "--json"]:
         print(json.dumps(CATALOG))
         return

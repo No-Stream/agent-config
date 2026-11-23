@@ -17,6 +17,7 @@ place where the revision changes, adds, or drops any of the following:
 - a condition or limitation on a claim;
 - a causal claim, or the strength of its verb;
 - an attribution, citation, or quotation;
+- a decision, ask, option, threshold, deadline, or process step;
 - a name, identifier, command, code span, or link target.
 
 For each change, say whether the earlier version supports the revised statement. If the task prompt also gives source
