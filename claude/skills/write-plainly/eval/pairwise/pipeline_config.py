@@ -10,7 +10,7 @@ from typing import ClassVar, get_args
 
 from agents import ClaudeSettings
 
-AGENT_SEES = ("passage", "doc_type", "reader", "notes")
+AGENT_SEES = ("passage", "doc_type", "reader", "question", "left_to_other_documents", "notes")
 
 
 @dataclass(frozen=True)

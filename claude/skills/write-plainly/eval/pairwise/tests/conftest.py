@@ -15,6 +15,8 @@ STUB_TASKS = '''
 id = "stub-kettle"
 doc_type = "README section"
 reader = "Ana, a new contributor who wants to know why the kettle switches itself off"
+question = "Why does the kettle switch itself off?"
+left_to_other_documents = "how to descale the kettle"
 target_words = 180
 notes = """
 - the kettle switches off when the water boils [1]
@@ -26,6 +28,8 @@ sources = ["[1] stub source"]
 id = "stub-bridge"
 doc_type = "Design-doc explanation"
 reader = "Ben, an engineer choosing between two bridge designs"
+question = "Which bridge design suits a long span?"
+left_to_other_documents = "the cost of each design"
 target_words = 200
 notes = """
 - a suspension bridge hangs its deck from cables [1]

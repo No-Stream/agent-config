@@ -7,6 +7,8 @@ from common import MAX_PASSAGE_WORDS, MIN_PASSAGE_WORDS, Task, read_list
 TASK_BRIEF = """\
 Document type: {doc_type}
 Intended reader: {reader}
+Question the document answers: {question}
+Left to other documents: {left_to_other_documents}
 Target length: about {target_words} words; stay between {min_words} and {max_words}.
 
 Source notes (the only facts you may use):
@@ -91,6 +93,8 @@ def task_brief(task: Task) -> str:
     return TASK_BRIEF.format(
         doc_type=task.doc_type,
         reader=task.reader,
+        question=task.question,
+        left_to_other_documents=task.left_to_other_documents,
         target_words=task.target_words,
         min_words=MIN_PASSAGE_WORDS,
         max_words=MAX_PASSAGE_WORDS,

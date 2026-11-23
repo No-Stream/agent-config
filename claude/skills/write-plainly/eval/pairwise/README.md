@@ -31,7 +31,7 @@ The analysis that unblinds the grades is not in this repo; it runs beside the pr
    ```
 6. Judge: `uv run judges.py --sets eval/sets.jsonl --skill ../../SKILL.md --out eval/judges --seed 20261120`. The judge calls run four at a time; `--jobs` changes that. A rerun skips sets already ranked; a ranking on disk of other passages or another letter order (from another sets file or seed) stops the run, so a different set needs a fresh `--out`. At the end it prints each judge's agreement with itself across the two orders.
 
-Tests: `uv run --no-project --with pytest --with scipy --with playwright==1.64.0 python -m pytest tests` from this directory. The runner and judge tests use stand-in `claude` and `codex` executables from `tests/fakes/`. The grading tests cover the page's HTML and the result line. They also drive the page's script in headless Chromium under the sandbox header: grading, clearing and changing a grade, a note, moving between tasks, restoring from `window.name` and from the `#` fragment, and recording the page's line. That test needs Playwright's Chromium (`uv run --no-project --with playwright==1.64.0 playwright install chromium` once) and is skipped when Playwright is not installed.
+Tests: `uv run --no-project --with pytest --with scipy --with playwright python -m pytest tests` from this directory. The runner and judge tests use stand-in `claude` and `codex` executables from `tests/fakes/`. The grading tests cover the page's HTML and the result line. They also drive the page's script in headless Chromium under the sandbox header: grading, clearing and changing a grade, a note, moving between tasks, restoring from `window.name` and from the `#` fragment, and recording the page's line. That test needs Playwright's Chromium (`uv run --no-project --with playwright playwright install chromium` once) and is skipped when Playwright is not installed. Playwright's driver also needs the system library `libatomic.so.1`.
 
 ## Grading
 
@@ -60,7 +60,7 @@ A TOML file with a `[run]` table, named linters, a `[fidelity]` table and one `[
 | `draft` | Starts the author conversation: reads the files in `read` (at least one), follows `instructions`, returns the passage. |
 | `bare_draft` | The model's own draft, for a baseline without guidance: it follows `instructions`, its prompt names no files and carries no path note, and the call gets no tools. The task text and the rules for the run are the same as a `draft`'s. |
 | `copied_draft` | Reuses the draft and author session of the pipeline named in `from_pipeline`, so two pipelines can share one draft and differ only in later stages. That pipeline's own first stage cannot be a `copied_draft`. It makes no call. |
-| `agent` | A fresh reviewer conversation. It takes either `agent_file` (a Claude Code subagent definition: its body is the system prompt, its frontmatter sets the model and tools) or a `brief`. `sees` picks what it gets: `passage`, `doc_type`, `reader`, `notes`; `read` lists files it must read first, and `model` overrides the model. Consecutive agent stages with the same `group` run in parallel. |
+| `agent` | A fresh reviewer conversation. It takes either `agent_file` (a Claude Code subagent definition: its body is the system prompt, its frontmatter sets the model and tools) or a `brief`. `sees` picks what it gets: `passage`, `doc_type`, `reader`, `question`, `left_to_other_documents`, `notes`; `read` lists files it must read first, and `model` overrides the model. Consecutive agent stages with the same `group` run in parallel. |
 | `author` | One more turn of the author conversation: `instructions`, the files in `read`, the output of the earlier agent stages named in `inputs`, and the output of the linters named in `lint`, run on the current passage. With `loop` (`lint`, `score_key`, `until`, `max_rounds`), the linter runs again after each turn until its score reaches `until` or the turns reach `max_rounds`. |
 | `fidelity_gate` | Counts the sentences changed since the earlier draft, author or gate stage named in `compare_to` (required). At `min_changed_sentences` (default 4) or more it runs the fidelity checker named in `agent_file` (required), and if that reports an unsupported change, one author turn with `instructions` fixes it. `model` overrides the checker's model. |
 
@@ -70,7 +70,7 @@ A stage takes only `name` and the keys the table gives for its kind. Any other k
 
 After all pipelines finish a task, one more call runs the fidelity checker on every pipeline's final passage against the task's notes, with the passages under neutral letters.
 
-Each call is `claude -p --safe-mode`: no CLAUDE.md, skills, hooks, plugins or MCP servers, so a pipeline sees only the files its prompt names. Agents get the Read tool and the directories the config lists. The author is one conversation; each author stage resumes it with `--fork-session`, so a failed turn reruns from the same starting point. Every call checks that the model it asked for is the one that served it.
+Each call is `claude -p --safe-mode`: no CLAUDE.md, skills, hooks, plugins or Model Context Protocol (MCP) servers, so a pipeline sees only the files its prompt names. Agents get the Read tool and the directories the config lists. The author is one conversation; each author stage resumes it with `--fork-session`, so a failed turn reruns from the same starting point. Every call checks that the model it asked for is the one that served it.
 
 ## Agent count
 
@@ -85,6 +85,8 @@ Judges make one call per judge, order and set: with five tasks, two orders and t
 id = "pub-example"
 doc_type = "README section"
 reader = "Ana, a new contributor who wants to know why the tool skips some files"
+question = "Why does the tool skip some files, and how can Ana make it read them?"
+left_to_other_documents = "the full syntax of the ignore file"
 target_words = 200
 notes = """
 - a fact, as a short note [1]
@@ -92,7 +94,7 @@ notes = """
 sources = ["[1] where the fact comes from"]
 ```
 
-`doc_type` is one of: Section of a research readout, Proposal paragraph, README section, Pull request description, Design-doc explanation. Citation markers like `[1]` or `[1, 2]` are stripped before the notes reach a writer.
+`doc_type` is one of: Section of a research readout, Proposal paragraph, README section, Pull request description, Design-doc explanation. `question` is the question the passage answers, and `left_to_other_documents` names what it leaves to other documents. Every draft prompt states both, since the author of a real document knows them, and an agent stage gets them only when its `sees` names them. Citation markers like `[1]` or `[1, 2]` are stripped before the notes reach a writer.
 
 ## Limits of the design
 
@@ -104,7 +106,7 @@ The judges are told to apply one pipeline's own guidance, so the readout measure
 
 ## Blind grades on the public tasks
 
-The skill's owner graded the passages of this evaluation without knowing which pipeline wrote which, giving each passage a letter grade from A+ to F. The graded run had five tasks. Two of them are public, both in `tasks/public.toml`: a proposal paragraph on replacing a dashboard's Wald interval for conversion rates (`pub-wilson-interval`), and a design-doc explanation of SQLite's journal modes for a job queue with several worker processes (`pub-sqlite-wal`). The other three tasks, the analysis and the full readout are private. Five pipelines wrote the passages, and the three merged ones read write-plainly at commit 26dc181:
+The skill's owner graded the passages of this evaluation without knowing which pipeline wrote which, giving each passage a letter grade from A+ to F. The graded run had five tasks. Two of them are public, both in `tasks/public.toml`: a proposal paragraph on replacing a dashboard's Wald interval for conversion rates (`pub-wilson-interval`), and a design-doc explanation of SQLite's journal modes for a job queue with several worker processes (`pub-sqlite-wal`). The other three tasks, the analysis and the full readout are private. Five pipelines wrote the passages on 2026-11-21, and the three merged ones read write-plainly as it stood that morning:
 
 - `current`: the owner's earlier writing skill, with its style-editing pass, a humanizer pass and a slop-guard loop.
 - `merged`: write-plainly with the owner's private work layer.

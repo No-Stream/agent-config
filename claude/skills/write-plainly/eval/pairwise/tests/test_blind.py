@@ -14,7 +14,16 @@ PAIRWISE_DIR = Path(__file__).resolve().parents[1]
 
 def make_tasks(count: int) -> list[Task]:
     return [
-        Task(f"task-{index}", "README section", f"Reader {index}", 200, "- a fact", ("[1] stub",))
+        Task(
+            task_id=f"task-{index}",
+            doc_type="README section",
+            reader=f"Reader {index}",
+            question=f"Question {index}?",
+            left_to_other_documents="nothing",
+            target_words=200,
+            notes="- a fact",
+            sources=("[1] stub",),
+        )
         for index in range(count)
     ]
 

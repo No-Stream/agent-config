@@ -4,6 +4,8 @@
 id = "pub-chinchilla-scaling"
 doc_type = "Section of a research readout"
 reader = "Marco, an ML engineer who has trained mid-size transformers but has not read the scaling-law papers; he has a fixed GPU budget for a new pretraining run and needs to know how to split it between model size and training tokens, and how far to trust that rule"
+question = "How should a fixed pretraining compute budget be split between model size and training tokens, and how far can that rule be trusted?"
+left_to_other_documents = "how the paper fitted its scaling laws"
 target_words = 220
 notes = """
 - question: fixed training compute budget; best split between parameter count N and training tokens D. "compute-optimal" = lowest loss reachable for that budget [1]
@@ -29,6 +31,8 @@ sources = [
 id = "pub-wilson-interval"
 doc_type = "Proposal paragraph"
 reader = "Hana, an analytics lead whose team dashboard shows conversion rates with 95% error bars from the textbook Wald formula, often on segments of a few dozen users; she knows what a confidence interval is but not the coverage literature, and must decide whether to change the dashboard's default interval"
+question = "Should the dashboard's default 95% interval for conversion rates change from the Wald interval, and to which interval?"
+left_to_other_documents = "how to compute the new interval in the dashboard's code"
 target_words = 190
 notes = """
 - Wald ("standard") interval: p-hat +/- z * sqrt(p-hat * (1 - p-hat) / n), p-hat = X/n. textbook default, near-universal in practice [1]
@@ -54,6 +58,8 @@ sources = [
 id = "pub-ripgrep-filtering"
 doc_type = "README section"
 reader = "Sam, a new contributor who uses grep daily but is new to ripgrep; Sam ran rg for a string they know is in the repo, got no match, and needs to know which default filters could be hiding the file and how to check"
+question = "Which of ripgrep's default filters could be hiding a file from a search, and how can a user check which one is?"
+left_to_other_documents = "how to write ignore-file patterns, and rg's other search and output options"
 target_words = 180
 notes = """
 - recursive search skips by default: paths matched by ignore files; hidden files and dirs; binary files. symlinks not followed [1]
@@ -80,6 +86,8 @@ sources = [
 id = "pub-requests-verify-pool"
 doc_type = "Pull request description"
 reader = "Priya, a requests maintainer reviewing this PR; she knows HTTPAdapter and urllib3 connection pooling well but has not seen the security report, and needs to judge whether the change closes the hole and what it could break for HTTPAdapter subclasses"
+question = "Does this change stop a Session's first verify=False request from turning off certificate checks for later requests to the same host, and what could it break for HTTPAdapter subclasses?"
+left_to_other_documents = "workarounds for users who stay on a version before 2.32.0"
 target_words = 200
 notes = """
 - report: in a Session, if the first request to an origin uses verify=False, later requests to that origin also skip certificate verification, even with verify=True set explicitly [1, 2, 6]
@@ -110,6 +118,8 @@ sources = [
 id = "pub-sqlite-wal"
 doc_type = "Design-doc explanation"
 reader = "Dana, a backend engineer who has used SQLite as a library but never tuned it, choosing a journal mode for a local job queue where several worker processes on one machine poll for jobs and claim them"
+question = "Which SQLite journal mode suits a local job queue whose worker processes on one machine poll for jobs and claim them, and what does that mode need?"
+left_to_other_documents = "how a worker claims a job without another worker taking it too, and the queue's table schema"
 target_words = 210
 notes = """
 - default rollback journal: copy original pages to a journal file, write changes into the db file; commit = journal deleted [1]

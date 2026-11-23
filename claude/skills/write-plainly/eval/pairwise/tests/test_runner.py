@@ -55,13 +55,13 @@ name = "base"
   kind = "agent"
   name = "reviewer"
   agent_file = "{skill_dir}/reviewer.md"
-  sees = ["passage", "reader", "doc_type", "notes"]
+  sees = ["passage", "reader", "doc_type", "question", "left_to_other_documents", "notes"]
   group = "review"
   [[pipeline.stage]]
   kind = "agent"
   name = "reader-test"
   brief = "List the questions a cold reader would ask."
-  sees = ["passage"]
+  sees = ["passage", "question"]
   group = "review"
   [[pipeline.stage]]
   kind = "author"
@@ -275,6 +275,9 @@ class TestFullRun:
     def test_reviewers_see_only_what_their_stage_names(self, full_run: FullRun) -> None:
         reader_tests = full_run.prompts_starting("List the questions")
         assert reader_tests and all("Intended reader" not in prompt for prompt in reader_tests)
+        assert all("Left to other documents" not in prompt for prompt in reader_tests)
+        (kettle_reader_test,) = [prompt for prompt in reader_tests if "kettle" in prompt]
+        assert "Question the document answers: Why does the kettle switch" in kettle_reader_test
         assert all(
             "bimetal" not in prompt and "suspension" not in prompt for prompt in reader_tests
         )
@@ -287,6 +290,8 @@ class TestFullRun:
         assert reviewer_prompts and all("Intended reader" in prompt for prompt in reviewer_prompts)
         (kettle_review,) = [prompt for prompt in reviewer_prompts if "kettle" in prompt]
         assert "Document type: README section" in kettle_review and "bimetal" in kettle_review
+        assert "Question the document answers: Why does the kettle switch" in kettle_review
+        assert "Left to other documents: how to descale the kettle" in kettle_review
         assert "[1]" not in kettle_review
         style_prompts = full_run.prompts_starting("Style pass.")
         assert style_prompts and all("Override for the variant." in p for p in style_prompts)
@@ -491,7 +496,7 @@ class TestConfigChecks:
             ('kind = "copied_draft"\n  name = "draft"\n  from_pipeline = "base"', READS_NOTHING),
             ('name = "reviewer"\n', 'name = "reviewer"\n  brief = "Review it."\n'),
             ('kind = "agent"\n  name = "style"', 'kind = "critic"\n  name = "style"'),
-            ('sees = ["passage"]\n  group', 'sees = ["passage", "mood"]\n  group'),
+            ('sees = ["passage", "question"]', 'sees = ["passage", "mood"]'),
             ('name = "reader-test"', 'name = "reviewer"'),
             ('name = "solo"', 'name = "base"'),
             ('inputs = ["style"]', 'inputs = ["draft"]'),
