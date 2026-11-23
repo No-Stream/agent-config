@@ -28,6 +28,12 @@ def _findings(rule: str, text: str, **options: object) -> list[tuple[int, str]]:
     ]
 
 
+FERRY = (
+    "The ferry leaves the north pier at seven. It crosses in about forty minutes. Bikes ride free"
+    " on the lower deck. The café opens once the ferry clears the harbor."
+)
+
+
 class TestThinSection:
     def test_counts_lists_tables_and_fenced_code_as_body_blocks(self) -> None:
         text = (
@@ -77,21 +83,30 @@ class TestThinSection:
         assert rule_lines("thin-section", text) == [1]
 
     def test_a_lower_heading_needs_a_full_paragraph(self) -> None:
-        full = (
-            "The ferry leaves the north pier at seven. It crosses in about forty minutes. Bikes"
-            " ride free on the lower deck. The café opens once the ferry clears the harbor."
-        )
         text = (
             "# Island guide\n\n"
-            f"## Getting there\n\n{full}\n\n"
+            f"## Getting there\n\n{FERRY}\n\n"
+            f"### Ferry\n\n{FERRY}\n\n"
             "### Tickets\n\nBuy tickets at the pier. The office opens at six.\n\n"
-            f"### Bikes\n\n{full}\n\n"
+            f"### Bikes\n\n{FERRY}\n\n"
             "#### Parking\n\n- the north lot\n- the harbor lot\n\n"
             "### Luggage\n\n"
             "### Pets\n\nDogs ride on the open deck.\n\n"
-            f"{full}\n"
+            f"{FERRY}\n"
         )
-        assert rule_lines("thin-section", text) == [7, 15, 20]
+        assert rule_lines("thin-section", text) == [11, 19, 24]
+
+    def test_a_full_paragraph_is_counted_across_the_paragraphs_of_a_lower_heading(self) -> None:
+        text = (
+            "# Island guide\n\n"
+            f"## Getting there\n\n{FERRY}\n\n"
+            "### Tickets\n\nBuy tickets at the pier.\n\nThe office opens at six.\n\n"
+            "### Bikes\n\nBikes ride free on the lower deck.\n\n- the north rack\n"
+            "- the south rack\n\n"
+            "### Fares\n\nAdults pay four euros. Children ride free.\n\n"
+            "A day pass costs ten euros. It covers the island bus too.\n"
+        )
+        assert rule_lines("thin-section", text) == [7, 13]
 
     def test_skips_a_heading_whose_next_block_is_a_deeper_heading(self) -> None:
         text = (
@@ -396,6 +411,16 @@ class TestNumberDensity:
         )
         assert rule_lines("number-density", text) == [5]
 
+    def test_counts_a_measured_number_word_inside_a_spelled_number_once(self) -> None:
+        assert not _paragraph_flags(
+            "Visits rose nearly three percent, and the branch lent 40 drills.", more=""
+        )
+        for sentence in (
+            "Rye made up roughly two percent of sales.",
+            "The bakery sold under two hundred rye loaves.",
+        ):
+            assert not _paragraph_flags(sentence, more=" The bakery also sold 40 loaves."), sentence
+
     def test_exempts_emphasized_captions(self) -> None:
         text = (
             "The oven was tested in March.\n\n"
@@ -597,16 +622,16 @@ def _tool_library(paragraphs: int, appendix: int = 0) -> str:
         f"The ladders are new.[^1]\n\n[^1]: {TEN_WORDS}\n"
     )
     back = "\n\n".join([TEN_WORDS] * appendix)
-    return f"# Tool library\n\n{body}\n\n{extras}\n## Appendix\n\n{back}\n"
+    return f"# Tool library\n\n{body}\n\n- drills\n- ladders\n\n{extras}\n## Appendix\n\n{back}\n"
 
 
 class TestOverBudget:
     def test_flags_main_text_past_a_tenth_over_the_budget(self) -> None:
         within = _tool_library(paragraphs=10, appendix=30)
         over = _tool_library(paragraphs=11, appendix=30)
-        assert _findings("over-budget", within, budget=96) == []
-        assert _findings("over-budget", over, budget=96) == [
-            (1, "main text has 114 words against a budget of 96")
+        assert _findings("over-budget", within, budget=100) == []
+        assert _findings("over-budget", over, budget=100) == [
+            (1, "main text has 116 words against a budget of 100")
         ]
 
     def test_runs_only_when_a_budget_is_given(self) -> None:
@@ -618,7 +643,7 @@ class TestRevisionGrowth:
         old = _tool_library(paragraphs=3)
         new = _tool_library(paragraphs=4)
         assert _findings("revision-growth", new, against=old) == [
-            (1, "main text has 44 words against 34 in the old version")
+            (1, "main text has 46 words against 36 in the old version")
         ]
         assert _findings("appendix-growth", new, against=old) == []
 
@@ -689,6 +714,27 @@ class TestPrShape:
         assert _findings("number-density", text, pr=True) == []
         growth = {f.rule for f in lint_prose.lint_text(longer, against=text, pr=True)}
         assert {"revision-growth", "appendix-growth"} & growth == {"appendix-growth"}
+
+    def test_the_old_version_is_read_as_a_pr_description_too(self) -> None:
+        old = f"{PR_SUMMARY}\n\n---\n\n{PR_APPENDIX}"
+        new = f"{PR_SUMMARY} Holds expire at closing time.\n\n---\n\n{PR_APPENDIX}"
+        growth = {f.rule for f in lint_prose.lint_text(new, against=old, pr=True)}
+        assert {"revision-growth", "appendix-growth"} & growth == {"revision-growth"}
+
+    def test_a_template_comment_before_the_title_is_not_a_block(self) -> None:
+        text = (
+            f"<!-- Describe your change. -->\n\n## Summary\n\n{PR_SUMMARY}\n\n---\n\n{PR_APPENDIX}"
+        )
+        assert _findings("pr-shape", text, pr=True) == []
+
+    def test_counts_a_caption_in_the_summary(self) -> None:
+        text = (
+            "![The page](page.png)\n\nThe page lists each tool. Free days show in green.\n\n"
+            f"{PR_SUMMARY} Holds expire at closing time.\n\n---\n\n{PR_APPENDIX}"
+        )
+        assert _findings("pr-shape", text, pr=True) == [
+            (1, "summary above the first horizontal rule has 7 sentences and 54 words")
+        ]
 
     def test_without_a_rule_the_whole_description_is_the_summary(self) -> None:
         text = f"{PR_SUMMARY} {PR_MORE_SENTENCES}\n\n{PR_APPENDIX}"

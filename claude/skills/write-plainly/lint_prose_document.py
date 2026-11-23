@@ -47,9 +47,10 @@ PR_SUMMARY_BLOCK_NAMES = {"list-item": "a list", "table": "a table", "code": "a 
 
 DOCUMENT_MESSAGES = {
     "thin-section": (
-        "Section has less than its level needs: two blocks under an h1 or h2, a full paragraph"
-        " under a lower heading. Merge it into a neighboring section, or fold a subsection into"
-        " its parent's prose. Demoting the heading or padding the section is not a fix."
+        "Section has less than its level needs: two blocks under an h1 or h2, and under a lower"
+        f" heading a full paragraph's worth of prose, {MIN_FULL_PARAGRAPH_SENTENCES} sentences in"
+        " its paragraphs. Merge it into a neighboring section, or fold a subsection into its"
+        " parent's prose. Demoting the heading or padding the section is not a fix."
     ),
     "short-paragraph-run": (
         "Run of very short paragraphs; combine related sentences and state how they connect."
@@ -111,8 +112,9 @@ def section_findings(blocks: list[Block]) -> list[Finding]:
     """Flag a section outside the back matter with less body than its level needs.
 
     A section runs to the next heading of its level or higher, so it holds its subsections. An H1
-    or H2 needs two blocks, and a lower heading more than a lone list or a lone paragraph of fewer
-    than four sentences. A heading followed straight by a deeper heading only groups subsections.
+    or H2 needs two blocks, and a lower heading a full paragraph's worth of prose: four sentences
+    in its paragraphs, however they are split. A heading followed straight by a deeper heading only
+    groups subsections.
     """
     findings: list[Finding] = []
     for index in _section_headings(blocks):
@@ -136,6 +138,9 @@ def section_findings(blocks: list[Block]) -> list[Finding]:
 
 
 def _is_thin(body: list[Block], level: int) -> bool:
+    if level > 2:
+        sentences = sum(sentence_count(block.text) for block in body if block.kind == "paragraph")
+        return sentences < MIN_FULL_PARAGRAPH_SENTENCES
     content = [block for block in body if block.kind not in ("heading", "break")]
     pairs = zip([None, *content], content)
     merged = [
@@ -143,13 +148,7 @@ def _is_thin(body: list[Block], level: int) -> bool:
         for previous, block in pairs
         if not (previous and previous.kind == block.kind == "list-item")
     ]
-    if level <= 2:
-        return len(merged) < 2
-    if len(merged) != 1:
-        return not merged
-    only = merged[0]
-    short = sentence_count(only.text) < MIN_FULL_PARAGRAPH_SENTENCES
-    return only.kind == "list-item" or (only.kind == "paragraph" and short)
+    return len(merged) < 2
 
 
 def _is_reference_list(body: list[Block]) -> bool:

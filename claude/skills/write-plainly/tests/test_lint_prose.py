@@ -407,7 +407,7 @@ class TestStockEmphasis:
             "It's worth saying at least a few words about the lift.\n"
             "It is important to add salt to the soup.\n"
             "The staff said that the lift works.\n"
-            "Library cards used at five branches in one day are worth flagging, since most are shared.\n"
+            "Cards used at five branches in one day are worth flagging, since most are shared.\n"
             "The reading survey is worth repeating.\n"
             "A regression test for the empty input is worth adding here.\n"
         )
