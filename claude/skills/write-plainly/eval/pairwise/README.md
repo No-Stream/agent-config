@@ -29,9 +29,9 @@ The analysis that unblinds the grades is not in this repo; it runs beside the pr
    <result line>
    EOF
    ```
-6. Judge: `uv run judges.py --sets eval/sets.jsonl --skill ../../SKILL.md --out eval/judges --seed 20261120`. The judge calls run four at a time; `--jobs` changes that. A rerun skips sets already ranked; a ranking on disk of other passages or another letter order (from another sets file or seed) stops the run, so a different set needs a fresh `--out`. At the end it prints each judge's agreement with itself across the two orders.
+6. Judge: `uv run --upgrade judges.py --sets eval/sets.jsonl --skill ../../SKILL.md --out eval/judges --seed 20261120`. The judge calls run four at a time; `--jobs` changes that. A rerun skips sets already ranked; a ranking on disk of other passages or another letter order (from another sets file or seed) stops the run, so a different set needs a fresh `--out`. At the end it prints each judge's agreement with itself across the two orders.
 
-Tests: `uv run --no-project --with pytest --with scipy --with playwright python -m pytest tests` from this directory. The runner and judge tests use stand-in `claude` and `codex` executables from `tests/fakes/`. The grading tests cover the page's HTML and the result line. They also drive the page's script in headless Chromium under the sandbox header: grading, clearing and changing a grade, a note, moving between tasks, restoring from `window.name` and from the `#` fragment, and recording the page's line. That test needs Playwright's Chromium (`uv run --no-project --with playwright playwright install chromium` once) and is skipped when Playwright is not installed. Playwright's driver also needs the system library `libatomic.so.1`.
+Tests: `uv run --upgrade --no-project --with pytest --with scipy --with playwright python -m pytest tests` from this directory. The runner and judge tests use stand-in `claude` and `codex` executables from `tests/fakes/`. The grading tests cover the page's HTML and the result line. They also drive the page's script in headless Chromium under the sandbox header: grading, clearing and changing a grade, a note, moving between tasks, restoring from `window.name` and from the `#` fragment, and recording the page's line. That test needs Playwright's Chromium (`uv run --upgrade --no-project --with playwright playwright install chromium` once) and is skipped when Playwright is not installed. Playwright's driver also needs the system library `libatomic.so.1`.
 
 ## Grading
 
@@ -94,7 +94,7 @@ notes = """
 sources = ["[1] where the fact comes from"]
 ```
 
-`doc_type` is one of: Section of a research readout, Proposal paragraph, README section, Pull request description, Design-doc explanation. `question` is the question the passage answers, and `left_to_other_documents` names what it leaves to other documents. Every draft prompt states both, since the author of a real document knows them, and an agent stage gets them only when its `sees` names them. Citation markers like `[1]` or `[1, 2]` are stripped before the notes reach a writer.
+`doc_type` is one of: Section of a research readout, Proposal paragraph, README section, Pull request description, Design-doc explanation. `question` is the question the passage answers, and `left_to_other_documents` names what it leaves to other documents; a task must give both. Every draft prompt states both, since the author of a real document knows them, and an agent stage gets them only when its `sees` names them. Citation markers like `[1]` or `[1, 2]` are stripped before the notes reach a writer.
 
 ## Limits of the design
 
