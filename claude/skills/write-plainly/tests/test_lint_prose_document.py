@@ -680,38 +680,25 @@ class TestPrShape:
         assert _findings("pr-shape", text, pr=True) == [(1, problems)]
 
 
-LOAN_CAPTION = (
-    "Each bar is one month of tool loans at the branch. Drills lead every month, and ladders"
-    " overtake sanders in the summer. The dip in August is the two weeks the branch closed."
+LOAN_SENTENCES = (
+    "Each bar is one month of loans.",
+    "Drills led with 340 loans in May, 410 in June and 380 in July.",
+    "Ladders rose from 90 to 150.",
 )
 
 
-class TestLongCaption:
-    def test_the_first_block_after_an_image_is_a_caption_whatever_its_length(self) -> None:
-        caption = (
-            "Each bar is one month of loans. Drills led with 340 loans in May, 410 in June and 380"
-            " in July. Ladders rose from 90 to 150. Sanders fell to 40."
+class TestCaptionAfterImage:
+    @staticmethod
+    def _after_image(block: str) -> str:
+        return (
+            "# Tool loans\n\nThe branch lends tools to its members.\n\n"
+            f"![Loans by month](loans.png)\n\n{block}\n"
         )
-        text = f"# Tool loans\n\n![Loans by month](loans.png)\n\n{caption}\n"
-        assert rule_lines("long-caption", text) == [5]
-        assert rule_lines("number-density", text) == []
 
-    def test_flags_a_caption_past_two_sentences_or_45_words(self) -> None:
-        one_long_sentence = (
-            "Figure 2: Each bar is one month of tool loans at the branch, with drills, ladders,"
-            " sanders, saws, sewing machines and pressure washers stacked from the bottom, and the"
-            " gray band marks the two weeks in August when the branch closed for a new tin roof."
-        )
-        text = (
-            f"# Tool loans\n\n![Loans](loans.png)\n\n{LOAN_CAPTION}\n\n"
-            f"![Loans](loans.png)\n\n{one_long_sentence}\n"
-        )
-        assert rule_lines("long-caption", text) == [5, 9]
+    def test_two_sentences_after_an_image_are_its_caption(self) -> None:
+        caption = " ".join(LOAN_SENTENCES[:2])
+        assert rule_lines("number-density", self._after_image(caption)) == []
 
-    def test_leaves_a_short_caption_and_the_paragraph_after_it_alone(self) -> None:
-        text = (
-            "# Tool loans\n\n![Loans](loans.png)\n\n"
-            "Each bar is one month of loans; drills lead every month.\n\n"
-            f"{LOAN_CAPTION}\n"
-        )
-        assert rule_lines("long-caption", text) == []
+    def test_a_longer_paragraph_after_an_image_is_body_text(self) -> None:
+        paragraph = " ".join(LOAN_SENTENCES)
+        assert rule_lines("number-density", self._after_image(paragraph)) == [7]

@@ -1,5 +1,5 @@
-"""Rules about a document's shape: its sections, paragraphs, headings, numbers, summary, captions,
-length and revisions."""
+"""Rules about a document's shape: its sections, paragraphs, headings, numbers, summary, length
+and revisions."""
 
 from __future__ import annotations
 
@@ -40,8 +40,6 @@ WORDS_PER_EXTRA_SECTION = 400
 MAX_SUMMARY_SENTENCES = 8
 MAX_SUMMARY_NUMBERS = 4
 MIN_FULL_PARAGRAPH_SENTENCES = 4
-MAX_CAPTION_SENTENCES = 2
-MAX_CAPTION_WORDS = 45
 BUDGET_TOLERANCE_PERCENT = 110
 MAX_PR_SUMMARY_SENTENCES = 6
 MAX_PR_SUMMARY_WORDS = 150
@@ -77,12 +75,6 @@ DOCUMENT_MESSAGES = {
         f"Summary runs past {MAX_SUMMARY_SENTENCES} sentences or carries more than the headline"
         " numbers; keep what and why, the main findings and the ask. Spelling numbers out or"
         " joining sentences is not a fix."
-    ),
-    "long-caption": (
-        f"Check: caption runs past {MAX_CAPTION_SENTENCES} sentences or about {MAX_CAPTION_WORDS}"
-        " words (advisory). Say in one or two sentences how to read the figure and what it shows,"
-        " and cut what its title, labels or legend already say; a further point belongs in the"
-        " body paragraph after the caption."
     ),
     "over-budget": (
         "Main text is over its word budget; cut whole paragraphs or sections, or move them to the"
@@ -293,19 +285,6 @@ def summary_findings(blocks: list[Block]) -> list[Finding]:
             measurement = f"summary has {sentences} sentences and {numbers} numbers"
             findings.append(Finding("tldr-shape", heading_line, 1, measurement))
     return findings
-
-
-def long_caption_findings(blocks: list[Block]) -> list[Finding]:
-    """Flag a caption of more than two sentences or about 45 words."""
-    return [
-        block.finding("long-caption", block.start_offset)
-        for block in blocks
-        if block.kind == "caption"
-        and (
-            sentence_count(block.text) > MAX_CAPTION_SENTENCES
-            or len(WORD.findall(block.text)) > MAX_CAPTION_WORDS
-        )
-    ]
 
 
 def _words(blocks: list[Block]) -> int:

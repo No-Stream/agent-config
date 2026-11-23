@@ -15,7 +15,6 @@ from lint_prose_document import (
     DOCUMENT_MESSAGES,
     budget_findings,
     heading_density_findings,
-    long_caption_findings,
     number_density_findings,
     pr_appendix_as_back_matter,
     pr_shape_findings,
@@ -621,7 +620,6 @@ def lint_text(
     findings.extend(supporting_statistic_findings(blocks))
     findings.extend(heading_density_findings(blocks, prose))
     findings.extend(summary_findings(blocks))
-    findings.extend(long_caption_findings(blocks))
     if budget is not None:
         findings.extend(budget_findings(blocks, budget))
     if against is not None:

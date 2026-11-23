@@ -20,6 +20,7 @@ BACK_MATTER_HEADING = re.compile(
     r"(?i)^(?:appendix\b.*|appendices|references|bibliography|notes|footnotes)$"
 )
 CAPTION_START = re.compile(r"(?i)^[*_]{0,3}(?:fig(?:ure)?\.?|table)\s+\d+[a-z]?\s*[.:]")
+MAX_CAPTION_SENTENCES = 2
 LIST_ITEM = re.compile(rf"^\s*{LIST_MARKER}\s+")
 FOOTNOTE_DEFINITION = re.compile(r"^\s*(?:\[\^[^\]]+\]:|[⁰¹²³⁴⁵⁶⁷⁸⁹]+\s)")
 IMAGE_LINE = re.compile(r"^\s*!\[")
@@ -98,7 +99,9 @@ class _BlockDraft:
     def finish(self, original_lines: list[str]) -> Block:
         """Build the block; its lines are consecutive source lines from its first line."""
         text = "\n".join(self.lines)
-        caption = self.after_image or CAPTION_START.match(text.lstrip())
+        caption = CAPTION_START.match(text.lstrip()) or (
+            self.after_image and sentence_count(text) <= MAX_CAPTION_SENTENCES
+        )
         kind = "caption" if self.kind == "paragraph" and caption else self.kind
         first = self.first_line - 1
         source_lines = tuple(original_lines[first : first + len(self.lines)])
