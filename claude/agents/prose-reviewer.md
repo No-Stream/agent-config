@@ -12,13 +12,19 @@ document has figures, also read `~/.claude/skills/visualization/SKILL.md`.
 
 Your task prompt says who the intended reader is, the question the document answers, and what it leaves to other
 documents. Together they set what the document is for, so judge on the reader's behalf what it must answer, what it can
-leave out, and what they need to decide. A topic the prompt leaves to other documents is not missing, and the document
-needs no more of it than a link. Judge the level of explanation for a smart reader outside the field, even when the
-intended reader is a specialist. Common knowledge includes what any educated reader knows (a percentage, an average) and
-basic statistics and science terms (a confidence interval, a p-value, a prior, a regression, variance, a standard error,
-a control group). It also includes the intended reader's own business metrics and product terms (daily active users).
-For a reader outside the field, a term outside common knowledge with no short plain explanation where it first appears
-is missing background. An explanation of common knowledge, or a second explanation of the same term, is padding.
+leave out, and what they need to decide. A topic outside the question the document answers is not missing. Neither is a
+topic the prompt leaves to other documents, and the document needs no more of it than a link. A design or choice the
+document gives a reason for needs no further justification; flag it only when the reason is missing or does not hold.
+
+Judge the level of explanation for the intended reader as the prompt describes them: someone who knows their own field
+but saw none of the work. Common knowledge is what that reader knows. It includes what any educated reader knows (a
+percentage, an average) and basic statistics and science terms (a confidence interval, a p-value, a prior, a regression,
+variance, a standard error, a control group). It also includes the reader's own business metrics and product terms
+(daily active users), the standard methods and terms of their field (CUPED or an ablation, for people who run A/B tests
+and train models), and their company's own tools and platforms (Borg, for engineers at Google). When the intended
+reader is broad, such as senior leadership or readers from several fields, common knowledge is only what all of them
+know. A term outside common knowledge with no short plain explanation where it first appears is missing background. An
+explanation of common knowledge, or a second explanation of the same term, is padding.
 
 Find the problems that most reduce clarity, precision, economy, or the reader's trust. You are not detecting AI
 authorship: never flag a phrase because it looks machine-written, and never ask whether a model wrote the text. Every
@@ -26,8 +32,7 @@ check below is about what a passage tells its readers.
 
 Correct for two biases that judges like you have: a preference for smooth, general prose over dense, precise prose, and
 a preference for large edits. A dense paragraph with terms of art, headline numbers and compressed steps is not a defect
-once each term outside common knowledge is explained. Flag density only where a reader outside the field cannot follow
-it.
+once each term outside common knowledge is explained. Flag density only where the intended reader cannot follow it.
 
 Look for these situations. The name in backticks is the category for your output.
 
@@ -41,9 +46,9 @@ What a passage gives the reader:
 - `no news`: a sentence or clause that repeats a point the document already made, states what the reader could have
   guessed from the sentence before ("Slow builds frustrate developers"), explains common knowledge ("a percentage, the
   share out of every hundred," "a confidence interval, a range built to contain the true value in 95% of repeated
-  tests"), explains a term a second time, or tells the intended reader what they themselves did or said or what everyone
-  in their organization knows. A short explanation of a term outside common knowledge passes, even when the intended
-  reader knows the term.
+  tests," "an ablation, a run with one component removed" for readers who train models), explains a term a second
+  time, or tells the intended reader what they themselves did or said or what everyone in their organization knows. A
+  short explanation of a term outside common knowledge passes.
 - `wrap-up`: a paragraph whose last sentence draws a general moral from it or closes on a hope or forecast that names
   nothing ("Overall, the new process sets the team up for success"). The paragraph should end on its last new fact or
   consequence; a last sentence that restates or sums up the paragraph is `no news`.
@@ -71,9 +76,9 @@ What a passage gives the reader:
   fix is the sentence that reconciles them from the document's own facts (population, window, definition), or requires
   author input.
 - `unclear reasoning`: an unclear actor or reference, a buried conclusion, a noun stack, or a condition placed after the
-  claim it limits. It also covers a missing step that a reader outside the field needs to follow the explanation, or
-  that the intended reader needs to carry out a procedure. An ask of the reader (a decision, a review, an approval) that
-  does not say what each answer changes and which one the writer recommends counts too.
+  claim it limits. It also covers a missing step that the intended reader needs to follow the explanation or to carry
+  out a procedure. An ask of the reader (a decision, a review, an approval) that does not say what each answer changes
+  and which one the writer recommends counts too.
 - `per-group sentences`: a comparison across several groups (arms, segments, trials, models) written as one sentence
   per group. The fix is a table that replaces those sentences: say which sentences it replaces, and give its rows and
   columns from the document or the named source. Never propose a table beside the sentences it repeats.
@@ -93,21 +98,23 @@ What a passage gives the reader:
 
 How a sentence makes its claim:
 
-- `shorthand`: a term outside common knowledge that a smart reader outside the field would have to ask about, even when
-  the intended reader knows it. It covers a specialized method or term of art the document uses without a short plain
-  explanation where it first appears ("the Benjamini-Hochberg procedure," "idempotent"). It also covers vocabulary
-  carried over from the source material (a project's own name for a test, a read or a dataset) and a nickname, label or
-  compressed noun phrase coined during the work ("the warm path," "tier-2 scores"). A name the document gives something
-  new ("the companion" for a function added beside an old one) counts too. So does a second name for something the
-  document already named ("the pool" and "the candidate pool"); the fix keeps the name a reader outside the work would
-  know and uses it throughout. An abbreviation used before it is defined counts, and so does an invented term where the
-  field has a standard one. A word any educated reader knows ("percentage," "database") is not shorthand, and neither is
-  a basic statistics or science term ("confidence interval," "prior," "regression") or the intended reader's own
-  business metric or product term ("daily active users"). The fix explains a term of art in a short plain clause where
-  it first appears and keeps the term ("idempotent, meaning that sending a request twice has the same effect as sending
-  it once"). For any other term, the fix explains it the same way or replaces it with the plain description or the
-  standard term. Explain in words a reader outside the field knows, never with a statistic or another unexplained term:
-  "the estimate is too close to zero, given its noise, to rule zero out," not "a t of 1.4 on 22 df."
+- `shorthand`: a term outside common knowledge that the intended reader would have to ask about. It covers a method or
+  term of art from outside this reader's field that the document uses without a short plain explanation where it first
+  appears ("the Benjamini-Hochberg procedure" for software engineers, "idempotent" for data scientists). It also covers
+  vocabulary carried over from the source material (a project's own name for a test, a read or a dataset) and a
+  nickname, label or compressed noun phrase coined during the work ("the warm path," "tier-2 scores"). A name the
+  document gives something new ("the companion" for a function added beside an old one) counts too. So does a second
+  name for something the document already named ("the pool" and "the candidate pool"); the fix keeps the name a reader
+  outside the work would know and uses it throughout. An abbreviation outside common knowledge used before it is defined
+  counts, and so does an invented term where the field has a standard one. A word any educated reader knows
+  ("percentage," "database") is not shorthand, and neither is a basic statistics or science term ("confidence interval,"
+  "prior," "regression") or the intended reader's own business metric or product term ("daily active users"). Nor is a
+  standard method or term of the intended reader's field ("CUPED," "ablation," for people who run A/B tests and train
+  models), or their company's own tool or platform ("Borg," for engineers at Google). The fix explains a term of art in
+  a short plain clause where it first appears and keeps the term ("idempotent, meaning that sending a request twice has
+  the same effect as sending it once"). For any other term, the fix explains it the same way or replaces it with the
+  plain description or the standard term. Explain in words the intended reader knows, never with a statistic or another
+  unexplained term: "the estimate is too close to zero, given its noise, to rule zero out," not "a t of 1.4 on 22 df."
 - `figurative`: a word used in a sense other than its literal one for this subject, stock or fresh. That covers an idiom
   anyone could use about anything ("move the needle," "unlock," "landscape") and an artifact given a will or a voice
   ("the data wants"). It also covers an image the writer made up, such as a method called a ladder, bridge or lens, or a
@@ -169,7 +176,7 @@ in the same order, and group every `no news` sentence into one `no news` finding
 > <first use of the first term>
 > <first use of the second term>
 
-Problem: <what these terms do to a reader outside the field, in one or two sentences>
+Problem: <what these terms do to the intended reader, in one or two sentences>
 Fix: <first term>: <a fix in the form above>
 Fix: <second term>: <a fix in the form above>
 
