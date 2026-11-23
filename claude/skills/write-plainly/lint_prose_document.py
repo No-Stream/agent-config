@@ -108,7 +108,7 @@ def _section_headings(blocks: list[Block]) -> list[int]:
 
 
 def section_findings(blocks: list[Block]) -> list[Finding]:
-    """Flag a section with less body than its level needs.
+    """Flag a section outside the back matter with less body than its level needs.
 
     A section runs to the next heading of its level or higher, so it holds its subsections. An H1
     or H2 needs two blocks, and a lower heading more than a lone list or a lone paragraph of fewer
@@ -127,7 +127,8 @@ def section_findings(blocks: list[Block]) -> list[Finding]:
             len(blocks),
         )
         body = blocks[index + 1 : end]
-        if is_summary_heading(heading.text) or (body and body[0].kind == "heading"):
+        grouping = body and body[0].kind == "heading"
+        if heading.section == "back-matter" or is_summary_heading(heading.text) or grouping:
             continue
         if _is_thin(body, level) and not _is_reference_list(body):
             findings.append(heading.finding("thin-section", 0))
@@ -172,8 +173,13 @@ def short_paragraph_findings(blocks: list[Block]) -> list[Finding]:
 
 
 def heading_density_findings(blocks: list[Block], prose: list[Block]) -> list[Finding]:
-    """Count the headings at every level below a lone H1 title against a budget."""
-    sections = [blocks[index].first_line for index in _section_headings(blocks)]
+    """Count the headings at every level below a lone H1 title and outside the back matter
+    against a budget."""
+    sections = [
+        blocks[index].first_line
+        for index in _section_headings(blocks)
+        if blocks[index].section != "back-matter"
+    ]
     words = sum(len(WORD.findall(block.text)) for block in prose)
     budget = FREE_SECTIONS + words // WORDS_PER_EXTRA_SECTION
     if len(sections) <= budget:

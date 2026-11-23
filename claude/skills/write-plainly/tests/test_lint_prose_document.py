@@ -3,6 +3,30 @@ from __future__ import annotations
 import lint_prose
 from conftest import rule_lines
 
+PR_SUMMARY = (
+    "This change lets members reserve a tool a week ahead. The reservation page lists each tool"
+    " with its free days. A reserved tool is held at the desk for two days. Members get an email"
+    " the day before pickup."
+)
+PR_MORE_SENTENCES = (
+    "Staff can cancel a hold from the desk. Holds expire at closing time. Staff can extend a hold"
+    " once."
+)
+PAPER_LIST = (
+    "the desk also keeps a paper list of holds for members who have no email address and staff"
+    " read it out each morning before the branch opens to the public"
+)
+PR_APPENDIX = "## Details\n\n- The page reads the loans table.\n- Emails go out at eight.\n"
+
+
+def _findings(rule: str, text: str, **options: object) -> list[tuple[int, str]]:
+    """Return the line and excerpt of each finding of one rule, linted with the options."""
+    return [
+        (finding.line, finding.excerpt)
+        for finding in lint_prose.lint_text(text, **options)
+        if finding.rule == rule
+    ]
+
 
 class TestThinSection:
     def test_counts_lists_tables_and_fenced_code_as_body_blocks(self) -> None:
@@ -85,6 +109,17 @@ class TestThinSection:
             "# Staying over\n\nThe inn has six rooms.\n\nBook a room by phone.\n"
         )
         assert rule_lines("thin-section", text) == [1]
+
+    def test_skips_back_matter_sections(self) -> None:
+        template = "## Test plan\n\n- Ran the tests.\n\n## Checklist\n\n- Updated the docs.\n"
+        description = f"# Tool holds\n\n{PR_SUMMARY}\n\n---\n\n{template}"
+        report = (
+            f"# Tool holds\n\n## Holds\n\n{PR_SUMMARY}\n\n{PR_MORE_SENTENCES}\n\n"
+            "## Appendix\n\n### Data\n\n- The page reads the loans table.\n"
+        )
+        assert rule_lines("thin-section", description) == [7, 11]
+        assert _findings("thin-section", description, pr=True) == []
+        assert rule_lines("thin-section", report) == []
 
 
 class TestShortParagraphRun:
@@ -539,17 +574,17 @@ class TestHeadingDensity:
         assert rule_lines("heading-density", six_sections) == []
         assert rule_lines("heading-density", long_document) == []
 
+    def test_leaves_back_matter_headings_out_of_the_count(self) -> None:
+        template = _garden("##", CROPS[:7], "- Checked.")
+        description = f"# Tool holds\n\n{PR_SUMMARY}\n\n---\n\n{template}"
+        appendix = _garden("###", CROPS[:7], "The beds need water in dry weeks.")
+        report = f"# Garden notes\n\n## Beds\n\n{GARDEN_PARAGRAPH}\n\n## Appendix\n\n{appendix}"
+        assert rule_lines("heading-density", description) == [31]
+        assert _findings("heading-density", description, pr=True) == []
+        assert rule_lines("heading-density", report) == []
+
 
 TEN_WORDS = "The branch lends drills and ladders to members every week."
-
-
-def _findings(rule: str, text: str, **options: object) -> list[tuple[int, str]]:
-    """Return the line and excerpt of each finding of one rule, linted with the options."""
-    return [
-        (finding.line, finding.excerpt)
-        for finding in lint_prose.lint_text(text, **options)
-        if finding.rule == rule
-    ]
 
 
 def _tool_library(paragraphs: int, appendix: int = 0) -> str:
@@ -600,22 +635,6 @@ class TestRevisionGrowth:
         for new in (_tool_library(paragraphs=3, appendix=2), old):
             findings = lint_prose.lint_text(new, against=old)
             assert not {"revision-growth", "appendix-growth"} & {f.rule for f in findings}
-
-
-PR_SUMMARY = (
-    "This change lets members reserve a tool a week ahead. The reservation page lists each tool"
-    " with its free days. A reserved tool is held at the desk for two days. Members get an email"
-    " the day before pickup."
-)
-PR_MORE_SENTENCES = (
-    "Staff can cancel a hold from the desk. Holds expire at closing time. Staff can extend a hold"
-    " once."
-)
-PAPER_LIST = (
-    "the desk also keeps a paper list of holds for members who have no email address and staff"
-    " read it out each morning before the branch opens to the public"
-)
-PR_APPENDIX = "## Details\n\n- The page reads the loans table.\n- Emails go out at eight.\n"
 
 
 class TestPrShape:
