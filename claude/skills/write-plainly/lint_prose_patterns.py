@@ -93,11 +93,15 @@ BRITISH_SPELLING = (
 )
 NOTING = (
     r"note|noting|mention|mentioning|remember|emphasi[sz]e|stress|point out|pointing out"
-    r"|highlight|keep in mind|recogni[sz]e|say|saying|flag|flagging|repeat|repeating|spell out"
-    r"|spelling out|clarify|clarifying|explain|explaining|observe|observing|add|adding|call out"
-    r"|calling out|underline|underlining"
+    r"|highlight|keep in mind|recogni[sz]e"
 )
 ANNOUNCED_POINT = r"(?=\s+(?:that|how|why|what|whether|here)\b|\s*[,:.;!])"
+# These verbs also name actions ("worth flagging", "worth adding here"), so they need a clause.
+SAYING = (
+    r"say|saying|flag|flagging|repeat|repeating|spell out|spelling out|clarify|clarifying|explain"
+    r"|explaining|observe|observing|add|adding|call out|calling out|underline|underlining"
+)
+ANNOUNCED_CLAUSE = r"(?=\s+(?:that|how|why|what|whether)\b)"
 IRREGULAR_PARTICIPLES = (
     r"beaten|bought|brought|built|caught|chosen|cut|dealt|done|drawn|driven|eaten|fed|found"
     r"|forgotten|given|grown|held|hidden|kept|known|laid|led|left|lent|lost|made|met|paid"
@@ -215,6 +219,7 @@ PHRASE_RULES = {
         rf"(?:{NOTING}){ANNOUNCED_POINT}"
         r"|it (?:should|must) be (?:noted|mentioned|emphasi[sz]ed|stressed|pointed out)"
         rf"|it bears (?:mentioning|noting|repeating)|(?:is|are) worth (?:{NOTING}){ANNOUNCED_POINT}"
+        rf"|(?:it['’]s|is|are) worth (?:{SAYING}){ANNOUNCED_CLAUSE}"
         r"|needless to say|it goes without saying|at (?:its|their) core(?=,)|the reality is"
         r"|the real (?:issue|problem|story) is|deserves? (?:a )?(?:mention|note|word)"
         r"|(?<!\bmore )(?<!\bmost )(?:importantly|interestingly|notably|crucially)(?=,))\b"
@@ -245,7 +250,7 @@ PHRASE_RULES = {
         r"(?i)\b(?P<hit>would (?:usually |likely |probably |typically )?have"
         r" (?:caught|detected|flagged|picked up)"
         rf"|(?:{CANNOT}|unable to) (?:reliably )?(?:detect|see|distinguish|measure)[^.;]{{0,60}}?"
-        r"(?:smaller|less|lower|below|under) (?:than )?(?:about |roughly )?[-+$]?\d"
+        r"(?:smaller|less|lower|below|under) (?:than )?(?:about |roughly )?[-+$]?\d+"
         r"|below what (?:the|this|our) (?:\w+ )?(?:test|experiment|study) (?:can|could|will)"
         r" detect"
         r"|(?:likely|probably|possibly|arguably) the (?:best|winner|top|leader|strongest))\b"
@@ -266,7 +271,7 @@ PHRASE_RULES = {
         r"(?! (?:ms|milliseconds?|seconds?|minutes?|hours?|days?|years?)\b)"
         r"|\d+(?:\.\d+)? per (?:hundred|100)\b"
         r"|(?:(?-i:NDCG|nDCG|HR|MRR|MAP|mAP)|recall|precision|hit rate)"
-        r" (?:at|at cutoff|at rank|over the top|in the top) ?\d+\b)"
+        r" (?:at|at cutoff|at rank|over the top|in the top) ?\d+\b(?!%| ?per ?cent\b|\.\d))"
     ),
     "rather-than": re.compile(
         rf"(?i)(?P<hit>\brather than\b|(?<!\w), not\b|{LESS_ABOUT}"

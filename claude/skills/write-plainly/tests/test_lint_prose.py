@@ -392,8 +392,10 @@ class TestStockEmphasis:
             "It is worth spelling out why the door sticks.\n"
             "The late fee deserves a mention.\n"
             "The volunteers deserve a word of thanks.\n"
+            "It is worth observing that the queue moves faster after lunch.\n"
+            "It is worth explaining why the lift stops at the second floor.\n"
         )
-        assert rule_lines("stock-emphasis", text) == [1, 2, 3, 4, 5]
+        assert rule_lines("stock-emphasis", text) == [1, 2, 3, 4, 5, 6, 7]
 
     def test_leaves_comparative_adverbs_and_plain_notes_alone(self) -> None:
         text = (
@@ -405,6 +407,9 @@ class TestStockEmphasis:
             "It's worth saying at least a few words about the lift.\n"
             "It is important to add salt to the soup.\n"
             "The staff said that the lift works.\n"
+            "Library cards used at five branches in one day are worth flagging, since most are shared.\n"
+            "The reading survey is worth repeating.\n"
+            "A regression test for the empty input is worth adding here.\n"
         )
         assert rule_lines("stock-emphasis", text) == []
 
@@ -538,6 +543,7 @@ class TestRatherThan:
         text = (
             "Instead of driving, take the bus.\n"
             "The van goes north. It is a replacement for the old bus.\n"
+            "Any book that is not a reference book goes home with a member.\n"
         )
         assert rule_lines("rather-than", text) == []
 
@@ -567,8 +573,10 @@ class TestPowerRead:
             "The survey cannot detect a change smaller than about 5 visits a day.\n"
             "The expected change is likely below what the test can detect.\n"
             "The north branch is likely the best of the three.\n"
+            "The survey cannot detect a change smaller than about 30 visits a day.\n"
+            "The till count cannot detect a shortfall smaller than $10.\n"
         )
-        assert rule_lines("power-read", text) == [1, 2, 3, 4]
+        assert rule_lines("power-read", text) == [1, 2, 3, 4, 5, 6]
 
     def test_leaves_point_estimates_and_plain_power_statements_alone(self) -> None:
         text = (
@@ -595,7 +603,7 @@ class TestUniversalNegative:
         text = (
             "We could not find a branch that opens on Sundays.\n"
             "We found no branch that opens on Sundays.\n"
-            "The branch no longer has a van.\n"
+            "The old branch no longer exists.\n"
             "No one at the desk knew the answer.\n"
         )
         assert rule_lines("universal-negative", text) == []
@@ -610,8 +618,9 @@ class TestNumberNotation:
             "Late returns run 3 per hundred loans.\n"
             "The catalogue search reached NDCG at 10 of 0.40.\n"
             "Recall in the top 5 rose for the new search.\n"
+            "The new search raised recall at 5.\n"
         )
-        assert rule_lines("number-notation", text) == [1, 2, 3, 4, 5, 6]
+        assert rule_lines("number-notation", text) == [1, 2, 3, 4, 5, 6, 7]
 
     def test_leaves_counts_of_things_durations_and_standard_notation_alone(self) -> None:
         text = (
@@ -620,6 +629,10 @@ class TestNumberNotation:
             "We asked 40 of the 1,000 members.\n"
             "The reading test scored the page 61 out of 100.\n"
             "The catalogue search reached NDCG@10 of 0.40 and 2% of loans came back late.\n"
+            "The catalogue search keeps precision at 90% recall.\n"
+            "Recall at 1% false-positive rate held steady for the spam filter.\n"
+            "The spam filter's recall at 0.5 is 0.81.\n"
+            "The catalogue search keeps precision at 90 percent recall.\n"
         )
         assert rule_lines("number-notation", text) == []
 
