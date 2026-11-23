@@ -14,17 +14,20 @@ Your task prompt says who the intended reader is, the question the document answ
 documents. Together they set what the document is for, so judge on the reader's behalf what it must answer, what it can
 leave out, and what they need to decide. A topic the prompt leaves to other documents is not missing, and the document
 needs no more of it than a link. Judge the level of explanation for a smart reader outside the field, even when the
-intended reader is a specialist. For that reader, a term outside common knowledge with no short plain explanation where
-it first appears is missing background. An explanation of what any educated reader knows, or a second explanation of the
-same term, is padding.
+intended reader is a specialist. Common knowledge includes what any educated reader knows (a percentage, an average) and
+basic statistics and science terms (a confidence interval, a p-value, a prior, a regression, variance, a standard error,
+a control group). It also includes the intended reader's own business metrics and product terms (daily active users).
+For a reader outside the field, a term outside common knowledge with no short plain explanation where it first appears
+is missing background. An explanation of common knowledge, or a second explanation of the same term, is padding.
 
 Find the problems that most reduce clarity, precision, economy, or the reader's trust. You are not detecting AI
 authorship: never flag a phrase because it looks machine-written, and never ask whether a model wrote the text. Every
 check below is about what a passage tells its readers.
 
-Correct for two biases that judges like you have: a preference for smooth, general prose over dense, precise prose,
-and a preference for large edits. A dense paragraph with terms of art, headline numbers and compressed steps is not a
-defect once each term is explained. Flag density only where a reader outside the field cannot follow it.
+Correct for two biases that judges like you have: a preference for smooth, general prose over dense, precise prose, and
+a preference for large edits. A dense paragraph with terms of art, headline numbers and compressed steps is not a defect
+once each term outside common knowledge is explained. Flag density only where a reader outside the field cannot follow
+it.
 
 Look for these situations. The name in backticks is the category for your output.
 
@@ -36,10 +39,11 @@ What a passage gives the reader:
   it with the specific thing this work found, or delete it. "This approach," pointing back at something named earlier,
   does not make a new general claim specific.
 - `no news`: a sentence or clause that repeats a point the document already made, states what the reader could have
-  guessed from the sentence before ("Slow builds frustrate developers"), explains what any educated reader knows ("a
-  percentage, the share out of every hundred"), explains a term a second time, or tells the intended reader what they
-  themselves did or said or what everyone in their organization knows. A short explanation of a term outside common
-  knowledge passes, even when the intended reader knows the term.
+  guessed from the sentence before ("Slow builds frustrate developers"), explains common knowledge ("a percentage, the
+  share out of every hundred," "a confidence interval, a range built to contain the true value in 95% of repeated
+  tests"), explains a term a second time, or tells the intended reader what they themselves did or said or what everyone
+  in their organization knows. A short explanation of a term outside common knowledge passes, even when the intended
+  reader knows the term.
 - `wrap-up`: a paragraph whose last sentence draws a general moral from it or closes on a hope or forecast that names
   nothing ("Overall, the new process sets the team up for success"). The paragraph should end on its last new fact or
   consequence; a last sentence that restates or sums up the paragraph is `no news`.
@@ -89,17 +93,19 @@ What a passage gives the reader:
 
 How a sentence makes its claim:
 
-- `shorthand`: a term that a smart reader outside the field would have to ask about, even when the intended reader knows
-  it. It covers a term of art the document uses without a short plain explanation where it first appears ("p-value,"
-  "idempotent"). It also covers vocabulary carried over from the source material (a project's own name for a test, a
-  read or a dataset) and a nickname, label or compressed noun phrase coined during the work ("the warm path," "tier-2
-  scores"). A name the document gives something new ("the companion" for a function added beside an old one) counts too.
-  So does a second name for something the document already named ("the pool" and "the candidate pool"); the fix keeps
-  the name a reader outside the work would know and uses it throughout. An abbreviation used before it is defined
-  counts, and so does an invented term where the field has a standard one. A word any educated reader knows
-  ("percentage," "average," "database") is not shorthand. The fix explains a term of art in a short plain clause where
-  it first appears and keeps the term ("the p-value, the chance of a result at least this large if there were no real
-  effect"). For any other term, the fix explains it the same way or replaces it with the plain description or the
+- `shorthand`: a term outside common knowledge that a smart reader outside the field would have to ask about, even when
+  the intended reader knows it. It covers a specialized method or term of art the document uses without a short plain
+  explanation where it first appears ("the Benjamini-Hochberg procedure," "idempotent"). It also covers vocabulary
+  carried over from the source material (a project's own name for a test, a read or a dataset) and a nickname, label or
+  compressed noun phrase coined during the work ("the warm path," "tier-2 scores"). A name the document gives something
+  new ("the companion" for a function added beside an old one) counts too. So does a second name for something the
+  document already named ("the pool" and "the candidate pool"); the fix keeps the name a reader outside the work would
+  know and uses it throughout. An abbreviation used before it is defined counts, and so does an invented term where the
+  field has a standard one. A word any educated reader knows ("percentage," "database") is not shorthand, and neither is
+  a basic statistics or science term ("confidence interval," "prior," "regression") or the intended reader's own
+  business metric or product term ("daily active users"). The fix explains a term of art in a short plain clause where
+  it first appears and keeps the term ("idempotent, meaning that sending a request twice has the same effect as sending
+  it once"). For any other term, the fix explains it the same way or replaces it with the plain description or the
   standard term. Explain in words a reader outside the field knows, never with a statistic or another unexplained term:
   "the estimate is too close to zero, given its noise, to rule zero out," not "a t of 1.4 on 22 df."
 - `figurative`: a word used in a sense other than its literal one for this subject, stock or fresh. That covers an idiom
