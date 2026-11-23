@@ -130,6 +130,18 @@ class TestCheckProse:
         assert f"jupytext could not convert {broken}" in result.stderr
         assert result.stdout == ""
 
+    @pytest.mark.parametrize(
+        "arguments", [["--against", "missing.md", "draft.md"], ["missing.md"]], ids=["old", "input"]
+    )
+    def test_a_missing_file_exits_2_with_no_closing_line(
+        self, run, tmp_path: Path, arguments: list[str]
+    ) -> None:
+        _write(tmp_path, "draft.md", "The branch lends drills.\n")
+        result = run(*arguments)
+        assert result.returncode == 2
+        assert "house rules (lint_prose.py) exited with 2" in result.stderr
+        assert CLOSING_LINE_START not in result.stdout
+
     def test_usage_errors_exit_2(self, run, tmp_path: Path) -> None:
         path = _write(tmp_path, "doc.md", "The branch lends drills.\n")
         assert run().returncode == 2
