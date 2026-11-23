@@ -9,6 +9,7 @@ import re
 import sys
 from collections.abc import Iterator, Sequence
 from dataclasses import asdict
+from itertools import groupby
 from pathlib import Path
 
 from lint_prose_document import (
@@ -451,9 +452,13 @@ def _sentence_shape_findings(prose: list[Block]) -> list[Finding]:
     return findings
 
 
-def _opens_like(first_words: list[str]) -> bool:
-    """Whether sentences open on one word, or each on a determiner such as "the" or "each"."""
-    return len(set(first_words)) == 1 or all(word in STACCATO_DETERMINERS for word in first_words)
+def _staccato_key(words: list[str]) -> str | None:
+    """Key a sentence by its opening: None when it is long, one key for every determiner such as
+    "the" or "each", and otherwise its first word."""
+    if len(words) > STACCATO_MAX_WORDS:
+        return None
+    first_word = words[0].lower()
+    return "" if first_word in STACCATO_DETERMINERS else first_word
 
 
 def _staccato_findings(prose: list[Block]) -> list[Finding]:
@@ -463,15 +468,13 @@ def _staccato_findings(prose: list[Block]) -> list[Finding]:
         if block.kind != "paragraph":
             continue
         spans = sentence_spans(mask_quotations(block.text))
-        sentences = [(start, WORD.findall(block.text[start:end])) for start, end in spans]
-        run_end = 0
-        for index in range(len(sentences) - STACCATO_RUN + 1):
-            window = sentences[index : index + STACCATO_RUN]
-            short = all(len(words) <= STACCATO_MAX_WORDS for _, words in window)
-            if short and _opens_like([words[0].lower() for _, words in window]):
-                if index >= run_end:
-                    findings.append(block.finding("staccato-run", window[0][0]))
-                run_end = index + STACCATO_RUN
+        keyed = [
+            (start, _staccato_key(WORD.findall(block.text[start:end]))) for start, end in spans
+        ]
+        for key, run in groupby(keyed, key=lambda sentence: sentence[1]):
+            starts = [start for start, _ in run]
+            if key is not None and len(starts) >= STACCATO_RUN:
+                findings.append(block.finding("staccato-run", starts[0]))
     return findings
 
 
