@@ -29,14 +29,21 @@ def _launcher(directory: Path, name: str, script: Path) -> None:
 
 @pytest.fixture
 def run(tmp_path: Path):
+    """Run check-prose.sh and check that it left nothing in its temporary directory."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     _launcher(bin_dir, "sloplint", FAKES_DIR / "fake_sloplint.py")
     _launcher(bin_dir, "uvx", FAKES_DIR / "fake_uvx.py")
-    environment = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
+    temporary_dir = tmp_path / "tmp"
+    temporary_dir.mkdir()
+    environment = {
+        **os.environ,
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "TMPDIR": str(temporary_dir),
+    }
 
     def run_check_prose(*arguments: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
+        result = subprocess.run(
             ["bash", str(SKILL_DIR / "check-prose.sh"), *arguments],
             capture_output=True,
             text=True,
@@ -44,12 +51,15 @@ def run(tmp_path: Path):
             env=environment,
             cwd=tmp_path,
         )
+        assert list(temporary_dir.iterdir()) == []
+        return result
 
     return run_check_prose
 
 
 def _write(tmp_path: Path, name: str, text: str) -> str:
     path = tmp_path / name
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return str(path)
 
@@ -111,12 +121,21 @@ class TestCheckProse:
         assert {"over-budget", "revision-growth"} <= rules
         assert old not in result.stdout
 
-    def test_converts_a_notebook_given_as_the_old_version(self, run, tmp_path: Path) -> None:
-        old = _notebook(tmp_path, "old.ipynb", "# Loans\n\nDrills lead.\n")
-        new = _notebook(tmp_path, "new.ipynb", "# Loans\n\nDrills lead, and ladders follow.\n")
+    def test_converts_an_earlier_revision_of_a_notebook_with_the_same_name(
+        self, run, tmp_path: Path
+    ) -> None:
+        old = _notebook(tmp_path, "old/loans.ipynb", "# Loans\n\nDrills lead.\n")
+        new = _notebook(tmp_path, "loans.ipynb", "# Loans\n\nDrills lead, and ladders follow.\n")
         result = run("--against", old, new)
         assert result.returncode == 1, result.stderr
         assert f"{new}:1:1: revision-growth:" in result.stdout
+
+    def test_a_notebook_jupytext_cannot_read_exits_2(self, run, tmp_path: Path) -> None:
+        broken = _write(tmp_path, "broken.ipynb", '<<<<<<< HEAD\n{"cells": []\n')
+        result = run(broken)
+        assert result.returncode == 2
+        assert f"jupytext could not convert {broken}" in result.stderr
+        assert result.stdout == ""
 
     def test_usage_errors_exit_2(self, run, tmp_path: Path) -> None:
         path = _write(tmp_path, "doc.md", "The branch lends drills.\n")
