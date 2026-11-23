@@ -177,7 +177,7 @@ MESSAGES = {
     ),
     "undefined-acronym": (
         "Check: acronym used before it is defined (advisory). Spell it out at first use with"
-        " the short form in parentheses."
+        " the short form in parentheses, unless the intended reader knows it."
     ),
     "long-sentence": (
         "Long sentence with almost no punctuation; split it or mark where its clauses break."
