@@ -424,4 +424,4 @@ MEASURED_NUMBER_WORD = re.compile(
 )
 STACCATO_DETERMINERS = {"a", "an", "the", "each", "every", "one", "another", "some", "most", "no"}
 STACCATO_DETERMINERS |= {"our", "their", "its", "this", "that", "these", "those"}
-PULL_REQUEST_FILE_NAME = re.compile(r"(?i)(?:^|[_-])(?:pr|cr)[-_]?(?:description|body)\b")
+PULL_REQUEST_FILE_NAME = re.compile(r"(?i)(?:^|[_-])(?:pr|cr)[-_]?(?:description|body)(?![a-z])")

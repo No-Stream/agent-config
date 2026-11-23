@@ -912,7 +912,12 @@ class TestCli:
         new_path.write_text(summary, encoding="utf-8")
         named_paths = [
             tmp_path / name
-            for name in ("release-pr-body.md", "PR_DESCRIPTION.md", "proposal-description.md")
+            for name in (
+                "release-pr-body.md",
+                "PR_DESCRIPTION.md",
+                "cr_description_v2.md",
+                "proposal-description.md",
+            )
         ]
         for path in named_paths:
             path.write_text(summary, encoding="utf-8")
@@ -927,7 +932,7 @@ class TestCli:
         assert "over-budget" in rules("--budget", "20", str(new_path))
         assert "revision-growth" in rules("--against", str(old_path), str(new_path))
         assert "pr-shape" in rules("--pr", str(new_path))
-        assert ["pr-shape" in rules(str(path)) for path in named_paths] == [True, True, False]
+        assert ["pr-shape" in rules(str(path)) for path in named_paths] == [True, True, True, False]
 
     def test_rejects_a_bad_budget_and_against_with_several_inputs(self, tmp_path: Path) -> None:
         path = tmp_path / "doc.md"
