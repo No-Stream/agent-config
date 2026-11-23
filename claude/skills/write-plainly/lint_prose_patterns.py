@@ -221,7 +221,7 @@ PHRASE_RULES = {
         rf"(?:{NOTING}){ANNOUNCED_POINT}"
         r"|it (?:should|must) be (?:noted|mentioned|emphasi[sz]ed|stressed|pointed out)"
         rf"|it bears (?:mentioning|noting|repeating)|(?:is|are) worth (?:{NOTING}){ANNOUNCED_POINT}"
-        rf"|(?:it['’]s|is|are) worth (?:{SAYING}){ANNOUNCED_CLAUSE}"
+        rf"|(?:it(?: is|['’]s)|is|are) worth (?:{SAYING}){ANNOUNCED_CLAUSE}"
         r"|needless to say|it goes without saying|at (?:its|their) core(?=,)|the reality is"
         r"|the real (?:issue|problem|story) is|deserves? (?:a )?(?:mention|note|word)"
         r"|(?<!\bmore )(?<!\bmost )(?:importantly|interestingly|notably|crucially)(?=,))\b"
