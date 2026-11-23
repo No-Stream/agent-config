@@ -626,7 +626,8 @@ def lint_text(
     if budget is not None:
         findings.extend(budget_findings(blocks, budget))
     if against is not None:
-        findings.extend(revision_findings(blocks, _blocks(against, pr)[2]))
+        _, _, old_blocks = _blocks(against, pr)
+        findings.extend(revision_findings(blocks, old_blocks))
     if pr:
         findings.extend(pr_shape_findings(blocks))
     return sorted(findings, key=lambda finding: (finding.line, finding.column, finding.rule))
@@ -645,7 +646,7 @@ def _positive_int(value: str) -> int:
     return number
 
 
-def is_pr_description_name(path: str) -> bool:
+def _is_pr_description_name(path: str) -> bool:
     """Whether a file name marks a pull request or code review description, as pr-body.md does."""
     return bool(PULL_REQUEST_FILE_NAME.search(Path(path).name))
 
@@ -674,7 +675,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     all_findings: list[dict[str, object]] = []
     text_findings: list[str] = []
     for input_path in options.inputs:
-        pr = options.pr or is_pr_description_name(input_path)
+        pr = options.pr or _is_pr_description_name(input_path)
         findings = lint_text(_read_input(input_path), budget=options.budget, against=against, pr=pr)
         for finding in findings:
             message = MESSAGES[finding.rule]
