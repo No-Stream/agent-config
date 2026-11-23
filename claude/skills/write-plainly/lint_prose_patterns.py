@@ -93,7 +93,9 @@ BRITISH_SPELLING = (
 )
 NOTING = (
     r"note|noting|mention|mentioning|remember|emphasi[sz]e|stress|point out|pointing out"
-    r"|highlight|keep in mind|recogni[sz]e"
+    r"|highlight|keep in mind|recogni[sz]e|say|saying|flag|flagging|repeat|repeating|spell out"
+    r"|spelling out|clarify|clarifying|explain|explaining|observe|observing|add|adding|call out"
+    r"|calling out|underline|underlining"
 )
 ANNOUNCED_POINT = r"(?=\s+(?:that|how|why|what|whether|here)\b|\s*[,:.;!])"
 IRREGULAR_PARTICIPLES = (
@@ -179,9 +181,12 @@ PHRASE_RULES = {
         rf"(?i){CLAUSE_START}(?P<hit>{ARTIFACT_SUBJECT}\s+(?:{ANIMATE_PREDICATE}))\b"
         + NOT_A_PREDICATE
     ),
+    # A thing is the subject at a clause start, or anywhere before "that" or "which".
     "inverted-animacy-check": re.compile(
-        rf"(?i){CLAUSE_START}(?P<hit>{THING_SUBJECT}\s+(?:(?:that|which)\s+)?"
-        rf"(?:{TRANSACTION_VERBS}))\b" + NOT_A_PREDICATE
+        rf"(?i)(?P<clause_start>{CLAUSE_START})?\b(?P<hit>{THING_SUBJECT}\s+"
+        rf"(?(clause_start)(?:(?:that|which)\s+)?|(?:that|which)\s+)(?:{TRANSACTION_VERBS})"
+        r"|(?:money|revenue|dollars)\s+(?:runs?|ran|flows?|flowed)(?!\s+(?:out|low|short|dry)\b))\b"
+        + NOT_A_PREDICATE
     ),
     "back-reference": re.compile(
         r"(?i)\b(?P<hit>as (?:discussed|mentioned|noted)\b(?!\s+(?:by|below|further below)\b)"
@@ -211,7 +216,7 @@ PHRASE_RULES = {
         r"|it (?:should|must) be (?:noted|mentioned|emphasi[sz]ed|stressed|pointed out)"
         rf"|it bears (?:mentioning|noting|repeating)|(?:is|are) worth (?:{NOTING}){ANNOUNCED_POINT}"
         r"|needless to say|it goes without saying|at (?:its|their) core(?=,)|the reality is"
-        r"|the real (?:issue|problem|story) is"
+        r"|the real (?:issue|problem|story) is|deserves? (?:a )?(?:mention|note|word)"
         r"|(?<!\bmore )(?<!\bmost )(?:importantly|interestingly|notably|crucially)(?=,))\b"
     ),
     "history-in-document": re.compile(
@@ -227,13 +232,48 @@ PHRASE_RULES = {
         r"|we (?:corrected|fixed|revised|updated) (?:the|an|our) (?:earlier|previous)\b"
         r"|(?:was|were) (?:[^.;,\n]|\.(?=\d)){1,30}, (?:and )?now\b"
         r"|now (?:[\w'’-]+ ){1,6}instead of\b"
+        r"|(?:earlier|previous|prior) (?:drafts|revisions)\b"
+        r"|(?:our|my) (?:first|earlier|previous|initial) (?:read|draft|pass|write-?up)\b"
+        r"|now (?:fixed|corrected)\b"
         r"|correction:)"
     ),
     "cannot-rule-out": re.compile(
         rf"(?i)\b(?P<hit>(?:{CANNOT}|unable to)\s+(?:be\s+)?rul(?:e|ed)\s+out"
         rf"|(?:we|I)\s+{CANNOT}\s+exclude|{CANNOT}\s+be\s+excluded)\b"
     ),
-    "rather-than": re.compile(rf"(?i)(?P<hit>\brather than\b|(?<!\w), not\b|{LESS_ABOUT})"),
+    "power-read": re.compile(
+        r"(?i)\b(?P<hit>would (?:usually |likely |probably |typically )?have"
+        r" (?:caught|detected|flagged|picked up)"
+        rf"|(?:{CANNOT}|unable to) (?:reliably )?(?:detect|see|distinguish|measure)[^.;]{{0,60}}?"
+        r"(?:smaller|less|lower|below|under) (?:than )?(?:about |roughly )?[-+$]?\d"
+        r"|below what (?:the|this|our) (?:\w+ )?(?:test|experiment|study) (?:can|could|will)"
+        r" detect"
+        r"|(?:likely|probably|possibly|arguably) the (?:best|winner|top|leader|strongest))\b"
+    ),
+    "universal-negative": re.compile(
+        r"(?i)\b(?P<hit>no (?!longer\b)(?:[\w'’-]+ ){0,3}(?:has|have|had) (?:ever|had)"
+        r"|no (?!longer\b)(?:[\w'’-]+ ){0,3}(?:exists?|existed)"
+        r"|none (?:of (?:them|these|those|the [\w-]+) )?"
+        r"(?:exists?|varied|changed|used|tested|ran|shipped|raised|measured)"
+        r"|(?:has|have) never (?:been (?:tried|tested|run|measured|done)|run|shipped|tested|tried"
+        r"|measured)"
+        r"|(?:to date|so far|ever),? (?:[\w'’-]+ ){0,4}(?:has|have) (?:not|never))\b"
+    ),
+    "number-notation": re.compile(
+        r"(?i)\b(?P<hit>(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|a few"
+        r"|several) (?:times )?(?:in (?:every )?(?:10|100|1,?000|ten|a hundred|a thousand)"
+        r"|(?:of|out of) every (?:100|1,?000|a hundred|a thousand))\b"
+        r"(?! (?:ms|milliseconds?|seconds?|minutes?|hours?|days?|years?)\b)"
+        r"|\d+(?:\.\d+)? per (?:hundred|100)\b"
+        r"|(?:(?-i:NDCG|nDCG|HR|MRR|MAP|mAP)|recall|precision|hit rate)"
+        r" (?:at|at cutoff|at rank|over the top|in the top) ?\d+\b)"
+    ),
+    "rather-than": re.compile(
+        rf"(?i)(?P<hit>\brather than\b|(?<!\w), not\b|{LESS_ABOUT}"
+        r"|\b(?:a|an|the) [\w'’-]+(?: [\w'’-]+)?,? (?:instead of|as opposed to|and not)"
+        r" (?:a|an|the) [\w'’-]+"
+        r"|(?<=[.;] )(?:it|this|that) (?:isn['’]t|is not|was not|is no) (?:a|an|the)\b)"
+    ),
     "american-spelling": re.compile(rf"(?i)\b(?P<hit>{BRITISH_SPELLING})\b"),
     "passive-by-agent": re.compile(
         r"(?i)\b(?P<hit>(?:is|are|was|were|be|been|being)\s+"
@@ -284,7 +324,16 @@ QUOTATION = re.compile(r'"[^"]{1,300}"|“[^”]{1,300}”')
 
 ANNOUNCING_COLON = re.compile(
     r"(?i)^(?![^:]*\b(?:we|i|you)\b)(?:(?:two|three|four|five|six|several|a few|\d+) [a-z]+"
-    r"(?: [a-z]+){0,6}|here(?:'s| is| are)\b(?: [^\s:]+){0,8}|the following(?: [a-z]+)?):(?:\s|$)"
+    r"(?:,? [a-z]+){0,6}|here(?:'s| is| are)\b(?: [^\s:]+){0,8}|the following(?: [a-z]+)?):(?:\s|$)"
+)
+NOTE_NOUNS = (
+    r"notes?|caveats?|things?|points?|limitations?|observations?|remarks?|cautions?"
+    r"|qualifications?|warnings?|asides?|wrinkles?"
+)
+ANNOUNCING_NOTES = re.compile(
+    r"(?i)^(?:two|three|four|five|a few|a couple of|several|some|one|a|\d+) (?:[\w-]+ ){0,2}"
+    rf"(?:{NOTE_NOUNS})(?: (?:on|about|for|before|regarding|to keep in mind)(?: [\w'-]+){{0,5}})?"
+    r"\s*[.:]$"
 )
 ANNOUNCING_QUESTION = re.compile(
     r"(?i)^we (?:asked|wanted to know|looked at|set out to (?:see|learn|test))"
@@ -295,6 +344,9 @@ CLEFT = re.compile(
     r"|it (?:is|was) (?:not |also |only |even )?(?:the|this|these|those|his|her|their|its|our"
     r"|my|your|by|in|with|from|because|when|then|something|what|how|why)\b[^.?!]{0,60}?"
     r" (?:that|who)\b)"
+)
+REVERSE_CLEFT = re.compile(
+    r"(?i)\b(?:is|are|was|were) (?:exactly |precisely |also |only )?what\b(?! (?:to|if)\b)"
 )
 SERIES_ITEM = r"(?!(?:and|or)\b)[\w'’-]+(?:\s+[\w'’-]+){0,3}"
 SERIES = re.compile(
@@ -390,7 +442,7 @@ SUPPORTING_STATISTIC = re.compile(
     rf"|\bp-?values?\b[^.;\d]{{0,20}}?(?:{P_COMPARISON}|\b(?:of|was|is|were|are))\s*0?\.\d"
     rf"|[\[(]{INTERVAL_PAIR}[\])]"
     rf"|{INTERVAL_LABEL}{ENDPOINT}\s*(?:to|and|–|-)\s*[-+−]?\d"
-    r"|\d\s*(?:±|\+/-|(?i:plus or minus))\s*\d"
+    r"|(?:±|\+/-|(?i:plus or minus))\s*\d"
 )
 LABELED_BRACKET_INTERVAL = re.compile(rf"{INTERVAL_LABEL}\[{INTERVAL_PAIR}\]")
 DECIMAL_RATE = r"(?<![\d.])[-+−]?0?\.\d+(?!\.\d)"

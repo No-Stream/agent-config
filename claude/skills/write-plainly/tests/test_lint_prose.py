@@ -267,12 +267,23 @@ class TestInvertedAnimacyCheck:
         )
         assert rule_lines("inverted-animacy-check", text) == [1, 2, 3, 4, 5]
 
+    def test_flags_a_relative_clause_anywhere_and_money_that_moves(self) -> None:
+        text = (
+            "Keep the reading features that won their trials.\n"
+            "We moved the layout which crowds the doorway.\n"
+            "The money runs the other way: new members cost the most.\n"
+            "Revenue flows to the north branch in winter.\n"
+        )
+        assert rule_lines("inverted-animacy-check", text) == [1, 2, 3, 4]
+
     def test_leaves_people_and_plain_verbs_alone(self) -> None:
         text = (
             "The library splits visitors across the groups.\n"
             "The table shows the loans for each group.\n"
             "We gave each group half of the visitors.\n"
             "The shelf has room for forty books.\n"
+            "The members that won the raffle collect their prizes today.\n"
+            "The grant money ran out in March.\n"
         )
         assert rule_lines("inverted-animacy-check", text) == []
 
@@ -319,11 +330,22 @@ class TestAnnouncingSentence:
         )
         assert rule_lines("announcing-sentence", text) == [1, 3, 5]
 
+    def test_flags_a_lead_in_with_a_comma_and_a_count_of_notes_without_a_colon(self) -> None:
+        text = (
+            "Three changes, each with a cost: a ramp, a lift and a wider door.\n\n"
+            "Two honest notes on the new rota.\n\n"
+            "A few caveats.\n\n"
+            "Three things to keep in mind.\n"
+        )
+        assert rule_lines("announcing-sentence", text) == [1, 3, 5, 7]
+
     def test_leaves_sentences_that_carry_the_point_alone(self) -> None:
         text = (
             "The ramp, the lift and the wide door make the branch accessible.\n\n"
             "We asked the council whether a second lift fits the budget, and it does.\n\n"
-            "The lift has one job: it carries wheelchairs to the first floor.\n"
+            "The lift has one job: it carries wheelchairs to the first floor.\n\n"
+            "Two notes on the rota were missing, so the desk closed early.\n\n"
+            "The branch keeps three notes on file for each member.\n"
         )
         assert rule_lines("announcing-sentence", text) == []
 
@@ -363,6 +385,16 @@ class TestStockEmphasis:
         )
         assert rule_lines("stock-emphasis", text) == list(range(1, 9))
 
+    def test_flags_verbs_of_saying_after_worth_and_deserves_a_mention(self) -> None:
+        text = (
+            "It is worth saying that the two counts agree.\n"
+            "It's worth flagging that the lift is slow.\n"
+            "It is worth spelling out why the door sticks.\n"
+            "The late fee deserves a mention.\n"
+            "The volunteers deserve a word of thanks.\n"
+        )
+        assert rule_lines("stock-emphasis", text) == [1, 2, 3, 4, 5]
+
     def test_leaves_comparative_adverbs_and_plain_notes_alone(self) -> None:
         text = (
             "More importantly, the lift now reaches every floor.\n"
@@ -370,6 +402,9 @@ class TestStockEmphasis:
             "The magnetic field peaks at its core.\n"
             "It is critical to note each failed request in the log.\n"
             "It is important to stress-test the lock.\n"
+            "It's worth saying at least a few words about the lift.\n"
+            "It is important to add salt to the soup.\n"
+            "The staff said that the lift works.\n"
         )
         assert rule_lines("stock-emphasis", text) == []
 
@@ -387,6 +422,15 @@ class TestHistoryInDocument:
         )
         assert rule_lines("history-in-document", text) == [1, 2, 3, 4, 5, 6, 7]
 
+    def test_flags_corrections_of_drafts_and_reads_the_reader_never_saw(self) -> None:
+        text = (
+            "The loan count, which earlier drafts called visits, is in the appendix.\n"
+            "Our first read had the north branch ahead.\n"
+            "The rota had two errors, now fixed in the shared sheet.\n"
+            "The total is now corrected.\n"
+        )
+        assert rule_lines("history-in-document", text) == [1, 2, 3, 4]
+
     def test_leaves_changes_in_the_world_alone(self) -> None:
         text = (
             "Visitors who saw the poster no longer asked for directions.\n"
@@ -394,6 +438,7 @@ class TestHistoryInDocument:
             "The loan rate changed from 4% to 6% after the reopening.\n"
             "The branch was previously a post office.\n"
             "The survey took its figures from an earlier version of the census.\n"
+            "Earlier write-ups measured the average wait; we asked who waits longest.\n"
         )
         assert rule_lines("history-in-document", text) == []
 
@@ -480,6 +525,22 @@ class TestRatherThan:
         text = "It's less about speed and more about trust.\n"
         assert rule_lines("rather-than", text) == []
 
+    def test_flags_other_connectives_and_a_sentence_about_what_it_is_not(self) -> None:
+        text = (
+            "We count the loans instead of the visits.\n"
+            "The branch is a library as opposed to a café.\n"
+            "The rota is a guide and not a rule.\n"
+            "The van goes north. It isn't a replacement for the branch.\n"
+        )
+        assert rule_lines("rather-than", text) == [1, 2, 3, 4]
+
+    def test_leaves_a_plain_instead_and_a_sentence_about_what_it_is_alone(self) -> None:
+        text = (
+            "Instead of driving, take the bus.\n"
+            "The van goes north. It is a replacement for the old bus.\n"
+        )
+        assert rule_lines("rather-than", text) == []
+
 
 class TestCannotRuleOut:
     def test_flags_conclusions_read_off_an_interval_edge(self) -> None:
@@ -499,11 +560,82 @@ class TestCannotRuleOut:
         assert rule_lines("cannot-rule-out", text) == []
 
 
+class TestPowerRead:
+    def test_flags_results_read_off_power_and_winners_inside_the_noise(self) -> None:
+        text = (
+            "The counts would usually have caught a drop worth 30 loans a week.\n"
+            "The survey cannot detect a change smaller than about 5 visits a day.\n"
+            "The expected change is likely below what the test can detect.\n"
+            "The north branch is likely the best of the three.\n"
+        )
+        assert rule_lines("power-read", text) == [1, 2, 3, 4]
+
+    def test_leaves_point_estimates_and_plain_power_statements_alone(self) -> None:
+        text = (
+            "The survey is too small to show a difference between branches, and we found none.\n"
+            "We can probably rule out larger effects.\n"
+            "Late opening added about 30 loans a week.\n"
+            "The camera cannot see the back door.\n"
+        )
+        assert rule_lines("power-read", text) == []
+
+
+class TestUniversalNegative:
+    def test_flags_claims_that_nothing_exists_or_ever_happened(self) -> None:
+        text = (
+            "No branch has ever opened on a Sunday.\n"
+            "In a survey of branches on 2026-03-01, none varied its opening hours.\n"
+            "Branches to date have not opened on Sundays.\n"
+            "No rural branch has had a mobile van.\n"
+            "The late shift has never been tried.\n"
+        )
+        assert rule_lines("universal-negative", text) == [1, 2, 3, 4, 5]
+
+    def test_leaves_claims_scoped_to_a_search_alone(self) -> None:
+        text = (
+            "We could not find a branch that opens on Sundays.\n"
+            "We found no branch that opens on Sundays.\n"
+            "The branch no longer has a van.\n"
+            "No one at the desk knew the answer.\n"
+        )
+        assert rule_lines("universal-negative", text) == []
+
+
+class TestNumberNotation:
+    def test_flags_shares_written_as_counts_and_metrics_at_a_cutoff_in_words(self) -> None:
+        text = (
+            "The shelf held the requested book 1.8 times in 100.\n"
+            "About 4 in 10 visitors come by bus.\n"
+            "Two of every 100 loans come back late.\n"
+            "Late returns run 3 per hundred loans.\n"
+            "The catalogue search reached NDCG at 10 of 0.40.\n"
+            "Recall in the top 5 rose for the new search.\n"
+        )
+        assert rule_lines("number-notation", text) == [1, 2, 3, 4, 5, 6]
+
+    def test_leaves_counts_of_things_durations_and_standard_notation_alone(self) -> None:
+        text = (
+            "Three of 10 volunteers stayed late.\n"
+            "The page loads 2 in 100 ms.\n"
+            "We asked 40 of the 1,000 members.\n"
+            "The reading test scored the page 61 out of 100.\n"
+            "The catalogue search reached NDCG@10 of 0.40 and 2% of loans came back late.\n"
+        )
+        assert rule_lines("number-notation", text) == []
+
+
 class TestCleftSentence:
     def test_flags_cleft_and_pseudo_cleft_sentences(self) -> None:
         text = (
             "What keeps the queue short is the second desk.\n"
             "It is the narrow door that causes the delay.\n"
+        )
+        assert rule_lines("cleft-sentence", text) == [1, 2]
+
+    def test_flags_a_reverse_pseudo_cleft_anywhere_in_the_sentence(self) -> None:
+        text = (
+            "Adding a second desk is what keeps the queue short.\n"
+            "In winter, a wider door is exactly what the branch needs.\n"
         )
         assert rule_lines("cleft-sentence", text) == [1, 2]
 
@@ -513,6 +645,9 @@ class TestCleftSentence:
             "It is likely that the lift was broken.\n"
             "The narrow door slows the queue.\n"
             "What-if planning helps the rota.\n"
+            "The question is what to do next.\n"
+            "Is a second desk what the branch needs?\n"
+            "The council asked what the branch needs.\n"
         )
         assert rule_lines("cleft-sentence", text) == []
 

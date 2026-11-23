@@ -466,6 +466,7 @@ class TestSupportingStatistic:
             "The crust darkened, with a p-value below 0.05.",
             "The crust darkened, with a p-value that was less than 0.05.",
             "Loaves rose higher in it (p under 0.05).",
+            "The probe reads the heat to within ±1.1% at the back of the oven.",
         )
         text = OVEN_OPENING + "\n\n".join(sentences) + "\n"
         paragraph_lines = [3 + 2 * index for index in range(len(sentences))]
