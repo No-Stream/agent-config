@@ -663,6 +663,10 @@ def main(arguments: Sequence[str] | None = None) -> int:
     options = parser.parse_args(arguments)
     if options.against is not None and len(options.inputs) != 1:
         parser.error("--against compares one input with OLD; give exactly one INPUT")
+    paths = [*options.inputs, *([] if options.against is None else [options.against])]
+    missing = [path for path in paths if path != "-" and not Path(path).is_file()]
+    if missing:
+        parser.error(f"no such file: {', '.join(missing)}")
     against = None if options.against is None else _read_input(options.against)
     all_findings: list[dict[str, object]] = []
     text_findings: list[str] = []

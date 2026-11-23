@@ -838,6 +838,14 @@ class TestCli:
         assert _run_cli("--budget", "0", str(path)).returncode == 2
         assert _run_cli("--against", str(path), str(path), str(path)).returncode == 2
 
+    def test_rejects_a_missing_input_or_against_file(self, tmp_path: Path) -> None:
+        path = tmp_path / "doc.md"
+        path.write_text("A clear sentence.\n", encoding="utf-8")
+        missing = str(tmp_path / "missing.md")
+        assert _run_cli(missing).returncode == 2
+        assert _run_cli(str(path), missing).returncode == 2
+        assert _run_cli("--against", missing, str(path)).returncode == 2
+
 
 def _run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
     script_path = Path(lint_prose.__file__).resolve()
