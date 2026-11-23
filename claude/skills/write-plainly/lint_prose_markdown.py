@@ -353,7 +353,12 @@ def nested_sections(blocks: list[Block]) -> list[tuple[Block, list[Block]]]:
     return sections
 
 
+def first_rule(blocks: list[Block]) -> int:
+    """Return the index of the first horizontal rule, or the number of blocks when there is none."""
+    return next((index for index, block in enumerate(blocks) if block.kind == "break"), len(blocks))
+
+
 def pr_appendix_as_back_matter(blocks: list[Block]) -> list[Block]:
     """Mark the blocks below a pull request description's first horizontal rule as back matter."""
-    rule = next((index for index, block in enumerate(blocks) if block.kind == "break"), len(blocks))
+    rule = first_rule(blocks)
     return [*blocks[:rule], *(replace(block, section="back-matter") for block in blocks[rule:])]

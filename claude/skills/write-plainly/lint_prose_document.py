@@ -12,6 +12,7 @@ from lint_prose_markdown import (
     Block,
     Finding,
     blank_match,
+    first_rule,
     heading_level,
     is_summary_heading,
     nested_sections,
@@ -153,6 +154,10 @@ def short_paragraph_findings(blocks: list[Block]) -> list[Finding]:
     return findings
 
 
+def _words(blocks: list[Block]) -> int:
+    return sum(len(WORD.findall(block.text)) for block in blocks)
+
+
 def heading_density_findings(blocks: list[Block], prose: list[Block]) -> list[Finding]:
     """Count the headings at every level below a lone H1 title and outside the back matter
     against a budget."""
@@ -161,7 +166,7 @@ def heading_density_findings(blocks: list[Block], prose: list[Block]) -> list[Fi
         for heading, _ in nested_sections(blocks)
         if heading.section != "back-matter"
     ]
-    words = sum(len(WORD.findall(block.text)) for block in prose)
+    words = _words(prose)
     budget = FREE_SECTIONS + words // WORDS_PER_EXTRA_SECTION
     if len(sections) <= budget:
         return []
@@ -274,11 +279,7 @@ def summary_findings(blocks: list[Block]) -> list[Finding]:
     return findings
 
 
-def _words(blocks: list[Block]) -> int:
-    return sum(len(WORD.findall(block.text)) for block in blocks)
-
-
-def main_text_words(blocks: list[Block]) -> int:
+def _main_text_words(blocks: list[Block]) -> int:
     """Count the words of paragraphs and list items outside the back matter.
 
     Headings, tables, figures, captions, code, quotations and footnotes are not main text.
@@ -305,7 +306,7 @@ def _appendix_words(blocks: list[Block]) -> int:
 
 def budget_findings(blocks: list[Block], budget: int) -> list[Finding]:
     """Flag main text more than a tenth over the agreed word budget."""
-    words = main_text_words(blocks)
+    words = _main_text_words(blocks)
     if words * 100 <= budget * BUDGET_TOLERANCE_PERCENT:
         return []
     measurement = f"main text has {words} words against a budget of {budget}"
@@ -315,7 +316,7 @@ def budget_findings(blocks: list[Block], budget: int) -> list[Finding]:
 def revision_findings(blocks: list[Block], old_blocks: list[Block]) -> list[Finding]:
     """Flag a revision whose main text grew, and on a second line one whose appendix grew."""
     findings: list[Finding] = []
-    words, old_words = main_text_words(blocks), main_text_words(old_blocks)
+    words, old_words = _main_text_words(blocks), _main_text_words(old_blocks)
     if words > old_words:
         measurement = f"main text has {words} words against {old_words} in the old version"
         findings.append(Finding("revision-growth", 1, 1, measurement))
@@ -356,13 +357,12 @@ def _pr_summary_problems(summary: list[Block]) -> list[str]:
 def pr_shape_findings(blocks: list[Block]) -> list[Finding]:
     """Flag a pull request description whose summary, above the first horizontal rule, is long or
     carries a list, a table, code, a bold lead-in or a heading after one leading title."""
-    content = [block for block in blocks if block.kind != "masked"]
-    rule = next((index for index, block in enumerate(content) if block.kind == "break"), None)
-    problems = _pr_summary_problems(content[:rule])
+    rule = first_rule(blocks)
+    problems = _pr_summary_problems([block for block in blocks[:rule] if block.kind != "masked"])
     if not problems:
         return []
     listed = ", ".join(problems[:-1]) + " and " + problems[-1] if len(problems) > 1 else problems[0]
     where = "summary above the first horizontal rule has"
-    if rule is None:
+    if rule == len(blocks):
         where = "no horizontal rule, and the whole description has"
     return [Finding("pr-shape", 1, 1, f"{where} {listed}")]
