@@ -476,7 +476,8 @@ class TestNumberDensity:
             "The library lends tools as well as books. Members borrow drills, ladders and sewing"
             " machines. The shed behind the branch holds 140 tools. Loans run for a week. A late"
             " tool costs $2 a day. Volunteers check each tool when it comes back. Broken tools go"
-            " to a repair night. The council pays for new tools. Last spring it bought 30 of them.\n"
+            " to a repair night. The council pays for new tools. Last spring it bought 30 of"
+            " them.\n"
         )
         assert rule_lines("number-density", text) == [1]
 

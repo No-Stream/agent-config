@@ -535,7 +535,7 @@ def _is_ordinary_word(token: str) -> bool:
 
 
 def _spells(acronym: str, words: str) -> bool:
-    """Whether the initials of the words, with or without small words, or their capitals spell it."""
+    """Whether the words' initials, with or without small words, or their capitals spell it."""
     parts = re.findall(r"[^\s-]+", words)
     initials = "".join(part[0] for part in parts)
     content_initials = "".join(part[0] for part in parts if part.lower() not in TITLE_SMALL_WORDS)

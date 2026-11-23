@@ -144,7 +144,8 @@ WORDY_PHRASES = (
 FINANCE_WORDS = (
     r"foregone\b(?! conclusion)|recoup(?:s|ed|ing)?\b"
     r"|repa(?:y|ys|id|ying) (?:its|their|the|our) (?:cost|costs|outlay|investment|price)\b"
-    r"|carr(?:y|ies|ied|ying) (?:about |roughly |nearly |over |almost |only |just )?[-+]?\d[\d.,]*\s?%"
+    r"|carr(?:y|ies|ied|ying) (?:about |roughly |nearly |over |almost |only |just )?"
+    r"[-+]?\d[\d.,]*\s?%"
 )
 METAPHOR_IMAGES = (
     r"(?:raise[sd]?|raising|lower(?:s|ed|ing)?|clear(?:s|ed|ing)?|set(?:s|ting)?|meet(?:s|ing)?|met)"
@@ -172,7 +173,8 @@ SIGNPOSTS = (
     r"|let(?:['’]s| us) (?:dive|dig|jump) in(?:to)?"
     r"|as (?:we|you)(?:['’]ll| will) see (?:below|later|shortly|in the next)"
     r"|as (?:described|shown|explained|discussed|detailed|outlined) below"
-    rf"|this (?:{DOCUMENT_WORDS}) (?:will )?(?:cover|describe|explain|outline|discuss|walk)(?:s|es)?\b"
+    rf"|this (?:{DOCUMENT_WORDS}) (?:will )?"
+    r"(?:cover|describe|explain|outline|discuss|walk)(?:s|es)?\b"
     r"|(?<![a-z,] )(?:in short|in sum|in summary|to sum up|to summari[sz]e|to wrap up|in closing"
     r"|in conclusion|all in all|taken together)(?=,)"
 )
@@ -317,7 +319,7 @@ TELL_RULES = {
         r"|great question|is there anything else|you['’]re absolutely right)\b"
     ),
 }
-# Pictographic emoji blocks, BMP emoji shown as pictures, and arrows; the footnote return "↩" passes.
+# Pictographic emoji, BMP emoji shown as pictures, and arrows; the footnote return "↩" passes.
 EMOJI = (
     r"\U0001F300-\U0001F64F\U0001F680-\U0001F6FF\U0001F900-\U0001F9FF\U0001FA70-\U0001FAFF"
     r"\u2614\u2615\u26A1\u26D4\u2705\u274C\u2728\u2753-\u2755\u2757\u2B50"
