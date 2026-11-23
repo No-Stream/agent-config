@@ -3,15 +3,22 @@
 import json
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 SLOP_GUARD_OPTIONS = ["-v", "--counts", "-t", "100", "-c"]
 JUPYTEXT_OPTIONS = ["--quiet", "--to", "md"]
 
 
+def _reject(tool: str, arguments: list[str]) -> NoReturn:
+    """Exit 2, which check-prose.sh reads as a failed linter, so a leaked option never passes."""
+    print(f"unexpected {tool} arguments: {arguments}", file=sys.stderr)
+    sys.exit(2)
+
+
 def _slop_guard(arguments: list[str]) -> int:
     """Score each file 100 less 10 per em dash, in slop-guard's text summary format."""
     if arguments[:5] != SLOP_GUARD_OPTIONS or not Path(arguments[5]).is_file():
-        sys.exit(f"unexpected sg arguments: {arguments}")
+        _reject("sg", arguments)
     failed = False
     for path in arguments[6:]:
         text = Path(path).read_text(encoding="utf-8")
@@ -27,7 +34,7 @@ def _slop_guard(arguments: list[str]) -> int:
 def _jupytext(arguments: list[str]) -> int:
     """Write a notebook's markdown cells as they are and its code cells as fenced blocks."""
     if arguments[:3] != JUPYTEXT_OPTIONS or "-o" not in arguments:
-        sys.exit(f"unexpected jupytext arguments: {arguments}")
+        _reject("jupytext", arguments)
     output = Path(arguments[arguments.index("-o") + 1])
     notebook = json.loads(Path(arguments[-1]).read_text(encoding="utf-8"))
     parts = []
@@ -44,7 +51,7 @@ def main() -> None:
         sys.exit(_slop_guard(arguments[3:]))
     if arguments[:3] == ["--from", "jupytext@latest", "jupytext"]:
         sys.exit(_jupytext(arguments[3:]))
-    sys.exit(f"unexpected uvx arguments: {arguments}")
+    _reject("uvx", arguments)
 
 
 if __name__ == "__main__":

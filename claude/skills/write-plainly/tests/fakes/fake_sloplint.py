@@ -10,7 +10,8 @@ def main() -> None:
     if arguments[:4] != ["check", "--markdown", "--ignore", "impact-noun-bare"] or not all(
         Path(path).is_file() for path in paths
     ):
-        sys.exit(f"unexpected sloplint arguments: {arguments}")
+        print(f"unexpected sloplint arguments: {arguments}", file=sys.stderr)
+        sys.exit(2)
     hits = [
         f"{path}:{number}:{line.index('—') + 1}: info (medium confidence) em-dash  Em dash."
         for path in paths
