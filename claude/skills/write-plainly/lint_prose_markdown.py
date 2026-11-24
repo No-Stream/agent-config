@@ -1,13 +1,24 @@
-"""The markdown model lint_prose.py reads: masked lines, blocks, sections and sentences."""
+"""The markdown model lint_prose.py reads: masked lines, blocks, sections and sentences.
+
+`prose_blocks` and `stretches` also prepare prose as Clark, Martin and Mahowald's paper does
+(arXiv:2610.29162, Appendix A.5) for the syntax parse and the surprisal study: markup goes, a
+backslash escape leaves its character, inline code, URLs, paths, identifiers and math each become
+the one word PLACEHOLDER, and an arrow, emoji or stray math symbol ends a stretch, which no
+sentence or word pair crosses.
+"""
 
 from __future__ import annotations
 
+import json
 import re
+import sys
 import textwrap
-from dataclasses import dataclass, replace
+import unicodedata
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, replace
 from typing import Literal
 
-from lint_prose_patterns import QUOTATION
+from lint_prose_patterns import INLINE_MATH, QUOTATION
 
 EXCERPT_LEFT_CONTEXT = 30
 HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+")
@@ -30,10 +41,70 @@ UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
 OUTER_PIPES = re.compile(r"^\||(?<!\\)\|$")
 ABBREVIATION_PERIODS = re.compile(r"(?i:\b(?:e\.g|i\.e|vs|dr|fig|et al)\.)|\betc\.(?!\s+[A-Z])")
 SENTENCE_END = re.compile(r"[.!?]+[\"'’”)\]]*(?=\s|\Z)")
-WORD = re.compile(r"[A-Za-z0-9]+(?:['’.,-][A-Za-z0-9]+)*")
+
+
+def _combining_marks() -> str:
+    """Every combining mark (Unicode category M) as character-class ranges, none of them ASCII."""
+    ranges: list[list[int]] = []
+    for code in range(sys.maxunicode + 1):
+        if unicodedata.category(chr(code))[0] != "M":
+            continue
+        if ranges and ranges[-1][1] == code - 1:
+            ranges[-1][1] = code
+        else:
+            ranges.append([code, code])
+    return "".join(chr(low) if low == high else f"{chr(low)}-{chr(high)}" for low, high in ranges)
+
+
+# Letters and digits in any script with their marks ("p̂"); the lookahead skips marks after ASCII.
+WORD_RUN = rf"(?:[^\W_]+(?:(?=[^\x00-\x7f])[{_combining_marks()}]+)?)+"
+WORD = re.compile(rf"{WORD_RUN}(?:['’.,-]{WORD_RUN})*")
+HEADING_WORD = re.compile(rf"(?=[^\W\d_])(?:{WORD_RUN}|')+")
+PLACEHOLDER = "Xyzzy"
+# CommonMark's code span: a whole run of backticks, closed only by a run of the same length.
+CODE_SPAN = r"(?<!`)(?P<ticks>`+)(?!`).+?(?<!`)(?P=ticks)(?!`)"
+# CommonMark's inline link after its text: a destination and an optional title, in parentheses.
+LINK_TAIL = (
+    r"\]\(\s*(?:<[^<>\n]*>|(?:[^\s()\\]|\\.|\((?:[^\s()\\]|\\.)*\))*)"
+    r"""(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\s*\)"""
+)
+# CommonMark's raw HTML tags; text in angle brackets that is no tag stays prose ("<file_name>").
+ATTRIBUTE = r"""\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?"""
+HTML_TAG = rf"<[A-Za-z][A-Za-z0-9-]*(?:{ATTRIBUTE})*\s*/?>|</[A-Za-z][A-Za-z0-9-]*\s*>"
+AUTOLINK = (
+    r"<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>"
+    r"|<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*>"
+)
+# Inline markup the linter blanks, but a CommonMark escape it keeps; the first match decides.
+INLINE_MARKUP = re.compile(
+    r"(?P<escape>\\[!-/:-@\[-`{-~])"
+    rf"|(?P<drop><!--.*?-->|\[\d+{LINK_TAIL}|{LINK_TAIL}|\[\^[^\]]+\])"
+    rf"|(?P<placeholder>{CODE_SPAN}|(?i:https?://)\S*[^\s.,;:!?)\]'\"])",
+    re.DOTALL,
+)
+# A character of a path or code name, where a converter may have escaped an underscore.
+NAME = r"(?:\w|\\_)"
+PATH = r"(?:[\w.-]|\\_)"
+# What the paper's preparation also drops, reads as one word, or stops at, in this order.
+PROSE_MARKUP = re.compile(
+    rf"(?P<link>!\[[^\]]*{LINK_TAIL}|\]\[[^\]]*\])"
+    rf"|(?P<placeholder>{AUTOLINK}|"
+    + INLINE_MATH.pattern
+    + rf"|(?<![\w/])(?:~|\.{{1,2}})?/{PATH}+(?:/{PATH}+)*/?"
+    rf"|\b{PATH}+(?:/{PATH}+)+\.[A-Za-z]\w{{0,4}}\b|\b{NAME}+(?:/{NAME}+){{2,}}\b"
+    rf"|\b[A-Za-z]{NAME}*\\?_{NAME}*[A-Za-z0-9]\b|\b[A-Za-z_](?:{NAME}|\.)*\(\)"
+    rf"|\b[a-z][a-z0-9]+(?:\.[a-z](?:[a-z0-9_]|\\_)+)+\b)"
+    rf"|(?P<tag>{HTML_TAG})"
+    r"|(?P<emphasis>\*+|~~|(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])"
+    rf"|\[(?=(?:[^\[\]\\]|\\.|\[[^\[\]]*\])*(?:{LINK_TAIL}|\]\[)))"
+    r"|(?P<stop><=>|->|=>|<-|[\u2190-\u21ff\u27f0-\u27ff\u2900-\u297f]"
+    r"|[\U0001f000-\U0001faff\u2600-\u27bf\ufe0f]"
+    r"|[=\u2248\u2260\u2264\u2265\u00b1\u00d7\u00f7\u2211\u220f\u221a\u221e]"
+    r"|(?<=\s)[<>](?=\s))",
+)
 
 Section = Literal["summary", "back-matter", "body"]
-# A masked block is a line that inline masking left blank, such as a lone link or comment.
+# A masked block is a paragraph that inline masking left blank, such as a lone link or comment.
 BlockKind = Literal[
     "paragraph",
     "list-item",
@@ -47,7 +118,7 @@ BlockKind = Literal[
     "table",
     "masked",
 ]
-LineKind = Literal["", "frontmatter", "code", "quote", "table", "masked"]
+LineKind = Literal["", "frontmatter", "code", "quote", "table"]
 PROSE_KINDS: tuple[BlockKind, ...] = ("paragraph", "list-item", "caption", "footnote")
 
 
@@ -64,13 +135,14 @@ class Finding:
 @dataclass(frozen=True)
 class Block:
     """One markdown block, in document order, with markup blanked from its text; the kinds in
-    PROSE_KINDS are prose."""
+    PROSE_KINDS are prose, and `marker_end` is where a list or footnote marker ends."""
 
     kind: BlockKind
     first_line: int
     text: str
     section: Section
     source_lines: tuple[str, ...]
+    marker_end: int = 0
 
     def position(self, offset: int) -> tuple[int, int]:
         line_start = self.text.rfind("\n", 0, offset) + 1
@@ -95,6 +167,7 @@ class _BlockDraft:
     after_image: bool
     section: Section
     lines: list[str]
+    marker_end: int = 0
 
     def finish(self, original_lines: list[str]) -> Block:
         """Build the block; its lines are consecutive source lines from its first line."""
@@ -102,10 +175,13 @@ class _BlockDraft:
         caption = CAPTION_START.match(text.lstrip()) or (
             self.after_image and sentence_count(text) <= MAX_CAPTION_SENTENCES
         )
-        kind = "caption" if self.kind == "paragraph" and caption else self.kind
+        if self.kind == "paragraph" and not text.strip():
+            kind: BlockKind = "masked"
+        else:
+            kind = "caption" if self.kind == "paragraph" and caption else self.kind
         first = self.first_line - 1
         source_lines = tuple(original_lines[first : first + len(self.lines)])
-        return Block(kind, self.first_line, text, self.section, source_lines)
+        return Block(kind, self.first_line, text, self.section, source_lines, self.marker_end)
 
 
 def blank_match(match: re.Match[str]) -> str:
@@ -113,13 +189,9 @@ def blank_match(match: re.Match[str]) -> str:
 
 
 def _mask_inline(text: str) -> str:
-    text = re.sub(r"<!--.*?-->", blank_match, text, flags=re.DOTALL)
-    text = re.sub(r"`+[^`]*`+", blank_match, text)
-    text = re.sub(r"\[\d+\]\([^)]*\)", blank_match, text)
-    text = re.sub(r"\]\([^)]*\)", blank_match, text)
-    text = re.sub(r"https?://\S*[^\s.,;:!?)\]'\"]", blank_match, text, flags=re.IGNORECASE)
-    text = re.sub(r"\[\^[^\]]+\]", blank_match, text)
-    return text
+    return INLINE_MARKUP.sub(
+        lambda match: match.group() if match.lastgroup == "escape" else blank_match(match), text
+    )
 
 
 def mask_quotations(text: str) -> str:
@@ -201,11 +273,30 @@ def masked_lines(text: str) -> tuple[list[str], list[str], list[LineKind]]:
             kinds[index] = "table"
         else:
             visible_lines[index] = _mask_inline(line)
-            if line.strip() and not visible_lines[index].strip():
-                kinds[index] = "masked"
             continue
         visible_lines[index] = ""
     return original_lines, visible_lines, kinds
+
+
+def write_findings(
+    results: Iterable[tuple[str, list[Finding]]], messages: dict[str, str], *, as_json: bool
+) -> int:
+    """Write each path's findings to stdout, as JSON or as the lines check-prose.sh reads, and
+    return the linter's exit code: 1 when anything was found, else 0."""
+    records = [
+        {**asdict(finding), "message": messages[finding.rule], "path": path}
+        for path, findings in results
+        for finding in findings
+    ]
+    if as_json:
+        sys.stdout.write(json.dumps(records, ensure_ascii=False, indent=2) + "\n")
+    else:
+        sys.stdout.writelines(
+            f"{record['path']}:{record['line']}:{record['column']}: {record['rule']}: "
+            f"{record['message']} | {record['excerpt']}\n"
+            for record in records
+        )
+    return 1 if records else 0
 
 
 def excerpt(line: str, column: int) -> str:
@@ -243,12 +334,13 @@ def is_heading(line: str) -> bool:
 
 
 def heading_text(line: str) -> str:
-    heading = re.sub(r"`+[^`]*`+", " ", HEADING.sub("", line))
+    heading = re.sub(CODE_SPAN, " ", HEADING.sub("", line))
     return re.sub(r"[*_~]", "", heading).strip(" #:")
 
 
 def heading_words(line: str) -> list[str]:
-    return re.findall(r"[A-Za-z][A-Za-z0-9']*", heading_text(line))
+    """A heading's words: each starts with a letter in any script and may hold an apostrophe."""
+    return HEADING_WORD.findall(heading_text(line))
 
 
 def is_summary_heading(line: str) -> bool:
@@ -305,7 +397,8 @@ def parse_blocks(
             drafts.append(_BlockDraft(kind, line_number, False, section, [visible]))
             open_kind, in_list, after_image = "", False, image
             continue
-        if not visible.strip():
+        # A line of only inline code or a link is not blank, so it stays in its paragraph.
+        if not source.strip():
             open_kind = ""
             continue
         footnote = FOOTNOTE_DEFINITION.match(source)
@@ -314,10 +407,125 @@ def parse_blocks(
         if marker or open_kind != "prose":
             in_list = bool(list_marker) or (in_list and visible.startswith("  "))
             kind = "footnote" if footnote else "list-item" if in_list else "paragraph"
-            drafts.append(_BlockDraft(kind, line_number, after_image, section, []))
+            # Read on the source, since the visible marker also covers a blanked code span after it.
+            source_marker = footnote or (LIST_ITEM.match(source) if list_marker else None)
+            marker_end = source_marker.end() if source_marker else 0
+            drafts.append(_BlockDraft(kind, line_number, after_image, section, [], marker_end))
             open_kind, after_image = "prose", False
         drafts[-1].lines.append(" " * marker.end() + visible[marker.end() :] if marker else visible)
     return [draft.finish(original_lines) for draft in drafts]
+
+
+def prose_blocks(text: str) -> list[Block]:
+    """The prose blocks of a markdown text, in order."""
+    original_lines, visible_lines, line_kinds = masked_lines(text)
+    blocks = parse_blocks(original_lines, visible_lines, line_kinds)
+    return [block for block in blocks if block.kind in PROSE_KINDS]
+
+
+@dataclass(frozen=True)
+class Stretch:
+    """Prose prepared as the paper prepares it, with the block offsets that each of its
+    characters covers and the offsets in it where a PLACEHOLDER starts."""
+
+    text: str
+    starts: tuple[int, ...]
+    ends: tuple[int, ...]
+    placeholder_starts: frozenset[int]
+    block: Block
+
+    def part(self, start: int, end: int) -> Stretch:
+        """The stretch of text[start:end], such as one of its sentences."""
+        return Stretch(
+            self.text[start:end],
+            self.starts[start:end],
+            self.ends[start:end],
+            frozenset(
+                offset - start for offset in self.placeholder_starts if start <= offset < end
+            ),
+            self.block,
+        )
+
+
+class _StretchBuilder:
+    """Collects the stretches of one block, with the block offsets of each character."""
+
+    def __init__(self, block: Block) -> None:
+        self.block = block
+        self.stretches: list[Stretch] = []
+        self._reset()
+
+    def _reset(self) -> None:
+        self.text: list[str] = []
+        self.starts: list[int] = []
+        self.ends: list[int] = []
+        self.placeholder_starts: set[int] = set()
+        self.placeholder_end = -1
+
+    def _append(self, character: str, start: int, end: int) -> None:
+        self.text.append(character)
+        self.starts.append(start)
+        self.ends.append(end)
+
+    def add(self, character: str, start: int, end: int) -> None:
+        """Append a character; whitespace becomes one space and none opens a stretch, and a
+        letter or digit right after a placeholder is set apart from it."""
+        if character.isspace():
+            if not self.text or self.text[-1] == " ":
+                return
+            character = " "
+        elif character.isalnum() and len(self.text) == self.placeholder_end:
+            self._append(" ", start, start)
+        self._append(character, start, end)
+
+    def add_placeholder(self, start: int, end: int) -> None:
+        """Append PLACEHOLDER as a word of its own, apart from any letter or digit before it."""
+        if self.text and self.text[-1].isalnum():
+            self._append(" ", start, start)
+        self.placeholder_starts.add(len(self.text))
+        for character in PLACEHOLDER:
+            self._append(character, start, end)
+        self.placeholder_end = len(self.text)
+
+    def close(self) -> None:
+        """End the current stretch, so no sentence or word pair crosses this point."""
+        kept = len(self.text)
+        while kept and self.text[kept - 1] == " ":
+            kept -= 1
+        if kept:
+            self.stretches.append(
+                Stretch(
+                    "".join(self.text[:kept]),
+                    tuple(self.starts[:kept]),
+                    tuple(self.ends[:kept]),
+                    frozenset(self.placeholder_starts),
+                    self.block,
+                )
+            )
+        self._reset()
+
+
+def stretches(block: Block) -> list[Stretch]:
+    """A prose block's text as the paper prepares it, cut at each arrow, emoji or math symbol;
+    the linter's own inline markup comes first, then the paper's further cases."""
+    source = "\n".join(block.source_lines)
+    builder = _StretchBuilder(block)
+    position = block.marker_end
+    while position < len(source):
+        markup = INLINE_MARKUP.match(source, position) or PROSE_MARKUP.match(source, position)
+        if markup is None:
+            builder.add(source[position], position, position + 1)
+            position += 1
+            continue
+        if markup.lastgroup == "escape":
+            builder.add(source[markup.end() - 1], markup.end() - 1, markup.end())
+        elif markup.lastgroup == "placeholder":
+            builder.add_placeholder(markup.start(), markup.end())
+        elif markup.lastgroup == "stop":
+            builder.close()
+        position = markup.end()
+    builder.close()
+    return builder.stretches
 
 
 def top_sections(blocks: list[Block]) -> list[tuple[Block | None, list[Block]]]:

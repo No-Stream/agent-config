@@ -44,12 +44,13 @@ What a passage gives the reader:
   The test: would this sentence fit just as well in a document about a different project? Then it is generic: replace
   it with the specific thing this work found, or delete it. "This approach," pointing back at something named earlier,
   does not make a new general claim specific.
-- `no news`: a sentence or clause that repeats a point the document already made, states what the reader could have
-  guessed from the sentence before ("Slow builds frustrate developers"), explains what the intended reader knows ("a
-  percentage, the share out of every hundred," "a confidence interval, a range built to contain the true value in 95% of
-  repeated tests," "an ablation, a run with one component removed" for readers who train models), explains a term a
-  second time, or tells the intended reader what they themselves did or said or what everyone in their organization
-  knows. A short explanation of a term the intended reader does not know passes.
+- `no news`: a sentence or clause that repeats a point the document already made, or states what the reader could have
+  guessed from the sentence before ("Slow builds frustrate developers"). So does one that explains what the intended
+  reader knows, such as "a percentage, the share out of every hundred" or "a confidence interval, a range built to
+  contain the true value in 95% of repeated tests." For readers who train models, "an ablation, a run with one component
+  removed" counts too. So does one that explains a term a second time, or tells the intended reader what they themselves
+  did or said or what everyone in their organization knows. A short explanation of a term the intended reader does not
+  know passes.
 - `wrap-up`: a paragraph whose last sentence draws a general moral from it or closes on a hope or forecast that names
   nothing ("Overall, the new process sets the team up for success"). The paragraph should end on its last new fact or
   consequence; a last sentence that restates or sums up the paragraph is `no news`.
@@ -77,9 +78,11 @@ What a passage gives the reader:
   fix is the sentence that reconciles them from the document's own facts (population, window, definition), or requires
   author input.
 - `unclear reasoning`: an unclear actor or reference, a buried conclusion, a noun stack, or a condition placed after the
-  claim it limits. It also covers a missing step that the intended reader needs to follow the explanation or to carry
-  out a procedure. An ask of the reader (a decision, a review, an approval) that does not say what each answer changes
-  and which one the writer recommends counts too.
+  claim it limits. A noun stack counts, however short, when the reader has to guess how its words group or relate: is
+  "the old server migration plan" the old plan or the plan to migrate the old servers? The fix writes the relation out
+  with "of," "for" or a clause ("the plan to migrate the old servers"). It also covers a missing step that the intended
+  reader needs to follow the explanation or to carry out a procedure. An ask of the reader (a decision, a review, an
+  approval) that does not say what each answer changes and which one the writer recommends counts too.
 - `per-group sentences`: a comparison across several groups (arms, segments, trials, models) written as one sentence
   per group. The fix is a table that replaces those sentences: say which sentences it replaces, and give its rows and
   columns from the document or the named source. Never propose a table beside the sentences it repeats.
@@ -103,23 +106,29 @@ How a sentence makes its claim:
   reader's field that the document uses without a short plain explanation where it first appears ("the
   Benjamini-Hochberg procedure" for software engineers, "idempotent" for data scientists). It also covers vocabulary
   carried over from the source material (a project's own name for a test, a read or a dataset) and a nickname, label or
-  compressed noun phrase coined during the work ("the warm path," "tier-2 scores"). A name the document gives something
-  new ("the companion" for a function added beside an old one) counts too. So does a second name for something the
-  document already named ("the pool" and "the candidate pool"); the fix keeps the name a reader outside the work would
-  know and uses it throughout. So do an abbreviation the intended reader does not know, used before it is defined, and
-  an invented term where the field has a standard one. A term the intended reader knows, as defined above, is not
-  shorthand. The fix explains a term of art in a short plain clause where it first appears and keeps the term
-  ("idempotent, meaning that sending a request twice has the same effect as sending it once"). For any other term, the
-  fix explains it the same way or replaces it with the plain description or the standard term. Explain in words the
-  intended reader knows, never with a statistic or another unexplained term: "the estimate is too close to zero, given
-  its noise, to rule zero out," not "a t of 1.4 on 22 df."
+  compressed noun phrase coined during the work ("the warm path," "tier-2 scores"). So does a pair of plain words that a
+  reader outside the work has never seen together ("a two-click gap," "the late-reply cost"), whose meaning the reader
+  has to guess. A name the document gives something new ("the companion" for a function added beside an old one) counts
+  too. So does a second name for something the document already named ("the pool" and "the candidate pool"); the fix
+  keeps the name a reader outside the work would know and uses it throughout. So do an abbreviation the intended reader
+  does not know, used before it is defined, and an invented term where the field has a standard one. A term the intended
+  reader knows, as defined above, is not shorthand. The fix explains a term of art in a short plain clause where it
+  first appears and keeps the term ("idempotent, meaning that sending a request twice has the same effect as sending it
+  once"). For any other term, the fix explains it the same way or replaces it with the plain description or the standard
+  term. A coined pair is replaced with the plain words it stands for ("the two extra clicks the new menu takes").
+  Explain in words the intended reader knows, never with a statistic or another unexplained term: "the estimate is too
+  close to zero, given its noise, to rule zero out," not "a t of 1.4 on 22 df."
 - `figurative`: a word used in a sense other than its literal one for this subject, stock or fresh. That covers an idiom
   anyone could use about anything ("move the needle," "unlock," "landscape") and an artifact given a will or a voice
   ("the data wants"). It also covers an image the writer made up, such as a method called a ladder, bridge or lens, or a
   threshold called a bar or floor. So do money said to run or echo and a quantity that is held, carried, bought or
-  handed back. The fix names the literal thing: the method, the threshold, the quantity or the cause. A term of art, a
-  name the writer gives a status or option, the plainest everyday idiom, and an analogy that explains faster than the
-  literal account and is followed by the mechanism all pass.
+  handed back. A noun made into a verb for one sentence counts too ("we spreadsheeted the results"). So does a verb
+  borrowed from another subject ("a queue cushions traffic spikes," "this year's schedule mirrors last year's," "the
+  retry is masking the bug"). The fix names the literal thing: the method, the threshold, the quantity, the cause or the
+  action ("we put the results in a spreadsheet," "the queue stores requests during a spike"). A term of art, a name the
+  writer gives a status or option, the plainest everyday idiom, and an analogy that explains faster than the literal
+  account and is followed by the mechanism all pass. So does a verb the reader's field already makes from a noun, such
+  as ship, stage, gate, cache or log for engineers.
 - `maxim`: a saying about how things always go that could be lifted out and quoted on its own ("Every temporary fix
   becomes permanent"), where the reader wants the fact about this case. A testable statement about how a particular
   tool behaves ("SQLite allows one writer at a time") passes.
@@ -168,7 +177,8 @@ Problem: <what this does to the intended reader, in one or two sentences>
 Fix: delete | replace with "<text>" | move to <table | footnote | limitations section | appendix> | change the figure: <what it shows instead> | requires author input: <what is missing>
 
 Put every `shorthand` term in one finding, with a `>` line for each term's first use and a `Fix:` line for each term,
-in the same order, and group every `no news` sentence into one `no news` finding the same way:
+in the same order. Group every `no news` sentence, and every `figurative` word, into one finding of its category the
+same way:
 
 ### <n>. shorthand, <substantial | moderate>
 > <first use of the first term>

@@ -13,6 +13,7 @@ sys.path.insert(0, str(EVAL_DIR))
 sys.path.insert(0, str(EVAL_DIR.parent))
 
 import lint_prose
+import lint_syntax
 
 import false_flags
 
@@ -39,8 +40,8 @@ AGENT_PUMP = (
 )
 AGENT_WELL = (
     "Families in the valley take turns at a single well, each on its own day of the week. The"
-    " arrangement is old, and nobody knows exactly when it started. Quarrels are uncommon, since"
-    " the schedule hangs beside the well.\n"
+    " arrangement is old, and nobody knows exactly when it started. Quarrels are rare; the rota"
+    " the elders wrote settles them.\n"
 )
 # (corpus, side, register, file name, text, words)
 FIXTURES = (
@@ -142,9 +143,11 @@ class TestCollectHits:
                 }
             ),
             ("slop-guard", "contrast_pairs"): Counter({paths["human-pump.md"]: 1}),
+            ("lint_syntax", "dropped-relativizer"): Counter({paths["agent-well.md"]: 1}),
         }
         assert catalogs == {
             "lint_prose": set(lint_prose.MESSAGES),
+            "lint_syntax": set(lint_syntax.MESSAGES),
             "sloplint": {"exact-exactly", "never-fires"},
             "slop-guard": {"contrast_pairs", "placeholder"},
         }
@@ -173,14 +176,15 @@ class TestRender:
             "| rule | linter | human | agent | human / agent | human > agent"
             " | human docs | agent docs |"
         )
-        assert lines[main_table + 2 : main_table + 6] == [
+        assert lines[main_table + 2 : main_table + 7] == [
             "| contrast_pairs | slop-guard | 8.33 | 0.00 | inf | yes | 1/3 | 0/2 |",
             "| em-dash | lint_prose | 16.67 | 12.50 | 1.33 | yes | 1/3 | 1/2 |",
             "| exact-exactly | sloplint | 8.33 | 37.50 | 0.22 |  | 1/3 | 2/2 |",
+            "| dropped-relativizer | lint_syntax | 0.00 | 12.50 | 0.00 |  | 0/3 | 1/2 |",
             "",
         ]
         register_table = lines.index("## By corpus and register (hits per 1,000 words)") + 2
-        assert lines[register_table : register_table + 6] == [
+        assert lines[register_table : register_table + 7] == [
             (
                 "| rule | linter | matched all human (96 w) | matched all agent (80 w)"
                 " | techdoc human (55 w) | techdoc agent (41 w) |"
@@ -189,11 +193,14 @@ class TestRender:
             "| contrast_pairs | slop-guard | 10.42 | 0.00 | 18.18 | 0.00 |",
             "| em-dash | lint_prose | 20.83 | 12.50 | 36.36 | 24.39 |",
             "| exact-exactly | sloplint | 10.42 | 37.50 | 0.00 | 48.78 |",
+            "| dropped-relativizer | lint_syntax | 0.00 | 12.50 | 0.00 | 0.00 |",
             "",
         ]
         silent_lint_prose = ", ".join(sorted(set(lint_prose.MESSAGES) - {"em-dash"}))
-        assert lines[-3:] == [
+        silent_lint_syntax = ", ".join(sorted(set(lint_syntax.MESSAGES) - {"dropped-relativizer"}))
+        assert lines[-4:] == [
             f"- lint_prose: {silent_lint_prose}",
+            f"- lint_syntax: {silent_lint_syntax}",
             "- sloplint: never-fires",
             "- slop-guard: placeholder",
         ]

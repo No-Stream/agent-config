@@ -39,12 +39,12 @@ ARTIFACT_NOUNS = (
 ANIMATE_VERBS = (
     "argue|argues|believe|believes|care|cares|claim|claims|complain|complained|complains"
     "|hate|hates|hope|hoped|hopes|insist|insisted|insists|knew|know|knows|likes|loves"
-    "|prefer|prefers|pretend|pretended|pretends|promise|promises|refuse|refused|refuses"
+    "|prefer|prefers|pretend|pretended|pretends"
     "|said|say|says|tell|tells|think|thinks|told|tried|tries|try|understand|understands"
     "|want|wanted|wants|wish|wished|wishes|worries|worry"
 )
 ANIMATE_PROGRESSIVES = (
-    "complaining|hoping|insisting|pretending|refusing|saying|telling|thinking|trying|wanting"
+    "complaining|hoping|insisting|pretending|saying|telling|thinking|trying|wanting"
 )
 ABSTRACT_NOUNS = (
     "arm|budget|card|change|comparison|cost|design|discount|display|fee|feature|gain|group|layout"
@@ -56,19 +56,67 @@ TRANSACTION_VERBS = (
     "|earned|earns|held|hold|holds|paid|pay|pays|recoup|recoups|repay|repays|rescue|rescued"
     "|rescues|spend|spends|spent|win|wins|won"
 )
+# After "this" a participle is an adjective ("this earned income"), so no form here is one.
+THING_VERBS = "carry|crowd|earn|eat|misunderstand|recoup|repay"
+THING_VERBS_SINGULAR = "ate|carries|crowds|earns|eats|misunderstands|recoups|repays"
+THING_PROGRESSIVES = "eating|misunderstanding"
+MIND_VERBS = "hope|know|want"
+MIND_VERBS_SINGULAR = "hopes|knew|knows|wants"
+MIND_PROGRESSIVES = "hoping|wanting"
+NOT_A_SUBJECT_WORD = (
+    "a|about|after|again|all|already|also|always|an|and|another|any|are|as|at|be|been|before"
+    "|being|both|but|by|can|could|did|do|does|down|each|either|even|ever|every|few|for|from|had"
+    "|has|have|he|her|here|him|his|how|i|if|in|into|is|it|its|just|least|less|many|may|me|might"
+    "|more|most|much|must|my|neither|never|no|nor|not|nothing|now|of|off|often|on|one|ones|only"
+    "|or|other|others|our|out|over|own|she|should|so|some|something|still|such|than|that|the"
+    "|their|them|then|there|these|they|this"
+    "|those|to|too|under|up|us|very|was|we|were|what|when|where|whether|which|while|who|whom"
+    "|whose|why|will|with|would|you|your"
+)
+SUBJECT_WORD = rf"(?!(?:{NOT_A_SUBJECT_WORD})\b)(?![a-z]+ly\b)[a-z][\w-]*"
+PHRASAL_PARTICLE = r"(?!\s+(?:out|on|over|through|forward|along|off|up)\b)"
+COMMON_HYPHENATED = (
+    "copy-on-write|day-to-day|easy-to-use|end-to-end|face-to-face|first-come-first-served"
+    "|man-in-the-middle|one-to-one|out-of-date|out-of-memory|out-of-the-box|peer-to-peer"
+    "|point-to-point|run-of-the-mill|state-of-the-art|step-by-step|up-to-date|word-of-mouth"
+)
+# Each part after a hyphen starts with a letter, so dates, ranges and "COVID-19" do not count.
+HYPHENATED_WORD = rf"(?![\w-]*-and-a-half\b)(?!(?:{COMMON_HYPHENATED})(?![\w-]))[a-z\d]+"
+HYPHENATED = rf"{HYPHENATED_WORD}(?:-[a-z][a-z\d]*)+"
+LONG_HYPHENATED = rf"{HYPHENATED_WORD}(?:-[a-z][a-z\d]*){{3,}}"
+# Not part of a path, a file name, a host or an email address.
+NOT_IN_PATH_BEFORE = r"(?<![\w/.@+-])"
+NOT_IN_PATH_AFTER = r"(?![\w/@+-]|\.\w)"
 CLAUSE_START = (
     r"(?:\A\s*|[.!?;:,]\s+|\(\s*|\b(?:and|but|or|so|because|if|when|whenever|while|until|unless"
     r"|that|since|although|though|then|where|once|after|before)\s+)"
 )
 SUBJECT_DETERMINER = r"(?:(?:the|this|that|these|those|our|your|its|their|my|each|every|a|an)\s+)?"
 ARTIFACT_SUBJECT = rf"{SUBJECT_DETERMINER}(?:[a-z][\w-]*\s+)?(?:{ARTIFACT_NOUNS})s?"
+DOCUMENT_NOUNS = (
+    "changelog|comment|dashboard|doc|docstring|documentation|guide|header|interface|label|manual"
+    "|message|name|note|page|post|readme|report|schema|signature|spec|specification|summary|title"
+    "|tutorial|website"
+)
+PROMISING_SUBJECT = (
+    rf"{SUBJECT_DETERMINER}(?:{SUBJECT_WORD}\s+){{0,2}}(?:{ARTIFACT_NOUNS}|{DOCUMENT_NOUNS})s?"
+)
+# "Promises to be" and "promises to become" say what is likely ("the API promises to be faster").
+PROMISE_PREDICATE = r"promises?(?!\s+to\s+(?:be|become)\b)"
 THING_SUBJECT = rf"{SUBJECT_DETERMINER}(?:[a-z][\w-]*\s+)?(?:{ARTIFACT_NOUNS}|{ABSTRACT_NOUNS})s?"
-ANIMATE_PREDICATE = (
-    r"(?:(?:will|would|can|could|should|may|might|must|does|did|do|doesn't|didn't|don't"
-    rf"|won't|can't|cannot)\s+(?:not\s+)?)?(?:{ANIMATE_VERBS})"
-    rf"|(?:is|are|was|were)\s+(?:not\s+|still\s+)?(?:{ANIMATE_PROGRESSIVES})"
+MODAL = (
+    r"(?:will|would|can|could|should|may|might|must|does|did|do|doesn['’]t|didn['’]t|don['’]t"
+    r"|won['’]t|can['’]t|cannot)\s+(?:not\s+)?"
+)
+PROGRESSIVE = r"(?:is|are|was|were)\s+(?:not\s+|still\s+)?"
+ANIMATE_PREDICATE = rf"(?:{MODAL})?(?:{ANIMATE_VERBS})|{PROGRESSIVE}(?:{ANIMATE_PROGRESSIVES})"
+# A bare form after "this" is a noun ("this crowd"), so a pronoun takes a singular verb or a modal.
+PRONOUN_SUBJECT_PREDICATE = (
+    rf"{MODAL}(?:{THING_VERBS}|{MIND_VERBS})|{THING_VERBS_SINGULAR}|{MIND_VERBS_SINGULAR}"
+    rf"|{PROGRESSIVE}(?:{THING_PROGRESSIVES}|{MIND_PROGRESSIVES})"
 )
 NOT_A_PREDICATE = r"(?!\s*(?:[,;:.!?)]|(?:and|or|are|is|were|was|such)\b))"
+RELATIVE_AFTER_SUBJECT = r"(?(clause_start)(?:(?:that|which)\s+)?|(?:that|which)\s+)"
 DISCOURSE_NOUNS = (
     "answer|ask|asks|command|commands|comment|decision|decisions|discussion|explanation|fix|list"
     "|message|note|option|options|plan|point|proposal|question|questions|reply|steps|suggestion"
@@ -184,15 +232,22 @@ PHRASE_RULES = {
     ),
     "nominalization-of": re.compile(rf"(?i)\b(?P<hit>(?:{ACTION_NOUNS})\s+of)\b"),
     "inverted-animacy": re.compile(
-        rf"(?i){CLAUSE_START}(?P<hit>{ARTIFACT_SUBJECT}\s+(?:{ANIMATE_PREDICATE}))\b"
-        + NOT_A_PREDICATE
+        rf"(?i){CLAUSE_START}(?P<hit>{ARTIFACT_SUBJECT}\s+(?:{ANIMATE_PREDICATE})"
+        rf"|{PROMISING_SUBJECT}\s+(?:{MODAL})?{PROMISE_PREDICATE})\b(?![-'’])" + NOT_A_PREDICATE
     ),
     # A thing is the subject at a clause start, or anywhere before "that" or "which".
     "inverted-animacy-check": re.compile(
-        rf"(?i)(?P<clause_start>{CLAUSE_START})?\b(?P<hit>{THING_SUBJECT}\s+"
-        rf"(?(clause_start)(?:(?:that|which)\s+)?|(?:that|which)\s+)(?:{TRANSACTION_VERBS})"
+        rf"(?i)(?P<clause_start>{CLAUSE_START})?\b(?P<hit>"
+        rf"{THING_SUBJECT}\s+{RELATIVE_AFTER_SUBJECT}(?:{TRANSACTION_VERBS})"
+        rf"|(?(clause_start)(?:it|this)\s+(?:{PRONOUN_SUBJECT_PREDICATE})|(?!))"
         r"|(?:money|revenue|dollars)\s+(?:runs?|ran|flows?|flowed)(?!\s+(?:out|low|short|dry)\b))\b"
+        + r"(?![-'’])"
+        + PHRASAL_PARTICLE
         + NOT_A_PREDICATE
+    ),
+    "hyphen-stack": re.compile(
+        rf"(?i){NOT_IN_PATH_BEFORE}(?P<hit>{HYPHENATED}\s+{HYPHENATED}\s+[a-z][\w-]*"
+        rf"|{LONG_HYPHENATED}){NOT_IN_PATH_AFTER}"
     ),
     "back-reference": re.compile(
         r"(?i)\b(?P<hit>as (?:discussed|mentioned|noted)\b(?!\s+(?:by|below|further below)\b)"
@@ -326,7 +381,8 @@ EMOJI = (
 )
 ARROWS = r"\u2190-\u21A8\u21AB-\u21FF\u27A1\u27F0-\u27FF\u2900-\u297F\u2B05-\u2B07"
 SYMBOL_IN_PROSE = re.compile(rf"[{EMOJI}{ARROWS}]|(?<=\w) -?-> (?=\w)")
-INLINE_MATH = re.compile(r"\$[^$\n]+\$")
+# Pandoc's rule ("$5 and $6" is prose), or a TeX command between spaced dollars ("$ \\sum x $").
+INLINE_MATH = re.compile(r"\$(?!\s)[^$\n]+?(?<!\s)\$(?!\d)|\$[^$\n]*?\\[A-Za-z][^$\n]*\$(?!\d)")
 QUOTATION = re.compile(r'"[^"]{1,300}"|“[^”]{1,300}”')
 
 ANNOUNCING_COLON = re.compile(

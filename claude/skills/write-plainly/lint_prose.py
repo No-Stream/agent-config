@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 from collections.abc import Iterator, Sequence
-from dataclasses import asdict
 from itertools import groupby
 from pathlib import Path
 
@@ -42,6 +40,7 @@ from lint_prose_markdown import (
     pr_appendix_as_back_matter,
     sentence_spans,
     top_sections,
+    write_findings,
 )
 from lint_prose_patterns import (
     ACRONYM,
@@ -110,12 +109,19 @@ MESSAGES = {
         ' as in "we implemented X".'
     ),
     "inverted-animacy": (
-        "A thing given a person's verb; say what it does (shows, returns) or who does it."
+        'A thing given a person\'s intent ("the docstring promises", "the model wants"). Say'
+        " what the thing does (shows, returns) or who acts; a verb that already states what the"
+        ' thing literally does ("the function expects an int") is fine.'
     ),
     "inverted-animacy-check": (
-        "Check: a thing that earns, holds, buys or wins (advisory). Make the person the subject,"
-        " or say what the thing has or contains. Another verb that gives the thing the same"
-        ' agency ("came out ahead") is not a fix.'
+        "Check: a thing that earns, carries, buys, holds or eats (advisory). Make the person the"
+        " subject, or say what the thing has, contains or shows. Another verb that gives the"
+        ' thing the same agency ("came out ahead") is not a fix.'
+    ),
+    "hyphen-stack": (
+        "Check: hyphenated words stacked into one noun phrase (advisory). Unpack a phrase coined"
+        ' for the work into a clause ("the per-branch late-fee change" becomes "the change that'
+        ' lets each branch set its own late fee"); keep a term the field already uses.'
     ),
     "back-reference": (
         "Check: points back to earlier text (advisory). Restate the thing here so this text"
@@ -674,23 +680,16 @@ def main(arguments: Sequence[str] | None = None) -> int:
     if missing:
         parser.error(f"no such file: {', '.join(missing)}")
     against = None if options.against is None else _read_input(options.against)
-    all_findings: list[dict[str, object]] = []
-    text_findings: list[str] = []
-    for input_path in options.inputs:
-        pr = options.pr or _is_pr_description_name(input_path)
-        findings = lint_text(_read_input(input_path), budget=options.budget, against=against, pr=pr)
-        for finding in findings:
-            message = MESSAGES[finding.rule]
-            all_findings.append({**asdict(finding), "message": message, "path": input_path})
-            text_findings.append(
-                f"{input_path}:{finding.line}:{finding.column}: {finding.rule}: "
-                f"{message} | {finding.excerpt}"
-            )
-    if options.json:
-        sys.stdout.write(json.dumps(all_findings, ensure_ascii=False, indent=2) + "\n")
-    else:
-        sys.stdout.write("\n".join(text_findings) + ("\n" if text_findings else ""))
-    return 1 if all_findings else 0
+    findings = [
+        lint_text(
+            _read_input(path),
+            budget=options.budget,
+            against=against,
+            pr=options.pr or _is_pr_description_name(path),
+        )
+        for path in options.inputs
+    ]
+    return write_findings(zip(options.inputs, findings), MESSAGES, as_json=options.json)
 
 
 if __name__ == "__main__":

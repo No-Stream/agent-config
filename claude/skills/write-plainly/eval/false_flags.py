@@ -1,13 +1,21 @@
 #!/usr/bin/env -S uv run --upgrade --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["trafilatura"]
+# dependencies = ["nltk", "spacy", "spacy-curated-transformers", "torch", "trafilatura"]
+#
+# [[tool.uv.index]]
+# name = "pytorch-cpu"
+# url = "https://download.pytorch.org/whl/cpu"
+# explicit = true
+#
+# [tool.uv.sources]
+# torch = { index = "pytorch-cpu" }
 # ///
 """Compare prose lint hit rates on careful human prose and on agent drafts.
 
-Fetches the corpora in corpora.toml into .cache/, runs lint_prose.py, sloplint and slop-guard on
-every text, and prints each rule's hits per 1,000 words on the human and agent sides. A rule with
-a higher human rate flags careful human writing more often than it flags model writing.
+Fetches the corpora in corpora.toml into .cache/, runs lint_prose.py, lint_syntax.py, sloplint and
+slop-guard on every text, and prints each rule's hits per 1,000 words on the human and agent sides.
+A rule with a higher human rate flags careful human writing more often than it flags model writing.
 """
 
 from __future__ import annotations
@@ -32,6 +40,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import lint_prose
 import lint_prose_markdown
+import lint_syntax
+import syntax_features
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -198,6 +208,15 @@ def _lint_prose_hits(keys: list[str]) -> dict[str, Counter[str]]:
     }
 
 
+def _lint_syntax_hits(keys: list[str]) -> dict[str, Counter[str]]:
+    texts = [Path(key).read_text(encoding="utf-8") for key in keys]
+    findings = lint_syntax.lint_texts(texts, syntax_features.load_model())
+    return {
+        key: Counter(finding.rule for finding in found)
+        for key, found in zip(keys, findings, strict=True)
+    }
+
+
 def _sloplint_hits(keys: list[str]) -> dict[str, Counter[str]]:
     notes_by_path = json.loads(_run([*SLOPLINT_CHECK, *keys], ok_codes=(0, 1)))
     hits: dict[str, Counter[str]] = {key: Counter() for key in keys}
@@ -229,11 +248,13 @@ def collect_hits(
     assert len(keys) > 1, "sloplint and slop-guard print a different JSON shape for one file"
     per_linter = {
         "lint_prose": _lint_prose_hits(keys),
+        "lint_syntax": _lint_syntax_hits(keys),
         "sloplint": _sloplint_hits(keys),
         "slop-guard": _slop_guard_hits(keys),
     }
     catalogs = {
         "lint_prose": set(lint_prose.MESSAGES),
+        "lint_syntax": set(lint_syntax.MESSAGES),
         "sloplint": _sloplint_rules(),
         "slop-guard": {rule for counts in per_linter["slop-guard"].values() for rule in counts},
     }

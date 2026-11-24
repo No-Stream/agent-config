@@ -204,6 +204,9 @@ class TestSymbolInProse:
         text = "## 📚 Hours\n\nThe queue fell → the desk worked.\n\nA cache miss -> a slow read.\n"
         assert rule_lines("symbol-in-prose", text) == [1, 3, 5]
 
+    def test_an_arrow_between_dollar_amounts_is_not_math(self) -> None:
+        assert rule_lines("symbol-in-prose", "Rent rose from $5 → $9 a month.\n") == [1]
+
     def test_leaves_code_tables_and_footnote_returns_alone(self) -> None:
         text = (
             "Run `a -> b` here, and $f: X → Y$ is a map.\n\n"

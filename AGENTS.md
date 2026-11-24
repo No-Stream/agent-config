@@ -18,19 +18,15 @@ Run these after any change, and keep them green:
 
 ```bash
 uv run --no-project --with pytest python -m pytest tests
-(cd claude/skills/write-plainly && uv run --no-project --with pytest python -m pytest tests)
+(cd claude/skills/write-plainly && uv run --no-project --with pytest --with nltk --with spacy --with spacy-curated-transformers --with torch --index https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match python -m pytest tests)
 (cd claude/skills/visualization && uv run --no-project --with pytest --with matplotlib --with numpy --with pandas --with pillow python -m pytest tests)
 python3 sync.py --check
 ruff check . && ruff format --check .
 ```
 
-Ruff reads `ruff.toml` at the root (and `claude/skills/write-plainly/ruff.toml` under that skill), so it gives the same answer from any directory; the copied directories are excluded there, because they are linted where they are edited.
+`tests/` runs `sync.py`, the link script and the codex builder end to end against a temporary home and repo, so no test touches the live config. `sync.py` and `scripts/` use only the standard library and run under the system `python3`, so keep them compatible with Python 3.9. Ruff reads `ruff.toml` at the root (and `claude/skills/write-plainly/ruff.toml` under that skill), so it gives the same answer from any directory; the copied directories are excluded there, because they are linted where they are edited.
 
-After a change under `claude/skills/write-plainly/eval/`, also run that evaluation's three suites, whose commands are in `eval/README.md`, `eval/pairwise/README.md` and `eval/detectors/README.md`.
-
-`tests/` runs `sync.py`, the link script and the codex builder end to end against a temporary home and repo, so no test touches the live config. `bash codex/hooks/test_guard_shell.sh codex/hooks/guard_shell_cases.tsv` tests the guard installed at `~/.codex/hooks/guard_shell.py`, so it runs only on a machine where that copy is installed.
-
-`sync.py` and `scripts/` use only the standard library and run under the system `python3`, so keep them compatible with Python 3.9.
+After a change under `claude/skills/write-plainly/eval/`, also run that evaluation's four suites, whose commands are in `eval/README.md`, `eval/pairwise/README.md`, `eval/detectors/README.md` and `eval/surprisal/README.md`. `bash codex/hooks/test_guard_shell.sh codex/hooks/guard_shell_cases.tsv` tests the guard installed at `~/.codex/hooks/guard_shell.py`, so it runs only on a machine where that copy is installed.
 
 ## Privacy
 
@@ -38,5 +34,5 @@ This repo is public, and every line committed to it is published.
 
 - Nothing from a work machine, and nothing about my work, is ever committed: no employer, client, team, project, product, dataset, table, metric, host, account, internal tool, internal URL, work machine path or person's name other than my public handle. Write examples fresh, on public topics.
 - `.private/` is gitignored and holds the private pattern list, the private replacements, plans and notes; `backlog/` holds task files and is kept out of git by `.git/info/exclude`. Never commit either, force-add them, or copy their contents into a tracked file.
-- My clones' git hooks enforce part of this: the pre-commit hook refuses any author or committer email but my public one and runs `python3 sync.py --check`, and the pre-push hook also runs `python3 sync.py --check-commits` on every commit being pushed, so a leak that a later commit deleted still blocks the push. The scan only finds the names its pattern list knows, so read every line you add as well.
+- My clones' git hooks enforce part of this. The pre-commit hook refuses any author or committer email but my public one and runs `python3 sync.py --check`. The pre-push hook also runs `python3 sync.py --check-commits` on every commit being pushed, so a leak that a later commit deleted still blocks the push. The scan only finds the names that its pattern list knows, so read every line you add as well.
 - Commit messages carry no AI attribution.

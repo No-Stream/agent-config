@@ -1,4 +1,4 @@
-"""Run check-prose.sh end to end, with stand-in sloplint and uvx executables on the PATH."""
+"""Run check-prose.sh end to end, with stand-in sloplint, uvx and uv executables on the PATH."""
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ def run(tmp_path: Path):
     bin_dir.mkdir()
     _launcher(bin_dir, "sloplint", FAKES_DIR / "fake_sloplint.py")
     _launcher(bin_dir, "uvx", FAKES_DIR / "fake_uvx.py")
+    _launcher(bin_dir, "uv", FAKES_DIR / "fake_uv.py")
     temporary_dir = tmp_path / "tmp"
     temporary_dir.mkdir()
     environment = {
@@ -100,6 +101,23 @@ class TestCheckProse:
         hits = [line for line in result.stdout.splitlines() if "em-dash" in line]
         assert [line.split(":")[0] for line in hits] == [notebook, notebook]
         assert "loans.md" not in result.stdout
+
+    def test_runs_the_syntax_linter_under_the_notebook_name(self, run, tmp_path: Path) -> None:
+        notebook = _notebook(tmp_path, "bread.ipynb", "We ate the bread the old baker sold.\n")
+        result = run(notebook)
+        assert result.returncode == 1, result.stderr
+        lines = result.stdout.splitlines()
+        assert "== syntax (lint_syntax.py)" in lines
+        hits = [line for line in lines if ": dropped-relativizer: Check:" in line]
+        assert [line.split(":")[0] for line in hits] == [notebook]
+
+    def test_a_linter_that_exits_1_with_no_findings_has_failed(self, run, tmp_path: Path) -> None:
+        failing_uv = tmp_path / "bin" / "uv"
+        failing_uv.write_text("#!/bin/sh\necho 'could not resolve spacy' >&2\nexit 1\n")
+        path = _write(tmp_path, "clean.md", "The branch lends drills to its members.\n")
+        result = run(path)
+        assert result.returncode == 2
+        assert CLOSING_LINE_START not in result.stdout
 
     def test_passes_budget_against_and_pr_to_lint_prose_only(self, run, tmp_path: Path) -> None:
         old = _write(tmp_path, "old.md", "The branch lends drills.\n")

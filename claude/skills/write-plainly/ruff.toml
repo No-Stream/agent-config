@@ -3,4 +3,12 @@ target-version = "py39"
 line-length = 100
 
 [lint.isort]
-known-first-party = ["conftest", "lint_prose", "lint_prose_document", "lint_prose_markdown", "lint_prose_patterns"]
+known-first-party = [
+    "conftest",
+    "lint_prose",
+    "lint_prose_document",
+    "lint_prose_markdown",
+    "lint_prose_patterns",
+    "lint_syntax",
+    "syntax_features",
+]

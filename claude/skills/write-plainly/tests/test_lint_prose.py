@@ -178,6 +178,10 @@ class TestTitleCaseHeading:
             if finding.rule == "title-case-heading"
         ] == [("title-case-heading", 1)]
 
+    def test_reads_words_that_start_with_a_letter_outside_ascii(self) -> None:
+        text = "## Notes on Émile Zola's Novels\n## Notes on Émile Zola's novels\n"
+        assert rule_lines("title-case-heading", text) == [1]
+
     def test_does_not_count_inline_code_words(self) -> None:
         text = "## `Making Every Word Title Case` in this heading\n"
         assert "title-case-heading" not in [finding.rule for finding in lint_prose.lint_text(text)]
@@ -234,6 +238,58 @@ class TestInvertedAnimacy:
         )
         assert rule_lines("inverted-animacy", text) == [1, 2, 3, 4, 6, 7]
 
+    def test_reads_contractions_with_either_apostrophe(self) -> None:
+        text = (
+            "The parser doesn’t want a header row.\nThe linter won't tell you which rule fired.\n"
+        )
+        assert rule_lines("inverted-animacy", text) == [1, 2]
+
+    def test_flags_a_document_or_artifact_that_promises(self) -> None:
+        text = (
+            "The docstring promises sorted output.\n"
+            "This README promises a one-line install.\n"
+            "The tide API promises an answer within a second.\n"
+            "Each function name promises more than the code does.\n"
+            "The manual promises a quiet engine.\n"
+            "My latest club post promises a picnic.\n"
+            "The docstring promises to return sorted output.\n"
+            "The new API promises to answer within a second.\n"
+        )
+        assert rule_lines("inverted-animacy", text) == [1, 2, 3, 4, 5, 6, 7, 8]
+
+    def test_leaves_people_pronouns_and_things_outside_its_lists_alone(self) -> None:
+        text = (
+            "The librarian knows every regular.\n"
+            "Each new visitor wants a library card.\n"
+            "The Rovers want a new pitch.\n"
+            "The new assistant knows the opening hours.\n"
+            "The hope is that the bridge opens in May.\n"
+            "This hope kept the branch open.\n"
+            "It might want a bigger buffer.\n"
+            "The cache knows which pages are stale.\n"
+        )
+        assert rule_lines("inverted-animacy", text) == []
+
+    def test_leaves_the_nouns_hope_and_want_alone(self) -> None:
+        text = (
+            "Their high hopes faded.\n"
+            "Our high hopes for the new release faded by March.\n"
+            "Our best hope lies in the second vote.\n"
+            "A faint hope remained that the ferry would run.\n"
+            "The basic wants of a household are food and shelter.\n"
+        )
+        assert rule_lines("inverted-animacy", text) == []
+
+    def test_leaves_literal_technical_verbs_and_likely_outcomes_alone(self) -> None:
+        text = (
+            "The server will refuse a request without a token.\n"
+            "The parser refused the file because its header was missing.\n"
+            "The new API promises to be faster.\n"
+            "The bakery owner promises fresh bread every morning.\n"
+            "The new guide promises to become the standard reference.\n"
+        )
+        assert rule_lines("inverted-animacy", text) == []
+
     def test_leaves_measurement_verbs_people_and_objects_alone(self) -> None:
         text = (
             "The model shows a clear warming trend.\n"
@@ -276,6 +332,45 @@ class TestInvertedAnimacyCheck:
         )
         assert rule_lines("inverted-animacy-check", text) == [1, 2, 3, 4]
 
+    def test_flags_it_or_this_that_carries_earns_or_eats(self) -> None:
+        text = (
+            "It carries every opening hour for the week.\n"
+            "This earns its heating budget.\n"
+            "It ate most of the disk.\n"
+            "It is eating the whole afternoon.\n"
+            "It misunderstands how the ferry timetable works.\n"
+        )
+        assert rule_lines("inverted-animacy-check", text) == [1, 2, 3, 4, 5]
+
+    def test_flags_a_pronoun_that_wants_knows_or_hopes(self) -> None:
+        text = (
+            "It might want a bigger buffer.\n"
+            "When it knows the answer, it stops.\n"
+            "The cache knows which pages are stale.\n"
+        )
+        assert rule_lines("inverted-animacy-check", text) == [1, 2]
+
+    def test_leaves_noun_phrases_outside_its_lists_to_the_syntax_pass(self) -> None:
+        text = (
+            "The appendix carries the full list of stations.\n"
+            "The overnight backup eats most of the disk.\n"
+            "Second, the parking objection misunderstands how the ferry timetable works.\n"
+            "The big crowd cheered.\n"
+            "The evening crowd gathered by the pier.\n"
+            "The businesses earn a little more each spring.\n"
+            "The docstring promises sorted output.\n"
+        )
+        assert rule_lines("inverted-animacy-check", text) == []
+
+    def test_leaves_pronoun_determiners_before_nouns_alone(self) -> None:
+        text = (
+            "This crowd cheered all night.\n"
+            "So that hopes stay high, we post updates.\n"
+            "This hope kept the branch open.\n"
+            "And that carry trade lost money.\n"
+        )
+        assert rule_lines("inverted-animacy-check", text) == []
+
     def test_leaves_people_and_plain_verbs_alone(self) -> None:
         text = (
             "The library splits visitors across the groups.\n"
@@ -284,8 +379,50 @@ class TestInvertedAnimacyCheck:
             "The shelf has room for forty books.\n"
             "The members that won the raffle collect their prizes today.\n"
             "The grant money ran out in March.\n"
+            "The volunteers carry the boxes upstairs.\n"
+            "Each new visitor buys a ticket at the door.\n"
+            "The bakery owner promises fresh bread every morning.\n"
+            "The Rovers earn a bonus for every match.\n"
+            "The reading room is usually quiet, and each regular usually buys a coffee.\n"
         )
         assert rule_lines("inverted-animacy-check", text) == []
+
+    def test_leaves_phrasal_verbs_past_participles_and_noun_uses_alone(self) -> None:
+        text = (
+            "The audit carries out three checks a year.\n"
+            "The experiment carried out in May found nothing.\n"
+            "The reputation earned in those years still helps.\n"
+            "That buys us a week before the move.\n"
+            "The book promises.\n"
+            "The engine is promising.\n"
+            "The coming weekend promises to be dry.\n"
+            "The old ones carry no labels, and the new ones earn their place.\n"
+        )
+        assert rule_lines("inverted-animacy-check", text) == []
+
+
+class TestHyphenStack:
+    def test_flags_two_hyphenated_modifiers_and_long_hyphen_chains(self) -> None:
+        text = (
+            "The per-branch late-return fee change starts in May.\n"
+            "We report the per-branch-per-week count.\n"
+            "A low-cost self-service kiosk sits by the door.\n"
+        )
+        assert rule_lines("hyphen-stack", text) == [1, 2, 3]
+
+    def test_leaves_single_compounds_fixed_phrases_dates_and_code_alone(self) -> None:
+        text = (
+            "A well-known author opened the late-night reading.\n"
+            "The state-of-the-art scanner has an end-to-end test.\n"
+            "The two-and-a-half-hour tour starts at noon.\n"
+            "The 2026-11-23 late-night shift ran long.\n"
+            "Set `per-branch late-return fee` in the config.\n"
+            'The sign said "per-branch late-return fee change" in red.\n'
+            "See https://example.com/per-branch-late-return-fee for the table.\n"
+            "Read notes/per-branch-late-return-fee.md and mail late-fees-north-branch@example.org.\n"
+            "The $2-4M one-time grant covers COVID-19 well-being visits.\n"
+        )
+        assert rule_lines("hyphen-stack", text) == []
 
 
 class TestBackReference:
