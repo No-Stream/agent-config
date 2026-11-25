@@ -8,9 +8,10 @@ Instruction and skill text (EVERGREEN_PATHS) states only the current rule, so th
 dates, history wording, ticket IDs and commit hashes.
 The paths in REPO_OWNED are edited in this repo and symlinked into the live config at the paths they map to, so the sync
 never deletes or overwrites them, and it leaves alone any live path that is itself a symlink into this repo.
-Names that must not appear (clients, projects, email) live in the gitignored PRIVATE_PATTERNS_FILE, one regex per line,
-private text substitutions in PRIVATE_REPLACEMENTS_FILE, one `old<TAB>new` per line, and exceptions to the scan in
-PRIVATE_ALLOWED_MATCHES_FILE, one `path<TAB>matched text<TAB>reason` per line, so this script does not publish them.
+Names that must not appear (clients, projects, email) live in the gitignored PRIVATE_PATTERNS_FILE and the files in
+PRIVATE_PATTERNS_DIR, one regex per line, private text substitutions in PRIVATE_REPLACEMENTS_FILE, one `old<TAB>new`
+per line, and exceptions to the scan in PRIVATE_ALLOWED_MATCHES_FILE, one `path<TAB>matched text<TAB>reason` per line,
+so this script does not publish them.
 
 Run: python3 sync.py. The local git hooks run python3 sync.py --check, which only scans the repo as it stands, and
 python3 sync.py --check-commits <sha>..., which scans the identities, message and added lines of each commit being
@@ -67,6 +68,8 @@ CODEX_DROPPED_TABLE_PREFIXES = (
 )
 
 PRIVATE_PATTERNS_FILE = REPO_ROOT / ".private" / "forbidden_patterns.txt"
+# More private patterns, one file per class of name (employer, tools, hosts, people and so on).
+PRIVATE_PATTERNS_DIR = REPO_ROOT / ".private" / "forbidden_patterns.d"
 PRIVATE_REPLACEMENTS_FILE = REPO_ROOT / ".private" / "replacements.tsv"
 PRIVATE_ALLOWED_MATCHES_FILE = REPO_ROOT / ".private" / "allowed_matches.tsv"
 
@@ -394,7 +397,10 @@ EVERGREEN_TEXT_PATTERNS = compile_patterns(EVERGREEN_PATTERNS)
 def load_leak_patterns() -> Patterns:
     """The generic leak classes and the private names, each keyed by the label a finding reports."""
     private_patterns = [
-        line for line in PRIVATE_PATTERNS_FILE.read_text().splitlines() if line.strip()
+        line
+        for path in [PRIVATE_PATTERNS_FILE, *sorted(PRIVATE_PATTERNS_DIR.glob("*.txt"))]
+        for line in path.read_text().splitlines()
+        if line.strip()
     ]
     if not private_patterns:
         raise ValueError(

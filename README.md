@@ -65,6 +65,6 @@ scan alone with `python3 sync.py --check`. The pre-push hook also runs `python3 
 being pushed, which scans each commit's author, committer, message and added lines, so a leak that a later commit deleted
 still blocks the push, and `python3 sync.py --check-history` scans every commit in the clone the same way. The patterns
 cover secrets and tokens, cloud account numbers and resource names, bucket addresses, internal hostnames and links, email
-addresses, home directory paths and IP addresses, plus a list of private names kept in the gitignored
-`.private/forbidden_patterns.txt`. The scan of the repo as it stands also fails on dates, history and ticket IDs in the
+addresses, home directory paths and IP addresses, plus private names kept in the gitignored
+`.private/forbidden_patterns.txt` and `.private/forbidden_patterns.d/`. The scan of the repo as it stands also fails on dates, history and ticket IDs in the
 instruction and skill text, which states only the current rule.

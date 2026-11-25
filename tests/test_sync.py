@@ -325,6 +325,17 @@ class TestCheck:
         write(repo / "claude/notes.md", "nothing to see\n")
         assert run_sync(repo, fresh_home, "--check").returncode == 0
 
+    def test_reads_the_private_names_in_every_class_file_too(
+        self, repo: Path, fresh_home: Path
+    ) -> None:
+        write(repo / ".private/forbidden_patterns.d/people.txt", "\\bAlice Example\\b\n")
+        write(repo / "claude/notes.md", "nothing to see\nreviewed by Alice Example\n")
+
+        result = run_sync(repo, fresh_home, "--check")
+
+        assert result.returncode == 1
+        assert "claude/notes.md:2: private pattern" in result.stderr
+
     @pytest.mark.parametrize(("label", "text"), LEAK_EXAMPLES + SECRET_EXAMPLES)
     def test_each_generic_class_fails_in_a_publishable_file_and_passes_when_private_or_ignored(
         self, repo: Path, fresh_home: Path, label: str, text: str
