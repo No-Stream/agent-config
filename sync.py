@@ -24,6 +24,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import NamedTuple, Optional
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -159,9 +160,26 @@ URL = re.compile(r"\bhttps?://\S+")
 # A \b in a leak pattern also fires between a letter or digit and an underscore, so a name inside an identifier matches.
 WORD_BOUNDARY = re.compile(r"(?<!\\)\\b")
 IDENTIFIER_BOUNDARY = r"(?:\b|(?<=_)(?=[^\W_])|(?<=[^\W_])(?=_))"
-# Without its leading \b a pattern matches a superset of lines, and re finds the literal that follows fast.
-LEADING_BOUNDARY = re.compile(r"^((?:\(\?[a-zA-Z-]+:)?)\\b")
-Patterns = dict[str, tuple[re.Pattern[str], re.Pattern[str]]]
+QUANTIFIER = re.compile(r"(?:([?*+])|\{(\d+),?\d*\})[?+]?")
+SCOPED_FLAGS = re.compile(r"\(\?([aiLmsux]*)(?:-([imsx]*))?:")
+LOOKAROUNDS = ("(?=", "(?!", "(?<=", "(?<!")
+
+
+class LeakPattern(NamedTuple):
+    """A compiled regex, and the lowercase literals one of which every match contains (none if unknown)."""
+
+    literals: tuple[str, ...]
+    regex: re.Pattern[str]
+
+
+Patterns = dict[str, LeakPattern]
+Literals = Optional[frozenset[str]]
+
+
+class TooComplex(Exception):
+    """The regex uses syntax that required_literals does not model, so the scan runs it on every line."""
+
+
 IGNORED_NAMES = {"__pycache__", ".pytest_cache", ".git", ".private"}
 
 
@@ -235,16 +253,136 @@ def copy_redacted(source: Path, destination: Path) -> None:
     write_text(destination, redact(source.read_text()), source)
 
 
+def required_literals(pattern: str) -> tuple[str, ...]:
+    """Lowercase literals one of which every match of the regex contains, so a substring search can rule a line out.
+
+    Python's re runs hundreds of case-insensitive patterns slowly, and most lines hold none of their literals. The
+    parse models literals, escapes, classes, groups, lookarounds, alternation and quantifiers, and gives up, returning
+    no literals, on anything else.
+    """
+    try:
+        literals, end = _alternation(pattern, 0)
+    except TooComplex:
+        return ()
+    return tuple(sorted(literals)) if literals and end == len(pattern) else ()
+
+
+def _alternation(pattern: str, index: int) -> tuple[Literals, int]:
+    branches = []
+    while True:
+        literals, index = _sequence(pattern, index)
+        branches.append(literals)
+        if pattern[index : index + 1] != "|":
+            break
+        index += 1
+    if any(branch is None for branch in branches):
+        return None, index
+    return frozenset().union(*branches), index
+
+
+def _longer(current: Literals, candidate: Literals) -> Literals:
+    """The more selective of two literal sets: the one whose shortest literal is longer."""
+    if not candidate or not all(candidate):
+        return current
+    if not current or min(map(len, candidate)) > min(map(len, current)):
+        return candidate
+    return current
+
+
+def _sequence(pattern: str, index: int) -> tuple[Literals, int]:
+    best: Literals = None
+    run = ""
+    while index < len(pattern) and pattern[index] not in "|)":
+        kind, literals, index = _atom(pattern, index)
+        minimum, quantified, index = _quantifier(pattern, index)
+        if kind == "literal" and minimum >= 1:
+            run += next(iter(literals))
+            if quantified:
+                best, run = _longer(best, frozenset({run})), ""
+            continue
+        best, run = _longer(best, frozenset({run})), ""
+        if kind == "group" and minimum >= 1:
+            best = _longer(best, literals)
+    return _longer(best, frozenset({run})), index
+
+
+def _quantifier(pattern: str, index: int) -> tuple[int, bool, int]:
+    """The fewest times the preceding atom repeats, whether a quantifier follows it, and the index after it."""
+    if pattern[index : index + 1] not in ("?", "*", "+", "{"):
+        return 1, False, index
+    match = QUANTIFIER.match(pattern, index)
+    if match is None:
+        raise TooComplex(pattern)
+    symbol = match.group(1)
+    minimum = int(match.group(2)) if symbol is None else int(symbol == "+")
+    return minimum, True, match.end()
+
+
+def _group(pattern: str, index: int) -> tuple[Literals, int]:
+    literals, index = _alternation(pattern, index)
+    if pattern[index : index + 1] != ")":
+        raise TooComplex(pattern)
+    return literals, index + 1
+
+
+def _class_end(pattern: str, index: int) -> int:
+    index += 2 if pattern[index + 1 : index + 2] == "^" else 1
+    index += 1 if pattern[index : index + 1] == "]" else 0
+    while index < len(pattern) and pattern[index] != "]":
+        index += 2 if pattern[index] == "\\" else 1
+    if index >= len(pattern):
+        raise TooComplex(pattern)
+    return index + 1
+
+
+def _atom(pattern: str, index: int) -> tuple[str, Literals, int]:
+    """The kind of the atom at index (literal, group, class or zero-width), its literals, and the index after it."""
+    char = pattern[index]
+    if char == "(":
+        if pattern.startswith(LOOKAROUNDS, index):
+            _, index = _group(pattern, index + (4 if pattern[index + 2] == "<" else 3))
+            return "zero-width", None, index
+        flags = SCOPED_FLAGS.match(pattern, index)
+        if flags is not None and "x" in flags.group(1) + (flags.group(2) or ""):
+            raise TooComplex(pattern)
+        if flags is not None:
+            literals, index = _group(pattern, flags.end())
+        elif pattern.startswith("(?P<", index):
+            literals, index = _group(pattern, pattern.index(">", index) + 1)
+        elif pattern.startswith("(?", index):
+            raise TooComplex(pattern)
+        else:
+            literals, index = _group(pattern, index + 1)
+        return "group", literals, index
+    if char == "[":
+        return "class", None, _class_end(pattern, index)
+    if char == "\\":
+        escaped = pattern[index + 1 : index + 2]
+        if escaped in ("b", "B", "A", "Z"):
+            return "zero-width", None, index + 2
+        if escaped and escaped in "dDwWsSafnrtv":
+            return "class", None, index + 2
+        if not escaped or escaped.isalnum():
+            raise TooComplex(pattern)
+        return "literal", frozenset({escaped.lower()}), index + 2
+    if char in "^$":
+        return "zero-width", None, index + 1
+    if char == ".":
+        return "class", None, index + 1
+    if char in "*+?{":
+        raise TooComplex(pattern)
+    return "literal", frozenset({char.lower()}), index + 1
+
+
 def compile_patterns(patterns: dict[str, str], boundary: str = r"\b") -> Patterns:
-    """Each pattern, with its word boundaries replaced by `boundary`, as (prefilter, full pattern)."""
-    compiled = {}
-    for label, pattern in patterns.items():
-        prefilter = LEADING_BOUNDARY.sub(r"\1", pattern)
-        compiled[label] = (
-            re.compile(WORD_BOUNDARY.sub(lambda _: boundary, prefilter), re.IGNORECASE),
+    """Each pattern with its word boundaries replaced by `boundary`, and the literals that gate it."""
+    return {
+        label: LeakPattern(
+            required_literals(pattern),
             re.compile(WORD_BOUNDARY.sub(lambda _: boundary, pattern), re.IGNORECASE),
         )
-    return compiled
+        for label, pattern in patterns.items()
+    }
 
 
 PUBLIC_LEAK_PATTERNS = compile_patterns(
@@ -296,31 +434,22 @@ def git(*args: str) -> str:
     ).stdout
 
 
-def findings(line: str, patterns: Patterns) -> list[tuple[str, str]]:
-    """Each (label, matched text) that the patterns find in the line."""
-    return [
-        (label, match.group(0))
-        for label, (prefilter, pattern) in patterns.items()
-        if prefilter.search(line)
-        for match in pattern.finditer(line)
-    ]
+def findings(lines: list[str], patterns: Patterns) -> list[tuple[int, str, str]]:
+    """Each (line index, label, matched text) in the lines; a pattern runs only on lines holding one of its literals."""
+    lowered = [line.lower() for line in lines]
+    block = "\n".join(lowered)
+    found = []
+    for label, (literals, regex) in patterns.items():
+        if literals and not any(literal in block for literal in literals):
+            continue
+        for index, line in enumerate(lines):
+            if not literals or any(literal in lowered[index] for literal in literals):
+                found += [(index, label, match.group(0)) for match in regex.finditer(line)]
+    return sorted(found)
 
 
 def describe(label: str, text: str) -> str:
     return label if label in SECRET_PATTERNS else f"{label} {text!r}"
-
-
-def file_line_leaks(
-    relative: str,
-    line: str,
-    patterns: Patterns,
-    allowed: set[tuple[str, str]],
-) -> list[str]:
-    return [
-        describe(label, text)
-        for label, text in findings(line, patterns)
-        if (relative, text) not in allowed
-    ]
 
 
 def publishable_files() -> list[Path]:
@@ -337,15 +466,42 @@ def scan_for_leaks() -> list[str]:
     leaks = []
     for path in publishable_files():
         relative = path.relative_to(REPO_ROOT).as_posix()
-        is_evergreen = EVERGREEN_PATHS.fullmatch(relative) is not None
-        for line_number, line in enumerate(path.read_text().splitlines(), start=1):
-            found = file_line_leaks(relative, line, leak_patterns, allowed)
-            if is_evergreen:
-                found += file_line_leaks(
-                    relative, URL.sub("", line), EVERGREEN_TEXT_PATTERNS, allowed
-                )
-            leaks += [f"{relative}:{line_number}: {finding}" for finding in found]
+        lines = path.read_text().splitlines()
+        found = findings(lines, leak_patterns)
+        if EVERGREEN_PATHS.fullmatch(relative):
+            found += findings([URL.sub("", line) for line in lines], EVERGREEN_TEXT_PATTERNS)
+        leaks += [
+            f"{relative}:{index + 1}: {describe(label, text)}"
+            for index, label, text in sorted(found)
+            if (relative, text) not in allowed
+        ]
     return leaks
+
+
+def added_lines(commit: str) -> list[tuple[str, str]]:
+    """Each (path, line) the commit adds, against its first parent for a merge."""
+    diff = git(
+        "show",
+        "--format=",
+        "--unified=0",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-prefix",
+        "--diff-merges=first-parent",
+        commit,
+    )
+    added = []
+    path, in_hunk = "", False
+    for line in diff.splitlines():
+        if line.startswith("diff --git "):
+            in_hunk = False
+        elif line.startswith("@@"):
+            in_hunk = True
+        elif not in_hunk and line.startswith("+++ "):
+            path = line[len("+++ ") :]
+        elif in_hunk and line.startswith("+"):
+            added.append((path, line[1:]))
+    return added
 
 
 def scan_commits(commits: list[str]) -> list[str]:
@@ -357,43 +513,24 @@ def scan_commits(commits: list[str]) -> list[str]:
     allowed = load_allowed_matches()
     leaks = []
     for commit in commits:
-        identities = git("log", "-1", "--format=author %an <%ae>%ncommitter %cn <%ce>", commit)
-        for line in identities.splitlines():
-            role = line.split(" ", 1)[0]
-            leaks += [
-                f"{commit} {role}: {describe(label, text)}"
-                for label, text in findings(line, leak_patterns)
-            ]
-        for line_number, line in enumerate(
-            git("log", "-1", "--format=%B", commit).splitlines(), start=1
-        ):
-            leaks += [
-                f"{commit} message line {line_number}: {describe(label, text)}"
-                for label, text in findings(line, leak_patterns)
-            ]
-        diff = git(
-            "show",
-            "--format=",
-            "--unified=0",
-            "--no-color",
-            "--no-ext-diff",
-            "--no-prefix",
-            "--diff-merges=first-parent",
-            commit,
-        )
-        path, in_hunk = "", False
-        for line in diff.splitlines():
-            if line.startswith("diff --git "):
-                in_hunk = False
-            elif line.startswith("@@"):
-                in_hunk = True
-            elif not in_hunk and line.startswith("+++ "):
-                path = line[len("+++ ") :]
-            elif in_hunk and line.startswith("+"):
-                leaks += [
-                    f"{commit} {path}: added line {finding}"
-                    for finding in file_line_leaks(path, line[1:], leak_patterns, allowed)
-                ]
+        identities = git(
+            "log", "-1", "--format=author %an <%ae>%ncommitter %cn <%ce>", commit
+        ).splitlines()
+        leaks += [
+            f"{commit} {identities[index].split(' ', 1)[0]}: {describe(label, text)}"
+            for index, label, text in findings(identities, leak_patterns)
+        ]
+        message = git("log", "-1", "--format=%B", commit).splitlines()
+        leaks += [
+            f"{commit} message line {index + 1}: {describe(label, text)}"
+            for index, label, text in findings(message, leak_patterns)
+        ]
+        added = added_lines(commit)
+        leaks += [
+            f"{commit} {added[index][0]}: added line {describe(label, text)}"
+            for index, label, text in findings([line for _, line in added], leak_patterns)
+            if (added[index][0], text) not in allowed
+        ]
     return leaks
 
 

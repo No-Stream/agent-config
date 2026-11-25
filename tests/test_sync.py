@@ -1,6 +1,7 @@
-"""End-to-end tests of sync.py and scripts/link-repo-owned.sh against a temporary home and repo."""
+"""Tests of sync.py and scripts/link-repo-owned.sh, end to end against a temporary home and repo."""
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -8,7 +9,27 @@ from pathlib import Path
 
 import pytest
 
+import sync
+
 SOURCE_REPO = Path(__file__).resolve().parents[1]
+
+LITERAL_CASES = [
+    (r"\bfoo\b", ("foo",)),
+    (r"(?-i:\bNASA\b)", ("nasa",)),
+    (r"colou?r", ("colo",)),
+    (r"ab+c", ("ab",)),
+    (r"a{2,3}bc", ("bc",)),
+    (r"(?:foo)?bar", ("bar",)),
+    (r"\b(?:alpha|beta)[-_ ]x\b", ("alpha", "beta")),
+    (r"\bfoo|\bbarbaz", ("barbaz", "foo")),
+    (r"(?<![a-z0-9])widget(?!(?:y|ing)\b)", ("widget",)),
+    (r"\$12\.5 ?K\b", ("$12.5",)),
+    (r"\bx(?:y|)z", ("x",)),
+    (r"[abc]+|\bfoo", ()),
+    (r"\d{12}", ()),
+    (r"(?x) f o o", ()),
+    (r"\x41BC", ()),
+]
 REPO_OWNED = dict(
     line.split("\t")
     for line in subprocess.run(
@@ -255,6 +276,36 @@ class TestSync:
 
         assert result.returncode == 0, result.stderr
         assert {relative: (repo / relative).read_bytes() for relative in linked_files} == before
+
+
+class TestRequiredLiterals:
+    @pytest.mark.parametrize(("pattern", "literals"), LITERAL_CASES)
+    def test_names_a_literal_every_match_contains_or_none_when_unsure(
+        self, pattern: str, literals: tuple[str, ...]
+    ) -> None:
+        assert sync.required_literals(pattern) == literals
+
+    @pytest.mark.parametrize(("pattern", "literals"), LITERAL_CASES)
+    def test_every_match_of_an_example_contains_one_of_its_literals(
+        self, pattern: str, literals: tuple[str, ...]
+    ) -> None:
+        texts = [
+            "foo",
+            "NASA",
+            "color",
+            "colour",
+            "abbbc",
+            "aaabc",
+            "bar",
+            "foobar",
+            "beta x",
+            "alpha-x",
+        ]
+        texts += ["widget", "$12.5 K", "xz", "xyz", "barbaz", "123456789012", "ABC"]
+        for text in texts:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match and literals:
+                assert any(literal in match.group(0).lower() for literal in literals)
 
 
 class TestCheck:
