@@ -1,6 +1,7 @@
 """Tests of sync.py and scripts/link-repo-owned.sh, end to end against a temporary home and repo."""
 
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -121,6 +122,29 @@ EXEMPT_FILES = (
     "docs/plans/order.md",
     "claude/notes.txt",
 )
+
+
+def random_alternation(rng: random.Random, depth: int) -> str:
+    """A random regex over a few letters, classes, anchors, lookarounds and groups, with bounded group repeats."""
+    branches = []
+    for _ in range(rng.choice([1, 1, 2, 3])):
+        parts = []
+        for _ in range(rng.randint(1, 5)):
+            roll = rng.random()
+            if depth > 2 or roll < 0.45:
+                parts.append(
+                    rng.choice("abAB_ -") + rng.choice(["", "", "?", "*", "+", "{2}", "{1,3}"])
+                )
+            elif roll < 0.55:
+                parts.append(rng.choice(["[ab]", "[^a]", r"[\]a]", ".", r"\w", r"\s"]) + "?")
+            elif roll < 0.65:
+                parts.append(rng.choice([r"\b", "^", "$", "(?=a)", "(?!b)", "(?<=a)", "(?<![ab])"]))
+            else:
+                opener = rng.choice(["(?:", "(", "(?-i:"])
+                inner = random_alternation(rng, depth + 1)
+                parts.append(f"{opener}{inner})" + rng.choice(["", "?", "{2}", "{1,3}"]))
+        branches.append("".join(parts))
+    return "|".join(branches)
 
 
 def write(path: Path, text: str) -> None:
@@ -306,6 +330,22 @@ class TestRequiredLiterals:
             match = re.search(pattern, text, re.IGNORECASE)
             if match and literals:
                 assert any(literal in match.group(0).lower() for literal in literals)
+
+    def test_every_match_of_a_random_pattern_contains_one_of_its_literals(self) -> None:
+        rng = random.Random(0)
+        checked = 0
+        for _ in range(2000):
+            pattern = random_alternation(rng, depth=0)
+            compiled = sync.compile_patterns({"p": pattern}, sync.IDENTIFIER_BOUNDARY)["p"]
+            for _ in range(10):
+                text = "".join(rng.choice("abAB_ -.") for _ in range(rng.randint(0, 12)))
+                for regex in (re.compile(pattern, re.IGNORECASE), compiled.regex):
+                    for match in regex.finditer(text) if compiled.literals else ():
+                        checked += 1
+                        assert any(
+                            literal in match.group(0).lower() for literal in compiled.literals
+                        ), (pattern, text)
+        assert checked > 1000
 
 
 class TestCheck:
