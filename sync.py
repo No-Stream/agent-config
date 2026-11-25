@@ -485,17 +485,16 @@ def scan_for_leaks() -> list[str]:
         relative = path.relative_to(REPO_ROOT).as_posix()
         lines = path.read_text().splitlines()
         found = [
-            finding
-            for finding in findings(lines, leak_patterns)
-            if (relative, finding[2]) not in allowed
+            (index, label, text)
+            for index, label, text in findings(lines, leak_patterns)
+            if (relative, text) not in allowed
         ]
         if EVERGREEN_PATHS.fullmatch(relative):
+            without_links = [URL.sub("", line) for line in lines]
             found += [
-                finding
-                for finding in findings(
-                    [URL.sub("", line) for line in lines], EVERGREEN_TEXT_PATTERNS
-                )
-                if (relative, lines[finding[0]]) not in dated_allowed
+                (index, label, text)
+                for index, label, text in findings(without_links, EVERGREEN_TEXT_PATTERNS)
+                if (relative, lines[index]) not in dated_allowed
             ]
         leaks += [
             f"{relative}:{index + 1}: {describe(label, text)}"
