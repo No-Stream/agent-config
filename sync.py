@@ -381,8 +381,8 @@ def compile_patterns(patterns: dict[str, str], boundary: str = r"\b") -> Pattern
     """Each pattern with its word boundaries replaced by `boundary`, and the literals that gate it."""
     return {
         label: LeakPattern(
-            required_literals(pattern),
-            re.compile(WORD_BOUNDARY.sub(lambda _: boundary, pattern), re.IGNORECASE),
+            regex=re.compile(WORD_BOUNDARY.sub(lambda _: boundary, pattern), re.IGNORECASE),
+            literals=required_literals(pattern),
         )
         for label, pattern in patterns.items()
     }
