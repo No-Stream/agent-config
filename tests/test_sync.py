@@ -64,7 +64,13 @@ LEAK_EXAMPLES = [
     pytest.param("internal hostname", "on ip-10" + "-4-7-12", id="cloud-private-host"),
     pytest.param("intranet URL", "open http:/" + "/wiki/onboarding", id="dotless-url"),
     pytest.param("intranet URL", "see go" + "/onboarding", id="go-link"),
+    pytest.param(
+        "intranet URL", "open http://localhost" + "-admin/onboarding", id="localhost-prefix"
+    ),
+    pytest.param("intranet URL", "see go/no-go" + "-private", id="go-no-go-prefix"),
     pytest.param("email address", "ask alice" + "@widgetco.biz", id="email"),
+    pytest.param("email address", "ask alice@example" + ".com.widgetco.biz", id="example-prefix"),
+    pytest.param("email address", "ask noreply@github" + ".com.widgetco.biz", id="noreply-prefix"),
     pytest.param("home directory path", "under /home" + "/user/notes", id="home"),
     pytest.param("home directory path", "under /local/home" + "/user/notes", id="local-home"),
     pytest.param("home directory path", "under /Users" + "/user/notes", id="mac-home"),
@@ -81,6 +87,11 @@ SECRET_EXAMPLES = [
         "aws_secret_" + "access_key = wJalrXUtnFEMIK7MDENG",
         id="secret",
     ),
+    pytest.param(
+        "AWS secret or session token",
+        '{"AWS_SECRET_' + 'ACCESS_KEY":"wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY"}',
+        id="json-secret",
+    ),
     pytest.param("Slack token or webhook", "xox" + "b-1234567890-abcdefghij", id="slack-token"),
     pytest.param("Slack token or webhook", "hooks.slack" + ".com/services/T000/B000", id="webhook"),
     pytest.param("JSON web token", "eyJhbGciOiJI" + "UzI1NiJ9.eyJzdWIiOiIxIn0", id="jwt"),
@@ -93,12 +104,14 @@ the documented example account 123456789012 and arn:aws:iam::000000000000:role/t
 serve on http://localhost:8080, http://127.0.0.1:9 or the documentation address 192.0.2.10
 read s3://bucket/key and https://docs.example.org/guide, a go/no-go call, ~/notes, threading.local()
 version 1.2.3, port 8080, a 10-digit 1234567890 and a 13-digit 1234567890123
+write to test@example.com. Open http://localhost/admin or http://localhost. Make the go/no-go.
 """
 EVERGREEN_EXAMPLES = [
     pytest.param("date", "Since 2025-03-14 the hook runs first.", id="iso-date"),
     pytest.param("date", "Updated 03-14: the hook runs first.", id="month-day"),
     pytest.param("date", "On March 14 the hook moved.", id="month-name"),
     pytest.param("date", "The hook moved in March 2025.", id="month-year"),
+    pytest.param("date", "See [guide](https://example.org/guide),2025-03-14.", id="after-link"),
     pytest.param("history wording", "As of this release the hook runs first.", id="as-of"),
     pytest.param("history wording", "The hook previously ran last.", id="previously"),
     pytest.param("history wording", "We used to run the hook last.", id="used-to"),
@@ -479,31 +492,59 @@ class TestCheck:
 
         assert result.returncode == 0, result.stderr
 
-    def test_an_allowed_match_passes_only_in_its_own_file(
+    def test_a_tracked_dated_line_passes_without_private_files_and_only_in_its_own_file(
         self, repo: Path, fresh_home: Path
     ) -> None:
-        dated = "Its revision of 2025-03-14 moves the rule.\n"
-        write(repo / "claude/skills/demo/sources.md", dated)
+        dated = "Its revision of 2025-03-14 moves the rule."
+        write(repo / "claude/skills/demo/sources.md", f"{dated}\n")
         write(
-            repo / ".private/allowed_matches.tsv",
-            "claude/skills/demo/sources.md\t2025-03-14\tthe date names the cited revision\n",
+            repo / "dated_allowed.tsv",
+            f"claude/skills/demo/sources.md\t{dated}\tthe date names the cited revision\n",
         )
         assert run_sync(repo, fresh_home, "--check").returncode == 0
 
-        write(repo / "claude/skills/demo/SKILL.md", dated)
+        write(repo / "claude/skills/demo/SKILL.md", f"{dated}\n")
         result = run_sync(repo, fresh_home, "--check")
 
         assert result.returncode == 1
         assert "claude/skills/demo/SKILL.md:1: date '2025-03-14'" in result.stderr
         assert "sources.md" not in result.stderr
 
-    def test_rejects_an_allowed_match_without_a_reason(self, repo: Path, fresh_home: Path) -> None:
-        write(repo / ".private/allowed_matches.tsv", "claude/skills/demo/SKILL.md\t2025-03-14\n")
+    def test_a_private_exception_lets_a_leak_through_but_not_a_date(
+        self, repo: Path, fresh_home: Path
+    ) -> None:
+        write(repo / "claude/skills/demo/SKILL.md", "Connect to 10.12" + ".4.7 since 2025-03-14.\n")
+        write(
+            repo / ".private/allowed_matches.tsv",
+            "claude/skills/demo/SKILL.md\t10.12" + ".4.7\tthe documented test address\n"
+            "claude/skills/demo/SKILL.md\t2025-03-14\ta date is not a private term\n",
+        )
 
         result = run_sync(repo, fresh_home, "--check")
 
         assert result.returncode == 1
-        assert "allowed_matches.tsv rows must be" in result.stderr
+        assert "IP address" not in result.stderr
+        assert "claude/skills/demo/SKILL.md:1: date '2025-03-14'" in result.stderr
+
+    @pytest.mark.parametrize("relative", [".private/allowed_matches.tsv", "dated_allowed.tsv"])
+    def test_rejects_an_exception_without_a_reason(
+        self, repo: Path, fresh_home: Path, relative: str
+    ) -> None:
+        write(repo / relative, "claude/skills/demo/SKILL.md\t2025-03-14\n")
+
+        result = run_sync(repo, fresh_home, "--check")
+
+        assert result.returncode == 1
+        assert f"{Path(relative).name} rows must be" in result.stderr
+
+    def test_runs_without_the_optional_files(self, repo: Path, fresh_home: Path) -> None:
+        assert not (repo / ".private/forbidden_patterns.d").exists()
+        assert not (repo / ".private/allowed_matches.tsv").exists()
+        assert not (repo / "dated_allowed.tsv").exists()
+
+        result = run_sync(repo, fresh_home, "--check")
+
+        assert result.returncode == 0, result.stderr
 
 
 class TestCheckCommits:

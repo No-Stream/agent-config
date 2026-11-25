@@ -10,8 +10,9 @@ The paths in REPO_OWNED are edited in this repo and symlinked into the live conf
 never deletes or overwrites them, and it leaves alone any live path that is itself a symlink into this repo.
 Names that must not appear (clients, projects, email) live in the gitignored PRIVATE_PATTERNS_FILE and the files in
 PRIVATE_PATTERNS_DIR, one regex per line, private text substitutions in PRIVATE_REPLACEMENTS_FILE, one `old<TAB>new`
-per line, and exceptions to the scan in PRIVATE_ALLOWED_MATCHES_FILE, one `path<TAB>matched text<TAB>reason` per line,
-so this script does not publish them.
+per line, and exceptions to the leak patterns in PRIVATE_ALLOWED_MATCHES_FILE, one `path<TAB>matched text<TAB>reason`
+per line, so this script does not publish them. Exceptions to the date check are style, not secrets, so they live in
+the tracked DATED_ALLOWED_FILE, one `path<TAB>exact line<TAB>reason` per line.
 
 Run: python3 sync.py. The local git hooks run python3 sync.py --check, which only scans the repo as it stands, and
 python3 sync.py --check-commits <sha>..., which scans the identities, message and added lines of each commit being
@@ -72,6 +73,8 @@ PRIVATE_PATTERNS_FILE = REPO_ROOT / ".private" / "forbidden_patterns.txt"
 PRIVATE_PATTERNS_DIR = REPO_ROOT / ".private" / "forbidden_patterns.d"
 PRIVATE_REPLACEMENTS_FILE = REPO_ROOT / ".private" / "replacements.tsv"
 PRIVATE_ALLOWED_MATCHES_FILE = REPO_ROOT / ".private" / "allowed_matches.tsv"
+# Lines of instruction and skill text that may keep a date, such as a citation's revision date; tracked and public.
+DATED_ALLOWED_FILE = REPO_ROOT / "dated_allowed.tsv"
 
 TEXT_REPLACEMENTS: list[tuple[str, str]] = [
     (str(HOME), "~"),
@@ -88,6 +91,8 @@ _MONTH = (
     r"|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
 )
 _WEEKDAY = r"(?:Mon|Tues?|Wed(?:nes)?|Thu(?:rs)?|Fri|Sat(?:ur)?|Sun)(?:day)?"
+# The end of a domain name: no further label, though a sentence's closing period may follow.
+_DOMAIN_END = r"(?![a-z0-9-]|\.[a-z0-9])"
 
 # Reported without the matched text, so a found secret is not echoed into a terminal or log.
 SECRET_PATTERNS: dict[str, str] = {
@@ -97,7 +102,7 @@ SECRET_PATTERNS: dict[str, str] = {
         r"(?-i:\b(?:AKIA|ASIA|ABIA|ACCA|AIDA|AROA|AGPA|AIPA|ANPA|ANVA|APKA|ASCA)[0-9A-Z]{16}\b)"
     ),
     "AWS secret or session token": (
-        r"\baws_(?:secret_access_key|session_token)\s*[=:]\s*[\"']?[A-Za-z0-9/+=]{16,}"
+        r"\baws_(?:secret_access_key|session_token)[\"']?\s*[=:]\s*[\"']?[A-Za-z0-9/+=]{16,}"
         r"|(?-i:\b(?:IQoJb3JpZ2luX2Vj|FwoGZXIvYXdzE)[A-Za-z0-9/+=]{8,})"
     ),
     "Slack token or webhook": (
@@ -121,13 +126,13 @@ GENERIC_LEAK_PATTERNS: dict[str, str] = {
         r"|\b(?:ip|ec2)-\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3}\b"
     ),
     "intranet URL": (
-        r"\bhttps?://(?!localhost\b)[a-z0-9-]+(?![a-z0-9.-])"
-        r"|(?<![\w/.-])go/(?!no-go\b)[a-z0-9_-]+"
+        r"\bhttps?://(?!localhost(?![a-z0-9.-]))[a-z0-9-]+(?![a-z0-9.-])"
+        r"|(?<![\w/.-])go/(?!no-go(?![a-z0-9_-]))[a-z0-9_-]+"
     ),
     "email address": (
-        rf"(?<![\w.%+-])(?!{re.escape(PUBLIC_EMAIL)}\b|(?:noreply|git)@github\.com\b)"
+        rf"(?<![\w.%+-])(?!(?:{re.escape(PUBLIC_EMAIL)}|(?:noreply|git)@github\.com){_DOMAIN_END})"
         r"[a-z0-9._%+-]+@(?!(?:[a-z0-9-]+\.)*(?:example\.(?:com|net|org)|example|test|invalid"
-        r"|localhost)\b)[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}\b"
+        rf"|localhost){_DOMAIN_END})[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{{2,}}\b"
     ),
     "IP address": (
         rf"\b(?!(?:127|0|169\.254|255|192\.0\.2|198\.51\.100|203\.0\.113)\.)"
@@ -158,8 +163,8 @@ EVERGREEN_PATTERNS: dict[str, str] = {
         r"|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b"
     ),
 }
-# A date inside a link names the page it points to, not the history of a rule.
-URL = re.compile(r"\bhttps?://\S+")
+# A date inside a link names the page it points to, not the history of a rule; a link ends at Markdown's delimiters.
+URL = re.compile(r"\bhttps?://[^\s)\]>]+")
 # A \b in a leak pattern also fires between a letter or digit and an underscore, so a name inside an identifier matches.
 IDENTIFIER_BOUNDARY = r"(?:\b|(?<=_)(?=[^\W_])|(?<=[^\W_])(?=_))"
 # The tokens a boundary rewrite keeps whole: a character class, where \b is a backspace, a comment, and an escape.
@@ -425,24 +430,17 @@ def load_leak_patterns() -> Patterns:
     return {**PUBLIC_LEAK_PATTERNS, **private}
 
 
-def load_allowed_matches() -> set[tuple[str, str]]:
-    """The (path, matched text) pairs the scan lets through; a missing file lets nothing through."""
-    if not PRIVATE_ALLOWED_MATCHES_FILE.exists():
+def load_exceptions(path: Path) -> set[tuple[str, str]]:
+    """The (path, text) pairs a tab-separated exception file lists, each with its reason; a missing file lists none."""
+    if not path.exists():
         return set()
-    rows = [
-        line.split("\t")
-        for line in PRIVATE_ALLOWED_MATCHES_FILE.read_text().splitlines()
-        if line.strip()
-    ]
+    rows = [line.split("\t") for line in path.read_text().splitlines() if line.strip()]
     malformed_rows = [
         row for row in rows if len(row) != 3 or not all(field.strip() for field in row)
     ]
     if malformed_rows:
-        raise ValueError(
-            f"{PRIVATE_ALLOWED_MATCHES_FILE} rows must be path<TAB>matched text<TAB>reason, "
-            f"got {malformed_rows}"
-        )
-    return {(path, text) for path, text, _reason in rows}
+        raise ValueError(f"{path} rows must be path<TAB>text<TAB>reason, got {malformed_rows}")
+    return {(relative, text) for relative, text, _reason in rows}
 
 
 def git(*args: str) -> str:
@@ -480,18 +478,28 @@ def publishable_files() -> list[Path]:
 def scan_for_leaks() -> list[str]:
     """Leaks in every publishable file, and dates or history in its instruction and skill text."""
     leak_patterns = load_leak_patterns()
-    allowed = load_allowed_matches()
+    allowed = load_exceptions(PRIVATE_ALLOWED_MATCHES_FILE)
+    dated_allowed = load_exceptions(DATED_ALLOWED_FILE)
     leaks = []
     for path in publishable_files():
         relative = path.relative_to(REPO_ROOT).as_posix()
         lines = path.read_text().splitlines()
-        found = findings(lines, leak_patterns)
+        found = [
+            finding
+            for finding in findings(lines, leak_patterns)
+            if (relative, finding[2]) not in allowed
+        ]
         if EVERGREEN_PATHS.fullmatch(relative):
-            found += findings([URL.sub("", line) for line in lines], EVERGREEN_TEXT_PATTERNS)
+            found += [
+                finding
+                for finding in findings(
+                    [URL.sub("", line) for line in lines], EVERGREEN_TEXT_PATTERNS
+                )
+                if (relative, lines[finding[0]]) not in dated_allowed
+            ]
         leaks += [
             f"{relative}:{index + 1}: {describe(label, text)}"
             for index, label, text in sorted(found)
-            if (relative, text) not in allowed
         ]
     return leaks
 
@@ -528,7 +536,7 @@ def scan_commits(commits: list[str]) -> list[str]:
     Dates and history wording are checked only in the tree: once a later commit removes them, they publish nothing.
     """
     leak_patterns = load_leak_patterns()
-    allowed = load_allowed_matches()
+    allowed = load_exceptions(PRIVATE_ALLOWED_MATCHES_FILE)
     leaks = []
     for commit in commits:
         identities = git(
