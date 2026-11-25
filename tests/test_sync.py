@@ -30,6 +30,10 @@ LITERAL_CASES = [
     (r"\d{12}", ()),
     (r"(?x) f o o", ()),
     (r"\x41BC", ()),
+    (r"[\b]x", ("x",)),
+    (r"(?#\b)foo", ()),
+    ("(" * 250 + "x" + ")" * 250, ()),
+    ("(?-i:ΟΣ)", ()),
 ]
 REPO_OWNED = dict(
     line.split("\t")
@@ -330,6 +334,23 @@ class TestRequiredLiterals:
             match = re.search(pattern, text, re.IGNORECASE)
             if match and literals:
                 assert any(literal in match.group(0).lower() for literal in literals)
+
+    def test_names_no_literals_for_a_pattern_re_rejects(self) -> None:
+        assert sync.required_literals("(?P<") == ()
+
+    @pytest.mark.parametrize(
+        ("pattern", "line"),
+        [("s", "a long ſ"), ("i", "a dotless ı"), (r"[\b]x", "\bx"), (r"(?#\b)foo", "foo")],
+    )
+    def test_finds_what_re_finds_for_case_folds_classes_and_comments(
+        self, pattern: str, line: str
+    ) -> None:
+        patterns = sync.compile_patterns({"p": pattern}, sync.IDENTIFIER_BOUNDARY)
+
+        found = sync.findings([line], patterns)
+
+        assert [text for _, _, text in found] == re.findall(pattern, line, re.IGNORECASE)
+        assert found
 
     def test_every_match_of_a_random_pattern_contains_one_of_its_literals(self) -> None:
         rng = random.Random(0)

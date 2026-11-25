@@ -161,8 +161,11 @@ EVERGREEN_PATTERNS: dict[str, str] = {
 # A date inside a link names the page it points to, not the history of a rule.
 URL = re.compile(r"\bhttps?://\S+")
 # A \b in a leak pattern also fires between a letter or digit and an underscore, so a name inside an identifier matches.
-WORD_BOUNDARY = re.compile(r"(?<!\\)\\b")
 IDENTIFIER_BOUNDARY = r"(?:\b|(?<=_)(?=[^\W_])|(?<=[^\W_])(?=_))"
+# The tokens a boundary rewrite keeps whole: a character class, where \b is a backspace, a comment, and an escape.
+REGEX_TOKEN = re.compile(r"\[\^?\]?(?:\\.|[^\]\\])*\]|\(\?#[^)]*\)|\\.")
+# Under re.IGNORECASE these letters also match "i" and "s", which str.lower() leaves as they are.
+IGNORECASE_FOLD = str.maketrans({"ı": "i", "ſ": "s"})
 QUANTIFIER = re.compile(r"(?:([?*+])|\{(\d+),?\d*\})[?+]?")
 SCOPED_FLAGS = re.compile(r"\(\?([aiLmsux]*)(?:-([imsx]*))?:")
 LOOKAROUNDS = ("(?=", "(?!", "(?<=", "(?<!")
@@ -265,9 +268,11 @@ def required_literals(pattern: str) -> tuple[str, ...]:
     """
     try:
         literals, end = _alternation(pattern, 0)
-    except TooComplex:
+    except (TooComplex, RecursionError):
         return ()
-    return tuple(sorted(literals)) if literals and end == len(pattern) else ()
+    if not literals or end != len(pattern) or not all(map(str.isascii, literals)):
+        return ()
+    return tuple(sorted(literals))
 
 
 def _alternation(pattern: str, index: int) -> tuple[Literals, int]:
@@ -350,7 +355,7 @@ def _atom(pattern: str, index: int) -> tuple[str, Literals, int]:
             raise TooComplex(pattern)
         if flags is not None:
             literals, index = _group(pattern, flags.end())
-        elif pattern.startswith("(?P<", index):
+        elif pattern.startswith("(?P<", index) and ">" in pattern[index:]:
             literals, index = _group(pattern, pattern.index(">", index) + 1)
         elif pattern.startswith("(?", index):
             raise TooComplex(pattern)
@@ -377,11 +382,18 @@ def _atom(pattern: str, index: int) -> tuple[str, Literals, int]:
     return "literal", frozenset({char.lower()}), index + 1
 
 
+def with_boundary(pattern: str, boundary: str) -> str:
+    """The pattern with each word boundary outside a character class or comment replaced by `boundary`."""
+    return REGEX_TOKEN.sub(
+        lambda token: boundary if token.group(0) == r"\b" else token.group(0), pattern
+    )
+
+
 def compile_patterns(patterns: dict[str, str], boundary: str = r"\b") -> Patterns:
     """Each pattern with its word boundaries replaced by `boundary`, and the literals that gate it."""
     return {
         label: LeakPattern(
-            regex=re.compile(WORD_BOUNDARY.sub(lambda _: boundary, pattern), re.IGNORECASE),
+            regex=re.compile(with_boundary(pattern, boundary), re.IGNORECASE),
             literals=required_literals(pattern),
         )
         for label, pattern in patterns.items()
@@ -442,7 +454,7 @@ def git(*args: str) -> str:
 
 def findings(lines: list[str], patterns: Patterns) -> list[tuple[int, str, str]]:
     """Each (line index, label, matched text) in the lines; a pattern runs only on lines holding one of its literals."""
-    lowered = [line.lower() for line in lines]
+    lowered = [line.lower().translate(IGNORECASE_FOLD) for line in lines]
     block = "\n".join(lowered)
     found = []
     for label, (literals, regex) in patterns.items():
