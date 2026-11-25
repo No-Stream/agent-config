@@ -300,6 +300,24 @@ class TestCheck:
         assert label in planted.stderr
         assert text.rsplit(maxsplit=1)[-1] not in planted.stderr
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "allow mcp__examplecorp-mcp__run_query",
+            "load_examplecorp_table",
+            "acct_4821" + "77305512",
+        ],
+    )
+    def test_finds_a_name_or_number_inside_a_snake_case_identifier(
+        self, repo: Path, fresh_home: Path, text: str
+    ) -> None:
+        write(repo / "claude/settings.md", f"{text}\n")
+
+        result = run_sync(repo, fresh_home, "--check")
+
+        assert result.returncode == 1
+        assert "claude/settings.md:1:" in result.stderr
+
     def test_passes_public_example_values(self, repo: Path, fresh_home: Path) -> None:
         write(repo / "claude/notes.md", PUBLIC_TEXT)
 

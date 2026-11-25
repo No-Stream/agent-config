@@ -156,6 +156,12 @@ EVERGREEN_PATTERNS: dict[str, str] = {
 }
 # A date inside a link names the page it points to, not the history of a rule.
 URL = re.compile(r"\bhttps?://\S+")
+# A \b in a leak pattern also fires between a letter or digit and an underscore, so a name inside an identifier matches.
+WORD_BOUNDARY = re.compile(r"(?<!\\)\\b")
+IDENTIFIER_BOUNDARY = r"(?:\b|(?<=_)(?=[^\W_])|(?<=[^\W_])(?=_))"
+# Without its leading \b a pattern matches a superset of lines, and re finds the literal that follows fast.
+LEADING_BOUNDARY = re.compile(r"^((?:\(\?[a-zA-Z-]+:)?)\\b")
+Patterns = dict[str, tuple[re.Pattern[str], re.Pattern[str]]]
 IGNORED_NAMES = {"__pycache__", ".pytest_cache", ".git", ".private"}
 
 
@@ -229,15 +235,25 @@ def copy_redacted(source: Path, destination: Path) -> None:
     write_text(destination, redact(source.read_text()), source)
 
 
-def compile_patterns(patterns: dict[str, str]) -> dict[str, re.Pattern[str]]:
-    return {label: re.compile(pattern, re.IGNORECASE) for label, pattern in patterns.items()}
+def compile_patterns(patterns: dict[str, str], boundary: str = r"\b") -> Patterns:
+    """Each pattern, with its word boundaries replaced by `boundary`, as (prefilter, full pattern)."""
+    compiled = {}
+    for label, pattern in patterns.items():
+        prefilter = LEADING_BOUNDARY.sub(r"\1", pattern)
+        compiled[label] = (
+            re.compile(WORD_BOUNDARY.sub(lambda _: boundary, prefilter), re.IGNORECASE),
+            re.compile(WORD_BOUNDARY.sub(lambda _: boundary, pattern), re.IGNORECASE),
+        )
+    return compiled
 
 
-PUBLIC_LEAK_PATTERNS = compile_patterns({**SECRET_PATTERNS, **GENERIC_LEAK_PATTERNS})
+PUBLIC_LEAK_PATTERNS = compile_patterns(
+    {**SECRET_PATTERNS, **GENERIC_LEAK_PATTERNS}, IDENTIFIER_BOUNDARY
+)
 EVERGREEN_TEXT_PATTERNS = compile_patterns(EVERGREEN_PATTERNS)
 
 
-def load_leak_patterns() -> dict[str, re.Pattern[str]]:
+def load_leak_patterns() -> Patterns:
     """The generic leak classes and the private names, each keyed by the label a finding reports."""
     private_patterns = [
         line for line in PRIVATE_PATTERNS_FILE.read_text().splitlines() if line.strip()
@@ -247,7 +263,8 @@ def load_leak_patterns() -> dict[str, re.Pattern[str]]:
             f"{PRIVATE_PATTERNS_FILE} is empty; it must list the private names to check for"
         )
     private = compile_patterns(
-        {f"private pattern {pattern!r}": pattern for pattern in private_patterns}
+        {f"private pattern {pattern!r}": pattern for pattern in private_patterns},
+        IDENTIFIER_BOUNDARY,
     )
     return {**PUBLIC_LEAK_PATTERNS, **private}
 
@@ -279,11 +296,12 @@ def git(*args: str) -> str:
     ).stdout
 
 
-def findings(line: str, patterns: dict[str, re.Pattern[str]]) -> list[tuple[str, str]]:
+def findings(line: str, patterns: Patterns) -> list[tuple[str, str]]:
     """Each (label, matched text) that the patterns find in the line."""
     return [
         (label, match.group(0))
-        for label, pattern in patterns.items()
+        for label, (prefilter, pattern) in patterns.items()
+        if prefilter.search(line)
         for match in pattern.finditer(line)
     ]
 
@@ -295,7 +313,7 @@ def describe(label: str, text: str) -> str:
 def file_line_leaks(
     relative: str,
     line: str,
-    patterns: dict[str, re.Pattern[str]],
+    patterns: Patterns,
     allowed: set[tuple[str, str]],
 ) -> list[str]:
     return [
