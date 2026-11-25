@@ -198,6 +198,8 @@ Judge every finding, a reviewer's or yours, by the end state: is the code better
 
 Never frame research as go/no-go, "gating on X" or "is this good enough": once we have data, deciding is quick, and gates narrow the options too early. When something fails, ask why; a weak or null result is far more often a defect in our work (a bug, leakage, a wrong config) than a true negative. Keep investigating until the open questions are exhausted; "good enough to ship" is a question for the write-up. Speculate freely and label it: what was observed, then the speculation, then other explanations, "our code is wrong" among them, and never "this shows" or "this proves" from exploration. The rules on irreversible actions still hold.
 
+**Look at the raw data, early and often. {#look-at-the-data}** Automated checks are necessary and never enough: reading the data by hand finds more bugs than you would expect. Throughout an analysis, not only at the end, display and read a sample of each frame after every step that builds or joins it, follow a few records through each join and filter, and read the rows behind any extreme or surprising number. Before a result is cited, subagents QA the raw data as a human analyst would, with plots, summary statistics, residuals and error analysis beside the reading. I would do this myself on my own projects; you take over that role, so budget it as part of the analysis, never as an optional review.
+
 **Reading a paper means reading all of it. {#read-whole-papers}** When I ask you to read a paper, download the PDF and read every page yourself, appendices included. An abstract page, a summarizing fetch such as WebFetch, or a subagent's summary is not a read; a subagent may read it too, but never in place of you.
 
 ### Debugging
