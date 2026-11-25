@@ -62,5 +62,9 @@ allowlist of files from `~/.claude` and `~/.codex`, replaces home-directory path
 and private names, and fails if any file git could publish matches a sensitive pattern. It never deletes or overwrites
 the repo-owned paths, or any live path that is a symlink into the repo. My local pre-commit and pre-push hooks run that
 scan alone with `python3 sync.py --check`. The pre-push hook also runs `python3 sync.py --check-commits` on every commit
-being pushed, which scans each commit's message and added lines, so a leak that a later commit deleted still blocks the
-push. The private part of the pattern list is kept in the gitignored `.private/forbidden_patterns.txt`.
+being pushed, which scans each commit's author, committer, message and added lines, so a leak that a later commit deleted
+still blocks the push, and `python3 sync.py --check-history` scans every commit in the clone the same way. The patterns
+cover secrets and tokens, cloud account numbers and resource names, bucket addresses, internal hostnames and links, email
+addresses, home directory paths and IP addresses, plus a list of private names kept in the gitignored
+`.private/forbidden_patterns.txt`. The scan of the repo as it stands also fails on dates, history and ticket IDs in the
+instruction and skill text, which states only the current rule.
