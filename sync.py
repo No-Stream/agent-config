@@ -1,16 +1,22 @@
 """Copy the shareable parts of the local Claude Code and Codex config into this repo, redacting personal details.
 
 Only the paths in COPIED_FILES and COPIED_DIRS are copied. After copying, every file git could publish (tracked, or
-untracked and not ignored) is scanned for the forbidden patterns and the script fails if any match, so a later edit to
-the live config cannot leak through a re-sync unnoticed.
+untracked and not ignored) is scanned for the leak patterns and the script fails if any match, so a later edit to the
+live config cannot leak through a re-sync unnoticed. The leak patterns are the generic classes below (secrets,
+account numbers, ARNs, buckets, internal hosts and URLs, emails, home paths, IP addresses) and the private names.
+Instruction and skill text (EVERGREEN_PATHS) states only the current rule, so the scan of the tree also fails on its
+dates, history wording, ticket IDs and commit hashes.
 The paths in REPO_OWNED are edited in this repo and symlinked into the live config at the paths they map to, so the sync
 never deletes or overwrites them, and it leaves alone any live path that is itself a symlink into this repo.
-Names that must not appear (clients, projects, email) live in the gitignored PRIVATE_PATTERNS_FILE, one regex per line,
-and private text substitutions in PRIVATE_REPLACEMENTS_FILE, one `old<TAB>new` per line, so this script does not
-publish them.
+Names that must not appear (clients, projects, email) live in the gitignored PRIVATE_PATTERNS_FILE and the files in
+PRIVATE_PATTERNS_DIR, one regex per line, private text substitutions in PRIVATE_REPLACEMENTS_FILE, one `old<TAB>new`
+per line, and exceptions to the leak patterns in PRIVATE_ALLOWED_MATCHES_FILE, one `path<TAB>matched text<TAB>reason`
+per line, so this script does not publish them. Exceptions to the date check are style, not secrets, so they live in
+the tracked DATED_ALLOWED_FILE, one `path<TAB>exact line<TAB>reason` per line.
 
 Run: python3 sync.py. The local git hooks run python3 sync.py --check, which only scans the repo as it stands, and
-python3 sync.py --check-commits <sha>..., which scans the message and added lines of each commit being pushed.
+python3 sync.py --check-commits <sha>..., which scans the identities, message and added lines of each commit being
+pushed. python3 sync.py --check-history scans every commit on any branch, remote-tracking branch or tag the same way.
 scripts/link-repo-owned.sh links the repo-owned paths into ~/.claude; see README.md, Installing.
 """
 
@@ -20,6 +26,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import NamedTuple, Optional
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -62,20 +69,128 @@ CODEX_DROPPED_TABLE_PREFIXES = (
 )
 
 PRIVATE_PATTERNS_FILE = REPO_ROOT / ".private" / "forbidden_patterns.txt"
+# More private patterns, one file per class of name (employer, tools, hosts, people and so on).
+PRIVATE_PATTERNS_DIR = REPO_ROOT / ".private" / "forbidden_patterns.d"
 PRIVATE_REPLACEMENTS_FILE = REPO_ROOT / ".private" / "replacements.tsv"
+PRIVATE_ALLOWED_MATCHES_FILE = REPO_ROOT / ".private" / "allowed_matches.tsv"
+# Lines of instruction and skill text that may keep a date, such as a citation's revision date; tracked and public.
+DATED_ALLOWED_FILE = REPO_ROOT / "dated_allowed.tsv"
 
 TEXT_REPLACEMENTS: list[tuple[str, str]] = [
     (str(HOME), "~"),
     (f"--user-name {HOME.name}", "--user-name example-user"),
 ]
 
-GENERIC_FORBIDDEN_PATTERNS: list[str] = [
-    re.escape(str(HOME)),
-    r"\bgh[opsu]_[A-Za-z0-9]{20,}",
-    r"\bsk-[A-Za-z0-9_-]{20,}",
-    r"AKIA[0-9A-Z]{16}",
-    r"BEGIN [A-Z ]*PRIVATE KEY",
-]
+PUBLIC_EMAIL = "15351234+No-Stream@users.noreply.github.com"
+# AWS's documented example accounts, and the all-zero account that tests use.
+EXAMPLE_AWS_ACCOUNTS = ("000000000000", "123456789012", "111122223333", "444455556666")
+_EXAMPLE_ACCOUNT = "|".join(EXAMPLE_AWS_ACCOUNTS)
+_OCTET = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
+_MONTH = (
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?"
+    r"|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+)
+_WEEKDAY = r"(?:Mon|Tues?|Wed(?:nes)?|Thu(?:rs)?|Fri|Sat(?:ur)?|Sun)(?:day)?"
+# The end of a domain name: no further label, though a sentence's closing period may follow.
+_DOMAIN_END = r"(?![a-z0-9-]|\.[a-z0-9])"
+
+# Reported without the matched text, so a found secret is not echoed into a terminal or log.
+SECRET_PATTERNS: dict[str, str] = {
+    "GitHub token": r"\bgh[opsu]_[A-Za-z0-9]{20,}",
+    "API key": r"\bsk-[A-Za-z0-9_-]{20,}",
+    "AWS access key or principal ID": (
+        r"(?-i:\b(?:AKIA|ASIA|ABIA|ACCA|AIDA|AROA|AGPA|AIPA|ANPA|ANVA|APKA|ASCA)[0-9A-Z]{16}\b)"
+    ),
+    "AWS secret or session token": (
+        r"\baws_(?:secret_access_key|session_token)[\"']?\s*[=:]\s*[\"']?[A-Za-z0-9/+=]{16,}"
+        r"|(?-i:\b(?:IQoJb3JpZ2luX2Vj|FwoGZXIvYXdzE)[A-Za-z0-9/+=]{8,})"
+    ),
+    "Slack token or webhook": (
+        r"\bxox[abposr]-[A-Za-z0-9-]{10,}|\bhooks\.slack\.com/services/[A-Za-z0-9]+"
+    ),
+    "Google API key": r"(?-i:\bAIza[0-9A-Za-z_-]{35})",
+    "JSON web token": r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}",
+    "private key": r"BEGIN [A-Z ]*PRIVATE KEY",
+}
+GENERIC_LEAK_PATTERNS: dict[str, str] = {
+    "this machine's home directory": re.escape(str(HOME)),
+    "home directory path": r"/(?:local/home|home|Users)/[A-Za-z0-9_.-]+|\b[A-Z]:\\Users\\",
+    "AWS account number": (
+        rf"\b(?!(?:{_EXAMPLE_ACCOUNT})\b)\d{{12}}\b|\b\d{{4}}-\d{{4}}-\d{{4}}\b"
+    ),
+    "ARN": rf"\barn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:(?!(?:{_EXAMPLE_ACCOUNT}):)[^\s\"'`)]*",
+    "S3 bucket": r"\bs3://(?!bucket(?![\w.-]))[a-z0-9][a-z0-9.-]*",
+    "internal hostname": (
+        r"\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:corp|internal|intranet|lan|localdomain)\b(?![.-]?\w)"
+        r"|\b[a-z0-9-]+\.(?:corp|internal|intranet)\.[a-z0-9-]+"
+        r"|\b(?:ip|ec2)-\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3}\b"
+    ),
+    "intranet URL": (
+        r"\bhttps?://(?!localhost(?![a-z0-9.-]))[a-z0-9-]+(?![a-z0-9.-])"
+        r"|(?<![\w/.-])go/(?!no-go(?![a-z0-9_-]))[a-z0-9_-]+"
+    ),
+    "email address": (
+        rf"(?<![\w.%+-])(?!(?:{re.escape(PUBLIC_EMAIL)}|(?:noreply|git)@github\.com){_DOMAIN_END})"
+        r"[a-z0-9._%+-]+@(?!(?:[a-z0-9-]+\.)*(?:example\.(?:com|net|org)|example|test|invalid"
+        rf"|localhost){_DOMAIN_END})[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{{2,}}\b"
+    ),
+    "IP address": (
+        rf"\b(?!(?:127|0|169\.254|255|192\.0\.2|198\.51\.100|203\.0\.113)\.)"
+        rf"{_OCTET}(?:\.{_OCTET}){{3}}\b"
+    ),
+}
+EVERGREEN_PATHS = re.compile(
+    r"(?:AGENTS|README)\.md|instructions/[^/]+\.md|claude/agents/[^/]+\.md"
+    r"|claude/skills/[^/]+/(?:references/)?[^/]+\.md"
+)
+EVERGREEN_PATTERNS: dict[str, str] = {
+    "date": (
+        r"\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\d|3[01]))?\b"
+        r"|\b(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\b"
+        r"|(?<![\d-])(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b"
+        r"|\b\d{1,2}/\d{1,2}/(?:\d{4}|\d{2})\b"
+        rf"|(?-i:\b{_MONTH}\.? \d{{1,2}}(?:st|nd|rd|th)?\b|\b\d{{1,2}}(?:st|nd|rd|th)? {_MONTH}\b"
+        rf"|\b{_MONTH},? (?:19|20)\d{{2}}\b|\b{_WEEKDAY},? (?:\d|{_MONTH}))"
+    ),
+    "history wording": (
+        rf"\bas of\b|\bsince (?:v?\d|last\b|(?-i:{_MONTH})\b)"
+        r"|\b(?:previously|formerly|originally|historically)\b|\bchange ?log\b|\brelease notes\b"
+        r"|(?<!\bis )(?<!\bare )(?<!\bbe )(?<!\bwas )(?<!\bwere )(?<!\bbeen )(?<!\bget )\bused to\b"
+    ),
+    "ticket or task ID": r"(?-i:\b(?:TASK|BUG|ISSUE|TICKET|PR|CR)-\d+\b)",
+    "commit hash or UUID": (
+        r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b"
+        r"|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b"
+    ),
+}
+# A date inside a link names the page it points to, not the history of a rule; a link ends at Markdown's delimiters.
+URL = re.compile(r"\bhttps?://[^\s)\]>]+")
+# A \b in a leak pattern also fires between a letter or digit and an underscore, so a name inside an identifier matches.
+IDENTIFIER_BOUNDARY = r"(?:\b|(?<=_)(?=[^\W_])|(?<=[^\W_])(?=_))"
+# The tokens a boundary rewrite keeps whole: a character class, where \b is a backspace, a comment, and an escape.
+REGEX_TOKEN = re.compile(r"\[\^?\]?(?:\\.|[^\]\\])*\]|\(\?#[^)]*\)|\\.")
+# Under re.IGNORECASE these letters also match "i" and "s", which str.lower() leaves as they are.
+IGNORECASE_FOLD = str.maketrans({"ı": "i", "ſ": "s"})
+QUANTIFIER = re.compile(r"(?:([?*+])|\{(\d+),?\d*\})[?+]?")
+SCOPED_FLAGS = re.compile(r"\(\?([aiLmsux]*)(?:-([imsx]*))?:")
+LOOKAROUNDS = ("(?=", "(?!", "(?<=", "(?<!")
+
+
+class LeakPattern(NamedTuple):
+    """A compiled regex, and the lowercase literals one of which every match contains (none if unknown)."""
+
+    literals: tuple[str, ...]
+    regex: re.Pattern[str]
+
+
+Patterns = dict[str, LeakPattern]
+Literals = Optional[frozenset[str]]
+
+
+class TooComplex(Exception):
+    """The regex uses syntax that required_literals does not model, so the scan runs it on every line."""
+
+
 IGNORED_NAMES = {"__pycache__", ".pytest_cache", ".git", ".private"}
 
 
@@ -149,15 +264,183 @@ def copy_redacted(source: Path, destination: Path) -> None:
     write_text(destination, redact(source.read_text()), source)
 
 
-def load_forbidden_patterns() -> list[str]:
+def required_literals(pattern: str) -> tuple[str, ...]:
+    """Lowercase literals one of which every match of the regex contains, so a substring search can rule a line out.
+
+    Python's re runs hundreds of case-insensitive patterns slowly, and most lines hold none of their literals. The
+    parse models literals, escapes, classes, groups, lookarounds, alternation and quantifiers, and gives up, returning
+    no literals, on anything else.
+    """
+    try:
+        literals, end = _alternation(pattern, 0)
+    except (TooComplex, RecursionError):
+        return ()
+    if not literals or end != len(pattern) or not all(map(str.isascii, literals)):
+        return ()
+    return tuple(sorted(literals))
+
+
+def _alternation(pattern: str, index: int) -> tuple[Literals, int]:
+    branches = []
+    while True:
+        literals, index = _sequence(pattern, index)
+        branches.append(literals)
+        if pattern[index : index + 1] != "|":
+            break
+        index += 1
+    if any(branch is None for branch in branches):
+        return None, index
+    return frozenset().union(*branches), index
+
+
+def _longer(current: Literals, candidate: Literals) -> Literals:
+    """The more selective of two literal sets: the one whose shortest literal is longer."""
+    if not candidate or not all(candidate):
+        return current
+    if not current or min(map(len, candidate)) > min(map(len, current)):
+        return candidate
+    return current
+
+
+def _sequence(pattern: str, index: int) -> tuple[Literals, int]:
+    best: Literals = None
+    run = ""
+    while index < len(pattern) and pattern[index] not in "|)":
+        kind, literals, index = _atom(pattern, index)
+        minimum, quantified, index = _quantifier(pattern, index)
+        if kind == "literal" and minimum >= 1:
+            run += next(iter(literals))
+            if quantified:
+                best, run = _longer(best, frozenset({run})), ""
+            continue
+        best, run = _longer(best, frozenset({run})), ""
+        if kind == "group" and minimum >= 1:
+            best = _longer(best, literals)
+    return _longer(best, frozenset({run})), index
+
+
+def _quantifier(pattern: str, index: int) -> tuple[int, bool, int]:
+    """The fewest times the preceding atom repeats, whether a quantifier follows it, and the index after it."""
+    if pattern[index : index + 1] not in ("?", "*", "+", "{"):
+        return 1, False, index
+    match = QUANTIFIER.match(pattern, index)
+    if match is None:
+        raise TooComplex(pattern)
+    symbol = match.group(1)
+    minimum = int(match.group(2)) if symbol is None else int(symbol == "+")
+    return minimum, True, match.end()
+
+
+def _group(pattern: str, index: int) -> tuple[Literals, int]:
+    literals, index = _alternation(pattern, index)
+    if pattern[index : index + 1] != ")":
+        raise TooComplex(pattern)
+    return literals, index + 1
+
+
+def _class_end(pattern: str, index: int) -> int:
+    index += 2 if pattern[index + 1 : index + 2] == "^" else 1
+    index += 1 if pattern[index : index + 1] == "]" else 0
+    while index < len(pattern) and pattern[index] != "]":
+        index += 2 if pattern[index] == "\\" else 1
+    if index >= len(pattern):
+        raise TooComplex(pattern)
+    return index + 1
+
+
+def _atom(pattern: str, index: int) -> tuple[str, Literals, int]:
+    """The kind of the atom at index (literal, group, class or zero-width), its literals, and the index after it."""
+    char = pattern[index]
+    if char == "(":
+        if pattern.startswith(LOOKAROUNDS, index):
+            _, index = _group(pattern, index + (4 if pattern[index + 2] == "<" else 3))
+            return "zero-width", None, index
+        flags = SCOPED_FLAGS.match(pattern, index)
+        if flags is not None and "x" in flags.group(1) + (flags.group(2) or ""):
+            raise TooComplex(pattern)
+        if flags is not None:
+            literals, index = _group(pattern, flags.end())
+        elif pattern.startswith("(?P<", index) and ">" in pattern[index:]:
+            literals, index = _group(pattern, pattern.index(">", index) + 1)
+        elif pattern.startswith("(?", index):
+            raise TooComplex(pattern)
+        else:
+            literals, index = _group(pattern, index + 1)
+        return "group", literals, index
+    if char == "[":
+        return "class", None, _class_end(pattern, index)
+    if char == "\\":
+        escaped = pattern[index + 1 : index + 2]
+        if escaped in ("b", "B", "A", "Z"):
+            return "zero-width", None, index + 2
+        if escaped and escaped in "dDwWsSafnrtv":
+            return "class", None, index + 2
+        if not escaped or escaped.isalnum():
+            raise TooComplex(pattern)
+        return "literal", frozenset({escaped.lower()}), index + 2
+    if char in "^$":
+        return "zero-width", None, index + 1
+    if char == ".":
+        return "class", None, index + 1
+    if char in "*+?{":
+        raise TooComplex(pattern)
+    return "literal", frozenset({char.lower()}), index + 1
+
+
+def with_boundary(pattern: str, boundary: str) -> str:
+    """The pattern with each word boundary outside a character class or comment replaced by `boundary`."""
+    return REGEX_TOKEN.sub(
+        lambda token: boundary if token.group(0) == r"\b" else token.group(0), pattern
+    )
+
+
+def compile_patterns(patterns: dict[str, str], boundary: str = r"\b") -> Patterns:
+    """Each pattern with its word boundaries replaced by `boundary`, and the literals that gate it."""
+    return {
+        label: LeakPattern(
+            regex=re.compile(with_boundary(pattern, boundary), re.IGNORECASE),
+            literals=required_literals(pattern),
+        )
+        for label, pattern in patterns.items()
+    }
+
+
+PUBLIC_LEAK_PATTERNS = compile_patterns(
+    {**SECRET_PATTERNS, **GENERIC_LEAK_PATTERNS}, IDENTIFIER_BOUNDARY
+)
+EVERGREEN_TEXT_PATTERNS = compile_patterns(EVERGREEN_PATTERNS)
+
+
+def load_leak_patterns() -> Patterns:
+    """The generic leak classes and the private names, each keyed by the label a finding reports."""
     private_patterns = [
-        line for line in PRIVATE_PATTERNS_FILE.read_text().splitlines() if line.strip()
+        line
+        for path in [PRIVATE_PATTERNS_FILE, *sorted(PRIVATE_PATTERNS_DIR.glob("*.txt"))]
+        for line in path.read_text().splitlines()
+        if line.strip()
     ]
     if not private_patterns:
         raise ValueError(
             f"{PRIVATE_PATTERNS_FILE} is empty; it must list the private names to check for"
         )
-    return GENERIC_FORBIDDEN_PATTERNS + private_patterns
+    private = compile_patterns(
+        {f"private pattern {pattern!r}": pattern for pattern in private_patterns},
+        IDENTIFIER_BOUNDARY,
+    )
+    return {**PUBLIC_LEAK_PATTERNS, **private}
+
+
+def load_exceptions(path: Path) -> set[tuple[str, str]]:
+    """The (path, text) pairs a tab-separated exception file lists, each with its reason; a missing file lists none."""
+    if not path.exists():
+        return set()
+    rows = [line.split("\t") for line in path.read_text().splitlines() if line.strip()]
+    malformed_rows = [
+        row for row in rows if len(row) != 3 or not all(field.strip() for field in row)
+    ]
+    if malformed_rows:
+        raise ValueError(f"{path} rows must be path<TAB>text<TAB>reason, got {malformed_rows}")
+    return {(relative, text) for relative, text, _reason in rows}
 
 
 def git(*args: str) -> str:
@@ -167,8 +450,22 @@ def git(*args: str) -> str:
     ).stdout
 
 
-def matching_patterns(line: str, patterns: list[str]) -> list[str]:
-    return [pattern for pattern in patterns if re.search(pattern, line, flags=re.IGNORECASE)]
+def findings(lines: list[str], patterns: Patterns) -> list[tuple[int, str, str]]:
+    """Each (line index, label, matched text) in the lines; a pattern runs only on lines holding one of its literals."""
+    lowered = [line.lower().translate(IGNORECASE_FOLD) for line in lines]
+    block = "\n".join(lowered)
+    found = []
+    for label, (literals, regex) in patterns.items():
+        if literals and not any(literal in block for literal in literals):
+            continue
+        for index, line in enumerate(lines):
+            if not literals or any(literal in lowered[index] for literal in literals):
+                found += [(index, label, match.group(0)) for match in regex.finditer(line)]
+    return sorted(found)
+
+
+def describe(label: str, text: str) -> str:
+    return label if label in SECRET_PATTERNS else f"{label} {text!r}"
 
 
 def publishable_files() -> list[Path]:
@@ -179,47 +476,91 @@ def publishable_files() -> list[Path]:
 
 
 def scan_for_leaks() -> list[str]:
-    forbidden_patterns = load_forbidden_patterns()
+    """Leaks in every publishable file, and dates or history in its instruction and skill text."""
+    leak_patterns = load_leak_patterns()
+    allowed = load_exceptions(PRIVATE_ALLOWED_MATCHES_FILE)
+    dated_allowed = load_exceptions(DATED_ALLOWED_FILE)
     leaks = []
     for path in publishable_files():
-        for line_number, line in enumerate(path.read_text().splitlines(), start=1):
-            for pattern in matching_patterns(line, forbidden_patterns):
-                leaks.append(f"{path.relative_to(REPO_ROOT)}:{line_number}: matches {pattern!r}")
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        lines = path.read_text().splitlines()
+        found = [
+            (index, label, text)
+            for index, label, text in findings(lines, leak_patterns)
+            if (relative, text) not in allowed
+        ]
+        if EVERGREEN_PATHS.fullmatch(relative):
+            without_links = [URL.sub("", line) for line in lines]
+            found += [
+                (index, label, text)
+                for index, label, text in findings(without_links, EVERGREEN_TEXT_PATTERNS)
+                if (relative, lines[index]) not in dated_allowed
+            ]
+        leaks += [
+            f"{relative}:{index + 1}: {describe(label, text)}"
+            for index, label, text in sorted(found)
+        ]
     return leaks
+
+
+def added_lines(commit: str) -> list[tuple[str, str]]:
+    """Each (path, line) the commit adds, against its first parent for a merge."""
+    diff = git(
+        "show",
+        "--format=",
+        "--unified=0",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-prefix",
+        "--diff-merges=first-parent",
+        commit,
+    )
+    added = []
+    path, in_hunk = "", False
+    for line in diff.splitlines():
+        if line.startswith("diff --git "):
+            in_hunk = False
+        elif line.startswith("@@"):
+            in_hunk = True
+        elif not in_hunk and line.startswith("+++ "):
+            path = line[len("+++ ") :]
+        elif in_hunk and line.startswith("+"):
+            added.append((path, line[1:]))
+    return added
 
 
 def scan_commits(commits: list[str]) -> list[str]:
-    """Leaks in each commit's message and added lines, so a leak that a later commit deleted still counts."""
-    forbidden_patterns = load_forbidden_patterns()
+    """Leaks in each commit's identities, message and added lines, so a leak a later commit deleted still counts.
+
+    Dates and history wording are checked only in the tree: once a later commit removes them, they publish nothing.
+    """
+    leak_patterns = load_leak_patterns()
+    allowed = load_exceptions(PRIVATE_ALLOWED_MATCHES_FILE)
     leaks = []
     for commit in commits:
-        for line_number, line in enumerate(
-            git("log", "-1", "--format=%B", commit).splitlines(), start=1
-        ):
-            for pattern in matching_patterns(line, forbidden_patterns):
-                leaks.append(f"{commit} message line {line_number}: matches {pattern!r}")
-        diff = git(
-            "show",
-            "--format=",
-            "--unified=0",
-            "--no-color",
-            "--no-ext-diff",
-            "--no-prefix",
-            "--diff-merges=first-parent",
-            commit,
-        )
-        path, in_hunk = "", False
-        for line in diff.splitlines():
-            if line.startswith("diff --git "):
-                in_hunk = False
-            elif line.startswith("@@"):
-                in_hunk = True
-            elif not in_hunk and line.startswith("+++ "):
-                path = line[len("+++ ") :]
-            elif in_hunk and line.startswith("+"):
-                for pattern in matching_patterns(line[1:], forbidden_patterns):
-                    leaks.append(f"{commit} {path}: added line matches {pattern!r}")
+        identities = git(
+            "log", "-1", "--format=author %an <%ae>%ncommitter %cn <%ce>", commit
+        ).splitlines()
+        leaks += [
+            f"{commit} {identities[index].split(' ', 1)[0]}: {describe(label, text)}"
+            for index, label, text in findings(identities, leak_patterns)
+        ]
+        message = git("log", "-1", "--format=%B", commit).splitlines()
+        leaks += [
+            f"{commit} message line {index + 1}: {describe(label, text)}"
+            for index, label, text in findings(message, leak_patterns)
+        ]
+        added = added_lines(commit)
+        leaks += [
+            f"{commit} {added[index][0]}: added line {describe(label, text)}"
+            for index, label, text in findings([line for _, line in added], leak_patterns)
+            if (added[index][0], text) not in allowed
+        ]
     return leaks
+
+
+def history_commits() -> list[str]:
+    return git("rev-list", "--branches", "--tags", "--remotes").split()
 
 
 def fail_on_leaks(leaks: list[str], advice: str) -> None:
@@ -316,7 +657,12 @@ def main() -> None:
         "--check-commits",
         nargs="+",
         metavar="SHA",
-        help="scan each commit's message and added lines; exit 1 on any match",
+        help="scan each commit's identities, message and added lines; exit 1 on any match",
+    )
+    mode.add_argument(
+        "--check-history",
+        action="store_true",
+        help="scan every commit on any branch, remote-tracking branch or tag; exit 1 on any match",
     )
     mode.add_argument(
         "--list-repo-owned",
@@ -331,6 +677,10 @@ def main() -> None:
     elif args.check_commits:
         fail_on_leaks(scan_commits(args.check_commits), "rewrite these commits before pushing")
         logger.info("No sensitive patterns found in %d commits", len(args.check_commits))
+    elif args.check_history:
+        commits = history_commits()
+        fail_on_leaks(scan_commits(commits), "rewriting published history is the owner's call")
+        logger.info("No sensitive patterns found in %d commits", len(commits))
     elif args.list_repo_owned:
         print("\n".join(f"{repo_path}\t{live_path}" for repo_path, live_path in REPO_OWNED.items()))
     else:

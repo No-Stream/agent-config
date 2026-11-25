@@ -47,7 +47,7 @@ From this directory:
 ./rescore.sh
 ```
 
-It rebuilds the manifest, scores every new or changed text with `desklib` and `gpttrace` on the CPU, and writes the summaries to `.private/eval/detectors/` at the repo root. A text keeps its old score when its prepared text and the detector's window are unchanged, so adding texts and rerunning scores only the new ones, and a new model revision does not rescore old texts. The CPU step runs under `heavy`, a local job wrapper that caps threads, memory and run time, and the other steps run under `heavy --light`; set `CPU_LAUNCHER=""` or `LIGHT_LAUNCHER=""` to run those steps directly. Scoring many new texts on the CPU takes a while, so start the script in tmux:
+It rebuilds the manifest, scores every new or changed text with `desklib` and `gpttrace` on the CPU, and writes the summaries to `.private/eval/detectors/` at the repo root. A text keeps its old score when its prepared text and the detector's window are unchanged, so adding texts and rerunning scores only the new ones, and a new model revision does not rescore old texts. Each step runs directly; on a shared machine, set `CPU_LAUNCHER` to the command prefix of a job wrapper that caps the CPU step's threads and memory, and `LIGHT_LAUNCHER` to the one for the other steps. Scoring many new texts on the CPU takes a while, so start the script in tmux:
 
 ```sh
 tmux new-session -d -s rescore "set -o pipefail; ./rescore.sh 2>&1 | tee ~/logs/rescore.log; echo EXITCODE=\$? >> ~/logs/rescore.log"
@@ -56,7 +56,7 @@ tmux new-session -d -s rescore "set -o pipefail; ./rescore.sh 2>&1 | tee ~/logs/
 Binoculars and Fast-DetectGPT need a GPU, so they run on their own, in a SageMaker Processing job that takes 10 to 30 minutes. Rerun `./rescore.sh` afterwards to put their scores in the summaries. Their last run, on 2026-11-20, came before the pairwise passages were regenerated, so those passages have no current Binoculars or Fast-DetectGPT score. `summarize.py` leaves out any score of an earlier version of a text, and each detector's section says how many texts have a current score. The skill itself runs no detector, and the pairwise analysis compares the person's grades with `desklib` and `gpttrace` scores only, so nothing waits on this job.
 
 ```sh
-heavy --light -- uv run --upgrade sagemaker_job.py run
+uv run --upgrade sagemaker_job.py run
 ```
 
 The steps, each also runnable alone with `uv run --upgrade`:

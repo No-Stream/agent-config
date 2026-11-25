@@ -192,5 +192,5 @@ class TestSummary:
         assert "| bheijden | human | 4 |" in markdown
         assert (
             "8 of 9 texts have a current score; "
-            "`heavy --light -- uv run --upgrade sagemaker_job.py run` scores the rest."
+            "`uv run --upgrade sagemaker_job.py run` scores the rest."
         ) in markdown
