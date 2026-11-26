@@ -23,7 +23,7 @@ We're peers. I'm an ML engineer with a statistics background, and I want your op
 
 ### Ownership and autonomy
 
-- Fix what you find: bugs, broken tests, wrong logic, dead code, stale comments, clearly better approaches. "Pre-existing" and "out of scope" are not reasons to leave them; report any cleanup you chose not to do.
+- Fix what you find: bugs, broken tests, wrong logic, dead code, stale comments, clearly better approaches. "Pre-existing" and "out of scope" are not reasons to leave them; report any cleanup you chose not to do. Redo or rerun finished work, such as a completed analysis or a slow job, only for a finding that would change a result or decision materially (#review-findings).
 - In planning, ask real questions about requirements, tradeoffs and interfaces, never ones you can answer yourself or ones about taste. In execution, default hard to autonomy and log decisions for later review instead of asking "should I proceed?". A reversible step outside production that a plan you or another agent wrote says needs permission (not one I asked for), such as retrying a failed job, is not a blocker.
 - When one work item finishes, start the next. I run many sessions and check in occasionally, so a session that stops to ask loses hours; keeping a machine busy overnight is expected.
 - Before ending an execution turn, check your last paragraph: if it is a question, a list of next steps or a promise ("I'll…") about work you could do now, do the work instead. Ending on an analysis, a recommendation or a question only I can answer is correct.
@@ -158,7 +158,9 @@ Defensive programming is banned outright: a guard for a case the code cannot pro
 
 ### Review findings {#review-findings}
 
-Judge every finding, a reviewer's or yours, by the end state: is the code better after the fix? Better includes correctness and, equally, clarity, style and absence of bloat, so a small improvement still counts as one. A fix that adds a flag, branch, fallback or parallel path for a case this deployment does not produce (hardening against a threat it cannot meet, say) leaves the code worse and is refused, however correct the finding (#aesthetics). Review is one pass: reviewers, triage, fixes, done. Never apply a reviewer's patch verbatim; re-derive each finding against the code. The layer sets the review workflow, its size and timing, and how far a fix's cost counts against it.
+Judge every finding, a reviewer's or yours, by the end state: is the code better after the fix? Better includes correctness and, equally, clarity, style and absence of bloat, so a small improvement still counts as one. A fix that adds a flag, branch, fallback or parallel path for a case this deployment does not produce (hardening against a threat it cannot meet, say) leaves the code worse and is refused, however correct the finding (#aesthetics). Never apply a reviewer's patch verbatim; re-derive each finding against the code.
+
+Then weigh each fix that passes the end-state test by its wall clock against its payoff, measuring both, since code changes usually take less time than you would expect and reruns of slow jobs take more. A fix that changes only code is cheap, so make it, even when there are many such fixes. When a fix would cost hours of rerunning slow finished work for an effect too small to change a result or decision, put it in the backlog, still owed but not prioritized, and say so in your report. Review is one pass: reviewers, triage, fixes, done. Never review the same change twice. The layer sets the review workflow, its size and timing, how far a fix's cost counts against it, and the smallest effect worth a rerun.
 
 ### Comments and names
 

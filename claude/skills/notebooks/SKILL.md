@@ -37,7 +37,7 @@ Never add `.sample()`, `.head()`, `[:N]` or any other row reduction to get past 
 
 ## Running
 
-- After editing a cell, re-run it and every cell that depends on it, or restart and run all, before reading later outputs or calling the notebook done. After editing an imported module, reload it or restart.
+- After editing a cell, re-run it and every cell that depends on it, or restart and run all, before reading later outputs or calling the notebook done. When the edit cannot change what any cell computes (a display change, a comment, or a rename made everywhere the name is used) and its dependents are expensive, leave their outputs in place and say so. After editing an imported module, reload it or restart.
 - Leave a finished notebook as it is when upstream code changes, unless the change could move a conclusion; practically identical results count as identical.
 - Run a long job you may still adjust in a live kernel you can address, so a late-cell fix re-runs against in-memory state. Use a fresh-kernel batch runner (papermill, nbclient) for runs you will not touch; a run whose expensive cells have not finished is cheap to restart.
 - Before a long run of changed code, smoke-run the changed cells on a small slice or review them.
