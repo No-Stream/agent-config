@@ -7,7 +7,7 @@ from pathlib import Path
 
 def _result(path: str) -> dict:
     text = Path(path).read_text(encoding="utf-8").lower()
-    counts = {"contrast_pairs": text.count("not only"), "placeholder": 0}
+    counts = {"contrast_pairs": text.count("not only"), "weasel": 0}
     return {"score": 100, "counts": counts, "source": path}
 
 

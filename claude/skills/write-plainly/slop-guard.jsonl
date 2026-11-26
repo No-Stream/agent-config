@@ -1,7 +1,6 @@
 {"config": {"bold_header_min": 3, "bold_header_penalty": -5, "bullet_run_min": 6, "bullet_run_penalty": -3, "context_window_chars": 60, "triadic_advice_min": 1000000, "triadic_penalty": 0, "triadic_record_cap": 0}, "rule_type": "slop_guard.rules.paragraph.structural_pattern.StructuralPatternRule"}
 {"config": {"context_window_chars": 60, "penalty": -2}, "rule_type": "slop_guard.rules.sentence.weasel_phrase.WeaselPhraseRule"}
 {"config": {"context_window_chars": 60, "penalty": -10}, "rule_type": "slop_guard.rules.sentence.ai_disclosure.AIDisclosureRule"}
-{"config": {"context_window_chars": 60, "penalty": -5}, "rule_type": "slop_guard.rules.sentence.placeholder.PlaceholderRule"}
 {"config": {"cv_threshold": 0.3, "min_sentences": 5, "penalty": -5}, "rule_type": "slop_guard.rules.passage.rhythm.RhythmRule"}
 {"config": {"density_threshold": 1.0, "penalty": -3, "words_basis": 150.0}, "rule_type": "slop_guard.rules.passage.em_dash_density.EmDashDensityRule"}
 {"config": {"advice_min": 2, "context_window_chars": 60, "penalty": -1, "record_cap": 5}, "rule_type": "slop_guard.rules.sentence.contrast_pair.ContrastPairRule"}
