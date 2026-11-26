@@ -149,7 +149,7 @@ class TestCollectHits:
             "lint_prose": set(lint_prose.MESSAGES),
             "lint_syntax": set(lint_syntax.MESSAGES),
             "sloplint": {"exact-exactly", "never-fires"},
-            "slop-guard": {"contrast_pairs", "placeholder"},
+            "slop-guard": {"contrast_pairs", "weasel"},
         }
 
 
@@ -202,7 +202,7 @@ class TestRender:
             f"- lint_prose: {silent_lint_prose}",
             f"- lint_syntax: {silent_lint_syntax}",
             "- sloplint: never-fires",
-            "- slop-guard: placeholder",
+            "- slop-guard: weasel",
         ]
 
 
